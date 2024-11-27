@@ -4,6 +4,7 @@
 import QtQuick
 import QtQuick.Layouts
 import QtQuick.Controls
+import Qt.labs.qmlmodels
 
 import Muse.Ui
 import Muse.UiComponents
@@ -91,39 +92,53 @@ Item {
 
                 navigation.section: root.navigationSection
                 navigation.order: 1
-                delegate: TrackItem {
-                    item: itemData
-                    isSelected: Boolean(item) ? item.isSelected : false
+                delegate: DelegateChooser {
+                    role: "type"
+                    DelegateChoice {
+                        roleValue: "track"
 
-                    navigation.name: Boolean(item) ? item.title + item.index : ""
-                    navigation.panel: view.navigation
-                    navigation.row: model.index
-                    navigation.accessible.name: Boolean(item) ? item.title : ""
-                    navigation.onActiveChanged: {
-                        if (navigation.active) {
-                            prv.currentItemNavigationName = navigation.name
-                            view.positionViewAtIndex(index, ListView.Contain)
+                        TrackItem {
+                            item: itemData
+                            isSelected: Boolean(item) ? item.isSelected : false
+
+                            navigation.name: Boolean(item) ? item.title + item.index : ""
+                            navigation.panel: view.navigation
+                            navigation.row: model.index
+                            navigation.accessible.name: Boolean(item) ? item.title : ""
+                            navigation.onActiveChanged: {
+                                if (navigation.active) {
+                                    prv.currentItemNavigationName = navigation.name
+                                    view.positionViewAtIndex(index, ListView.Contain)
+                                }
+                            }
+
+                            onIsSelectedChanged: {
+                                if (isSelected)
+                                    root.selectedTrackIndex = index
+                            }
+
+                            onSelectionRequested: function (exclusive) {
+                                tracksModel.selectRow(model.index, exclusive)
+                            }
+
+                            onOpenEffectsRequested: {
+                                root.selectedTrackIndex = index
+                                root.openEffectsRequested()
+                            }
+
+                            Component.onCompleted: {
+                                mousePressed.connect(dragHandler.startDrag)
+                                mouseReleased.connect(dragHandler.endDrag)
+                                mouseMoved.connect(dragHandler.onMouseMove)
+                            }
                         }
                     }
-
-                    onIsSelectedChanged: {
-                        if (isSelected)
-                            root.selectedTrackIndex = index
-                    }
-
-                    onSelectionRequested: function (exclusive) {
-                        tracksModel.selectRow(model.index, exclusive)
-                    }
-
-                    onOpenEffectsRequested: {
-                        root.selectedTrackIndex = index
-                        root.openEffectsRequested()
-                    }
-
-                    Component.onCompleted: {
-                        mousePressed.connect(dragHandler.startDrag)
-                        mouseReleased.connect(dragHandler.endDrag)
-                        mouseMoved.connect(dragHandler.onMouseMove)
+                }
+                DelegateChoice {
+                    roleValue: "gap"
+                    Item {
+                        width: tracksClipsView.width
+                        height: 228
                     }
                 }
             }

@@ -354,7 +354,8 @@ void TracksListModel::setItemsSelected(const QModelIndexList& indexes, bool sele
 QHash<int, QByteArray> TracksListModel::roleNames() const
 {
     static const QHash<int, QByteArray> roles = {
-        { rItemData, "itemData" }
+        { rItemData, "itemData" },
+        { ItemType, "type" }
     };
 
     return roles;
@@ -362,8 +363,21 @@ QHash<int, QByteArray> TracksListModel::roleNames() const
 
 QVariant TracksListModel::data(const QModelIndex& index, int role) const
 {
-    if (!index.isValid() || index.row() >= rowCount() || role != rItemData) {
+    if (!index.isValid() || index.row() >= rowCount() || (role != rItemData && role != ItemType)) {
         return QVariant();
+    }
+
+    if (index.row() == m_trackList.size()) {
+        switch (role) {
+        case ItemType:
+            return "gap";
+        }
+        return QVariant();
+    }
+
+    switch (role) {
+    case ItemType:
+        return "track";
     }
 
     return QVariant::fromValue(m_trackList.at(index.row()));
@@ -372,7 +386,7 @@ QVariant TracksListModel::data(const QModelIndex& index, int role) const
 int TracksListModel::rowCount(const QModelIndex& parent) const
 {
     UNUSED(parent);
-    return m_trackList.count();
+    return m_trackList.count() + 1;
 }
 
 bool TracksListModel::isMovingUpAvailable() const

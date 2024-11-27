@@ -1,5 +1,6 @@
 import QtQuick
 import QtQuick.Controls
+import Qt.labs.qmlmodels
 
 import Muse.Ui
 import Muse.UiComponents
@@ -340,38 +341,51 @@ Rectangle {
 
                 model: tracksModel
 
-                delegate: TrackClipsItem {
-                    width: tracksClipsView.width
-                    context: timeline.context
-                    canvas: content
-                    trackId: model.trackId
-                    isDataSelected: model.isDataSelected
-                    isTrackSelected: model.isTrackSelected
+                delegate: DelegateChooser {
+                    role: "type"
+                    DelegateChoice {
+                    roleValue: "track"
+                        TrackClipsItem {
+                            width: tracksClipsView.width
+                            context: timeline.context
+                            canvas: content
+                            trackId: model.trackId
+                            isDataSelected: model.isDataSelected
+                            isTrackSelected: model.isTrackSelected
 
-                    onTrackItemMousePositionChanged: function(xWithinTrack, yWithinTrack, clipKey) {
-                        timeline.updateCursorPosition(xWithinTrack)
+                            onTrackItemMousePositionChanged: function(xWithinTrack, yWithinTrack, clipKey) {
+                                timeline.updateCursorPosition(xWithinTrack)
 
-                        if (!root.clipHovered) {
-                            root.clipHovered = true
+                                if (!root.clipHovered) {
+                                    root.clipHovered = true
+                                }
+                                root.hoveredClipKey = clipKey
+                            }
+
+                            onClipSelectedRequested: {
+                                selectionController.resetDataSelection()
+                                clipsSelection.visible = false
+                            }
+
+                            onRequestSelectionContextMenu: function(x, y) {
+                                selectionContextMenuLoader.show(Qt.point(x + canvasIndent.width, y + timeline.height), selectionContextMenuModel.items)
+                            }
+
+                            onSelectionDraged: function(x1, x2, completed) {
+                                selectionController.onSelectionDraged(x1, x2, completed)
+                            }
+
+                            onSeekToX: function(x) {
+                                playCursorController.seekToX(x)
+                            }
                         }
-                        root.hoveredClipKey = clipKey
                     }
-
-                    onClipSelectedRequested: {
-                        selectionController.resetDataSelection()
-                        clipsSelection.visible = false
-                    }
-
-                    onRequestSelectionContextMenu: function(x, y) {
-                        selectionContextMenuLoader.show(Qt.point(x + canvasIndent.width, y + timeline.height), selectionContextMenuModel.items)
-                    }
-
-                    onSelectionDraged: function(x1, x2, completed) {
-                        selectionController.onSelectionDraged(x1, x2, completed)
-                    }
-
-                    onSeekToX: function(x) {
-                        playCursorController.seekToX(x)
+                    DelegateChoice {
+                        roleValue: "gap"
+                        Item {
+                            width: tracksClipsView.width
+                            height: 228
+                        }
                     }
                 }
 

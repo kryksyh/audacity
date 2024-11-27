@@ -85,7 +85,8 @@ private slots:
 
 private:
     enum RoleNames {
-        rItemData = Qt::UserRole + 1
+        rItemData = Qt::UserRole + 1,
+        ItemType,
     };
 
     bool isProjectOpened() const;

@@ -138,12 +138,20 @@ void TracksListClipsModel::load()
 
 int TracksListClipsModel::rowCount(const QModelIndex&) const
 {
-    return static_cast<int>(m_trackList.size());
+    return static_cast<int>(m_trackList.size() + 1);
 }
 
 QVariant TracksListClipsModel::data(const QModelIndex& index, int role) const
 {
     if (!index.isValid()) {
+        return QVariant();
+    }
+
+    if (index.row() == m_trackList.size()) {
+        switch (role) {
+        case ItemType:
+            return "gap";
+        }
         return QVariant();
     }
 
@@ -156,6 +164,9 @@ QVariant TracksListClipsModel::data(const QModelIndex& index, int role) const
     }
     case IsTrackSelectedRole: {
         return muse::contains(selectionController()->selectedTracks(), track.id);
+    }
+    case ItemType: {
+        return "track";
     }
     default:
         break;
@@ -171,7 +182,8 @@ QHash<int, QByteArray> TracksListClipsModel::roleNames() const
         //{ TypeRole, "trackType" },
         { TrackIdRole, "trackId" },
         { IsDataSelectedRole, "isDataSelected" },
-        { IsTrackSelectedRole, "isTrackSelected" }
+        { IsTrackSelectedRole, "isTrackSelected" },
+        { ItemType, "type" }
     };
     return roles;
 }
@@ -237,6 +249,6 @@ void TracksListClipsModel::setTotalTracksHeight(int height)
         return;
     }
 
-    m_totalTracksHeight = height;
+    m_totalTracksHeight = height + 228;
     emit totalTracksHeightChanged();
 }
