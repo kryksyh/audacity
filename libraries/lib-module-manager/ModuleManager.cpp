@@ -92,7 +92,9 @@ void Module::ShowLoadFailureError(const wxString &Error)
          .Format(ShortName, Error));
    wxLogMessage(wxT("Unable to load the module \"%s\". Error: %s"), mName, Error);
 }
-
+#include <dlfcn.h>
+#include <iostream>
+#include <cstdlib>
 bool Module::Load(wxString &deferredErrorMessage)
 {
    deferredErrorMessage.clear();
@@ -113,6 +115,17 @@ bool Module::Load(wxString &deferredErrorMessage)
       // after some other dependency of this module is loaded.  So the
       // error is not immediately reported.
       deferredErrorMessage = wxString(wxSysErrorMsg());
+
+      dlerror();
+
+      void* handle = dlopen(mName.c_str(), RTLD_NOW | RTLD_LOCAL);
+      if (!handle) {
+         const char* err = dlerror();
+         std::cerr << "dlopen failed: " << (err ? err : "Unknown error") << std::endl;
+      } else {
+         std::cout << "dlopen succeeded!" << std::endl;
+      }
+
       return false;
    }
 
@@ -289,8 +302,10 @@ void ModuleManager::TryLoadModules(
       int iModuleStatus = ModuleSettings::GetModuleStatus( file );
       if( iModuleStatus == kModuleDisabled )
          continue;
-      if( iModuleStatus == kModuleFailed )
-         continue;
+      if( iModuleStatus == kModuleFailed ) {
+         iModuleStatus = kModuleEnabled;
+      }
+
       // New module?  You have to go and explicitly enable it.
       if( iModuleStatus == kModuleNew ){
          // To ensure it is noted in config file and so
@@ -380,7 +395,7 @@ void ModuleManager::Initialize()
       errors.clear();
       TryLoadModules(files, decided, errors);
    }
-   while ( errors.size() && numDecided < decided.size() );
+   while ( errors.size() );
 
    // Only now show accumulated errors of modules that failed to load
    for ( const auto &pair : errors ) {
