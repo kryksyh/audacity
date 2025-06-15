@@ -1,0 +1,45 @@
+name: Verify CLA Compliance
+
+on: [pull_request]
+
+jobs:
+  check-commits:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+
+      - name: Install Google API Client
+        run: pip install gspread oauth2client
+
+      - name: Check if author signed the CLA
+        run: |
+          python <<EOF
+          import gspread, json, base64
+          from oauth2client.service_account import ServiceAccountCredentials
+
+          col_id = 4
+          scope = ['https://spreadsheets.google.com/feeds']
+          creds_dict = json.loads(base64.b64decode('${{ secrets.CLA_LIST_CREDENTIALS }}').decode('utf-8'))
+          creds = ServiceAccountCredentials.from_json_keyfile_dict(creds_dict, scope)
+          client = gspread.authorize(creds)
+
+          sheet = client.open_by_key('${{ secrets.CLA_LIST_ID }}').sheet1
+          allowed_emails = set(cell.strip().lower() for cell in sheet.col_values(col_id) if '@' in cell)
+
+          import os, subprocess
+          subprocess.run(['git', 'fetch', 'origin', os.environ['GITHUB_BASE_REF']], check=True)
+          pr_commits = subprocess.check_output([
+              'git', 'log', 'FETCH_HEAD..HEAD', '--pretty=format:%ae'
+          ]).decode().splitlines()
+
+
+          for email in pr_commits:
+              if email.strip().lower() not in allowed_emails:
+                  print(f"Unauthorized commit email: {email}")
+                  exit(1)
+
+          print("All PR authors signed the CLA.")
+          EOF
