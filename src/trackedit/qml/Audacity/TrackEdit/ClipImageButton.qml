@@ -30,16 +30,13 @@ Rectangle {
     id: root
 
     property string source: ""
+    property color unaccentedBorderColor: "transparent"
 
     signal clicked
 
     layer.enabled: true
-    layer.effect: EffectOpacityMask {
-        maskSource: RoundedRectangle {
-            width: root.width
-            height: root.height
-            radius: root.radius
-        }
+    layer.effect: RoundedCornersEffect {
+        radius: root.radius
     }
 
     AnimatedImage {
@@ -54,10 +51,9 @@ Rectangle {
         anchors.fill: parent
 
         color: "transparent"
-        border.color: ui.theme.accentColor
+        border.color: mouseArea.containsMouse ? ui.theme.accentColor : root.unaccentedBorderColor
         border.width: 1
         radius: root.radius
-        visible: mouseArea.containsMouse
     }
 
     MouseArea {
@@ -68,7 +64,7 @@ Rectangle {
         hoverEnabled: true
 
         onClicked: {
-            root.clicked();
+            root.clicked()
         }
     }
 }

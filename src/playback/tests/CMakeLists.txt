@@ -11,6 +11,7 @@ set(MODULE_TEST_SRC
 
     ${CMAKE_CURRENT_LIST_DIR}/mocks/playbackmock.h
     ${CMAKE_CURRENT_LIST_DIR}/mocks/playermock.h
+    ${CMAKE_CURRENT_LIST_DIR}/mocks/playbackconfigurationmock.h
     )
 
 set(MODULE_TEST_LINK
@@ -20,6 +21,8 @@ set(MODULE_TEST_LINK
 
     muse::uicomponents
     muse::ui
+
+    Qt::Quick
     )
 
 set(MODULE_TEST_DATA_ROOT ${CMAKE_CURRENT_LIST_DIR})

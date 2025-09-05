@@ -73,6 +73,8 @@ public:
     bool isNewlyCreated() const override;
     bool isImported() const override;
 
+    muse::String title() const override;
+
     muse::ValNt<bool> needSave() const override;
     muse::Ret canSave() const override;
 
@@ -109,6 +111,7 @@ private:
     muse::io::path_t m_path;
     muse::async::Notification m_pathChanged;
     muse::async::Notification m_displayNameChanged;
+    muse::async::Notification m_needSaveNotification;
 
     bool m_isNewlyCreated = false; /// true if the file has never been saved yet
     bool m_isImported = false;

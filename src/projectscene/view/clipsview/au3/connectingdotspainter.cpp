@@ -57,11 +57,17 @@ void ConnectingDotsPainter::paint(QPainter& painter, const trackedit::ClipKey& c
     for (size_t index = 0; index < waveClip->NChannels(); index++) {
         waveMetrics.height = channelHeight[index];
         samplespainterutils::drawBackground(painter, waveMetrics, params.style, trimLeft);
-        samplespainterutils::drawBaseLine(painter, waveMetrics, params.style);
+        // Draw center line at the middle of the current channel
+        const int centerY = waveMetrics.top + waveMetrics.height / 2;
+        samplespainterutils::drawCenterLine(painter, waveMetrics, params.style, centerY);
         const auto samples = samplespainterutils::getSampleData(*waveClip, index, waveMetrics, dB, dBRange, zoomMax, zoomMin);
         if (samples.size() == 0) {
             continue;
         }
+        if (params.showClipping) {
+            samplespainterutils::drawClippedSamples(samples, waveMetrics, painter, params.style);
+        }
+
         drawConnectingPoints(samples, waveMetrics, painter, params.style);
         waveMetrics.top += waveMetrics.height;
     }

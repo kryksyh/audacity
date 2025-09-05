@@ -11,8 +11,12 @@
 #include "internal/playbackuiactions.h"
 #include "internal/au3/au3playback.h"
 #include "internal/au3/au3trackplaybackcontrol.h"
+
+#include "ui/iinteractiveuriregister.h"
+
 #include "view/common/playbackstatemodel.h"
 #include "view/common/playbackmetermodel.h"
+#include "view/common/metermodel.h"
 #include "view/toolbars/components/timecodemodeselector.h"
 #include "view/toolbars/components/timecodemodel.h"
 #include "view/toolbars/components/bpmmodel.h"
@@ -56,6 +60,10 @@ void PlaybackModule::resolveImports()
     if (ar) {
         ar->reg(m_uiActions);
     }
+    auto ir = ioc()->resolve<muse::ui::IInteractiveUriRegister>(moduleName());
+    if (ir) {
+        ir->registerQmlUri(muse::Uri("audacity://playback/loop_region_in_out"), "Audacity/Playback/dialogs/LoopRegionInOut.qml");
+    }
 }
 
 void PlaybackModule::registerResources()
@@ -72,6 +80,7 @@ void PlaybackModule::registerUiTypes()
     qmlRegisterType<BPMModel>("Audacity.Playback", 1, 0, "BPMModel");
     qmlRegisterType<PlaybackMeterPanelModel>("Audacity.Playback", 1, 0, "PlaybackMeterPanelModel");
     qmlRegisterType<PlaybackMeterModel>("Audacity.Playback", 1, 0, "PlaybackMeterModel");
+    qmlRegisterType<MeterModel>("Audacity.Playback", 1, 0, "MeterModel");
     qmlRegisterUncreatableType<TracksBehaviors>("Audacity.Playback", 1, 0, "SoloBehavior", "Not creatable from QML");
     qmlRegisterUncreatableType<PlaybackQualityPrefs>("Audacity.Playback", 1, 0, "PlaybackQuality", "Not creatable from QML");
     qmlRegisterUncreatableType<DitherTypePrefs>("Audacity.Playback", 1, 0, "DitherType", "Not creatable from QML");
