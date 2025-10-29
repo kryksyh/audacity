@@ -14,6 +14,7 @@ static int gInitializationInstanceId = -1;
 muse::Ret AbstractViewLauncher::doShowEffect(int instanceId, EffectFamily family) const
 {
     muse::UriQuery uri(EFFECT_VIEWER_URI);
+    uri.addParam("instanceId", muse::Val(instanceId));
     uri.addParam("effectFamily", muse::Val(family));
     gInitializationInstanceId = instanceId;
     const auto ret = interactive()->openSync(uri);

@@ -82,6 +82,7 @@ void BuiltinEffectViewLoader::load(QObject* itemParent, QObject* dialogView, boo
     QObject* obj = component.createWithInitialProperties(
     {
         { "parent", QVariant::fromValue(itemParent) },
+        { "instanceId", m_instanceId },
         { "dialogView", QVariant::fromValue(dialogView) },
         { "usedDestructively", usedDestructively }
     });

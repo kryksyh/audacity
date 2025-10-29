@@ -15,7 +15,7 @@ BuiltinEffectBase {
     implicitHeight: row.height
     width: 560
 
-    model: reverb
+    model: ReverbViewModelFactory.createModel(root.instanceId)
 
     QtObject {
         id: prv
@@ -25,12 +25,8 @@ BuiltinEffectBase {
         readonly property int columnSpacing: 32
     }
 
-    ReverbViewModel {
-        id: reverb
-    }
-
     function newParameterValueRequested(key, value) {
-        reverb.setParam(key, value)
+        model.setParam(key, value)
     }
 
     RowLayout {
@@ -68,7 +64,7 @@ BuiltinEffectBase {
                 BigParameterKnob {
                     Layout.fillWidth: true
 
-                    parameter: reverb.paramsList["RoomSize"]
+                    parameter: model.paramsList["RoomSize"]
                     radius: 24
 
                     onNewValueRequested: function (key, newValue) {
@@ -76,13 +72,13 @@ BuiltinEffectBase {
                         value = newValue
                     }
 
-                    onCommitRequested: reverb.commitSettings()
+                    onCommitRequested: model.commitSettings()
                 }
 
                 BigParameterKnob {
                     Layout.fillWidth: true
 
-                    parameter: reverb.paramsList["StereoWidth"]
+                    parameter: model.paramsList["StereoWidth"]
                     radius: 24
 
                     onNewValueRequested: function (key, newValue) {
@@ -90,13 +86,13 @@ BuiltinEffectBase {
                         value = newValue
                     }
 
-                    onCommitRequested: reverb.commitSettings()
+                    onCommitRequested: model.commitSettings()
                 }
 
                 BigParameterKnob {
                     Layout.fillWidth: true
 
-                    parameter: reverb.paramsList["PreDelay"]
+                    parameter: model.paramsList["PreDelay"]
                     radius: 24
 
                     onNewValueRequested: function (key, newValue) {
@@ -104,7 +100,7 @@ BuiltinEffectBase {
                         value = newValue
                     }
 
-                    onCommitRequested: reverb.commitSettings()
+                    onCommitRequested: model.commitSettings()
                 }
             }
         }
@@ -130,56 +126,56 @@ BuiltinEffectBase {
 
                 Layout.fillWidth: true
 
-                parameter: reverb.paramsList["HfDamping"]
+                parameter: model.paramsList["HfDamping"]
 
                 onNewValueRequested: function (key, newValue) {
                     newParameterValueRequested(key, newValue)
                     value = newValue
                 }
 
-                onCommitRequested: reverb.commitSettings()
+                onCommitRequested: model.commitSettings()
             }
 
             ParameterKnob {
 
                 Layout.fillWidth: true
 
-                parameter: reverb.paramsList["Reverberance"]
+                parameter: model.paramsList["modelerance"]
 
                 onNewValueRequested: function (key, newValue) {
                     newParameterValueRequested(key, newValue)
                     value = newValue
                 }
 
-                onCommitRequested: reverb.commitSettings()
+                onCommitRequested: model.commitSettings()
             }
 
             ParameterKnob {
 
                 Layout.fillWidth: true
 
-                parameter: reverb.paramsList["ToneLow"]
+                parameter: model.paramsList["ToneLow"]
 
                 onNewValueRequested: function (key, newValue) {
                     newParameterValueRequested(key, newValue)
                     value = newValue
                 }
 
-                onCommitRequested: reverb.commitSettings()
+                onCommitRequested: model.commitSettings()
             }
 
             ParameterKnob {
 
                 Layout.fillWidth: true
 
-                parameter: reverb.paramsList["ToneHigh"]
+                parameter: model.paramsList["ToneHigh"]
 
                 onNewValueRequested: function (key, newValue) {
                     newParameterValueRequested(key, newValue)
                     value = newValue
                 }
 
-                onCommitRequested: reverb.commitSettings()
+                onCommitRequested: model.commitSettings()
             }
 
             SeparatorLine {
@@ -190,38 +186,38 @@ BuiltinEffectBase {
 
                 Layout.fillWidth: true
 
-                parameter: reverb.paramsList["WetGain"]
+                parameter: model.paramsList["WetGain"]
 
                 onNewValueRequested: function (key, newValue) {
                     newParameterValueRequested(key, newValue)
                     value = newValue
                 }
 
-                onCommitRequested: reverb.commitSettings()
+                onCommitRequested: model.commitSettings()
             }
 
             ParameterKnob {
 
                 Layout.fillWidth: true
 
-                parameter: reverb.paramsList["DryGain"]
+                parameter: model.paramsList["DryGain"]
 
                 onNewValueRequested: function (key, newValue) {
                     newParameterValueRequested(key, newValue)
                     value = newValue
                 }
 
-                onCommitRequested: reverb.commitSettings()
+                onCommitRequested: model.commitSettings()
             }
 
             CheckBox {
                 id: wetOnly
 
-                text: qsTrc("effects/reverb", "Wet only")
-                checked: reverb.wetOnly
+                text: qsTrc("effects/model", "Wet only")
+                checked: model.wetOnly
                 onClicked: function () {
-                    reverb.wetOnly = !reverb.wetOnly
-                    reverb.commitSettings()
+                    model.wetOnly = !model.wetOnly
+                    model.commitSettings()
                 }
             }
 

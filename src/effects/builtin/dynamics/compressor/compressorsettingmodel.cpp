@@ -21,8 +21,8 @@ const CompressorSettingModel::LabelMap labelMap = {
 };
 }
 
-CompressorSettingModel::CompressorSettingModel(QObject* parent)
-    : EffectSettingModelImpl<CompressorEffect>(parent, labelMap, [this](const CompressorEffect& effect) {
+CompressorSettingModel::CompressorSettingModel(const EffectInstanceId instanceId, QObject* parent)
+    : EffectSettingModelImpl<CompressorEffect>(instanceId, parent, labelMap, [this](const CompressorEffect& effect) {
     if (m_paramId == "thresholdDb") {
         return effect.thresholdDb;
     } else if (m_paramId == "makeupGainDb") {

@@ -20,7 +20,7 @@ class BuiltinEffectSettingModel : public BuiltinEffectModel
     Q_PROPERTY(QString unit READ unit CONSTANT FINAL)
 
 public:
-    BuiltinEffectSettingModel(QObject* parent);
+    BuiltinEffectSettingModel(const EffectInstanceId instanceId, QObject* parent);
     ~BuiltinEffectSettingModel() override = default;
 
     QString paramId() const;

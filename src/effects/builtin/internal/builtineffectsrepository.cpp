@@ -263,7 +263,9 @@ void BuiltinEffectsRepository::updateEffectMetaList()
                     false
                     );
         } else if (symbol == ReverbEffect::Symbol) {
-            qmlRegisterType<ReverbViewModel>("Audacity.Effects", 1, 0, "ReverbViewModel");
+            qmlRegisterSingletonType<ReverbViewModelFactory>("Audacity.Effects", 1, 0, "ReverbViewModelFactory", [](QQmlEngine*, QJSEngine*) -> QObject* {
+                return new ReverbViewModelFactory;
+            });
             regView(ReverbEffect::Symbol, u"qrc:/reverb/ReverbView.qml");
             regMeta(desc,
                     muse::mtrc("effects", "Reverb"),

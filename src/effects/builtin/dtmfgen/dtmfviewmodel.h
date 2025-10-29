@@ -17,7 +17,7 @@ class DtmfViewModel : public GeneratorEffectModel
     Q_PROPERTY(double silenceDuration READ silenceDuration NOTIFY silenceDurationChanged)
 
 public:
-    DtmfViewModel();
+    DtmfViewModel(const EffectInstanceId instanceId, QObject* parent);
     virtual ~DtmfViewModel();
 
     bool isApplyAllowed() const override;

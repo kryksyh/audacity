@@ -11,7 +11,7 @@ class CompressorViewModel : public BuiltinEffectModel
     Q_OBJECT
 
 public:
-    CompressorViewModel(QObject* parent = nullptr);
+    CompressorViewModel(const EffectInstanceId instanceId, QObject* parent = nullptr);
 
     Q_INVOKABLE QList<QVariantMap> compressionCurve(int from, int to, int count) const;
 

@@ -11,6 +11,7 @@ Rectangle {
 
     property var dialogView: null
 
+    property int instanceId: -1
     property BuiltinEffectModel model: null
     property bool usesPresets: model ? model.usesPresets : true
     property bool isPreviewing: model ? model.isPreviewing : false

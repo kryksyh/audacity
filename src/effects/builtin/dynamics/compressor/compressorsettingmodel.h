@@ -10,6 +10,6 @@ namespace au::effects {
 class CompressorSettingModel : public EffectSettingModelImpl<CompressorEffect>
 {
 public:
-    CompressorSettingModel(QObject* parent = nullptr);
+    CompressorSettingModel(const EffectInstanceId instanceId, QObject* parent = nullptr);
 };
 }

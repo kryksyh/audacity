@@ -9,8 +9,8 @@
 #include "log.h"
 
 namespace au::effects {
-GraphicEqViewModel::GraphicEqViewModel()
-    : mBandsModel(new GraphicEqBandsModel(this, effect<GraphicEq>()))
+GraphicEqViewModel::GraphicEqViewModel(const EffectInstanceId instanceId, QObject* parent)
+    : BuiltinEffectModel(instanceId, parent), mBandsModel(new GraphicEqBandsModel(parent, effect<GraphicEq>()))
 {
 }
 

@@ -13,7 +13,7 @@ class ReverbViewModel : public BuiltinEffectModel
     Q_PROPERTY(bool wetOnly READ wetOnly WRITE setWetOnly NOTIFY wetOnlyChanged FINAL)
 
 public:
-    ReverbViewModel();
+    ReverbViewModel(const EffectInstanceId instanceId, QObject* parent);
 
     QVariantMap paramsList() const;
 
@@ -38,5 +38,15 @@ private:
 
     QVariantMap m_paramsList;
     QMap<QString, Setter> m_setters;
+};
+
+class ReverbViewModelFactory : public QObject
+{
+    Q_OBJECT
+public:
+    Q_INVOKABLE ReverbViewModel* createModel(const EffectInstanceId instanceId)
+    {
+        return new ReverbViewModel(instanceId, this);
+    }
 };
 }

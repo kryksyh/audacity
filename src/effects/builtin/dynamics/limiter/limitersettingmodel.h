@@ -10,6 +10,6 @@ namespace au::effects {
 class LimiterSettingModel : public EffectSettingModelImpl<LimiterEffect>
 {
 public:
-    LimiterSettingModel(QObject* parent = nullptr);
+    LimiterSettingModel(const EffectInstanceId instanceId, QObject* parent = nullptr);
 };
 }

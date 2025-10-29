@@ -8,8 +8,8 @@
 #include "log.h"
 
 namespace au::effects {
-CompressorViewModel::CompressorViewModel(QObject* parent)
-    : BuiltinEffectModel{parent}
+CompressorViewModel::CompressorViewModel(const EffectInstanceId instanceId, QObject* parent)
+    : BuiltinEffectModel{instanceId, parent}
 {
 }
 

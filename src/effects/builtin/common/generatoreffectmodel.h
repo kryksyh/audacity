@@ -21,6 +21,7 @@ class GeneratorEffectModel : public BuiltinEffectModel
     Q_PROPERTY(bool isApplyAllowed READ isApplyAllowed NOTIFY isApplyAllowedChanged FINAL)
 
 public:
+    GeneratorEffectModel(const EffectInstanceId instanceId, QObject* parent);
 
     double duration() const;
     void prop_setDuration(double newDuration);

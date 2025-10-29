@@ -263,23 +263,25 @@ EffectStyledDialogView {
 
     Component {
         id: audioUnitViewerComp
-        AudioUnitViewer {
-            height: implicitHeight
-            topPadding: topPanel.height
-            bottomPadding: bbox.implicitHeight + prv.panelMargins * 2
-            sidePadding: prv.viewMargins
-            minimumWidth: prv.minimumWidth
-        }
+        Rectangle {}
+        // AudioUnitViewer {
+        //     height: implicitHeight
+        //     topPadding: topPanel.height
+        //     bottomPadding: bbox.implicitHeight + prv.panelMargins * 2
+        //     sidePadding: prv.viewMargins
+        //     minimumWidth: prv.minimumWidth
+        // }
     }
 
     Component {
         id: vstViewerComp
-        VstViewer {
-            height: implicitHeight
-            topPadding: topPanel.height
-            bottomPadding: bbox.implicitHeight + prv.panelMargins * 2
-            sidePadding: prv.viewMargins
-            minimumWidth: prv.minimumWidth
-        }
+        Rectangle {}
+        // VstViewer {
+        //     height: implicitHeight
+        //     topPadding: topPanel.height
+        //     bottomPadding: bbox.implicitHeight + prv.panelMargins * 2
+        //     sidePadding: prv.viewMargins
+        //     minimumWidth: prv.minimumWidth
+        // }
     }
 }

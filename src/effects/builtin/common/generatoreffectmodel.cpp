@@ -49,6 +49,11 @@ int GeneratorEffectModel::lowerTimeSignature() const
     return e.lowerTimeSignature();
 }
 
+GeneratorEffectModel::GeneratorEffectModel(const EffectInstanceId instanceId, QObject* parent)
+    : BuiltinEffectModel(instanceId, parent)
+{
+}
+
 double GeneratorEffectModel::duration() const
 {
     const auto& e = effect<GeneratorEffect>();

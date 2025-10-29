@@ -25,7 +25,7 @@ protected:
     muse::Inject<au::playback::IPlayback> playback;
 
 public:
-    AbstractEffectViewModel(QObject* parent = nullptr);
+    AbstractEffectViewModel(EffectInstanceId instanceId, QObject* parent = nullptr);
     ~AbstractEffectViewModel() override = default;
 
     Q_INVOKABLE void init();

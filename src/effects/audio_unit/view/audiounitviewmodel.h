@@ -29,7 +29,7 @@ class AudioUnitViewModel : public AbstractEffectViewModel
     muse::Inject<trackedit::IProjectHistory> projectHistory;
 
 public:
-    AudioUnitViewModel(QObject* parent = nullptr);
+    AudioUnitViewModel(const EffectInstanceId instanceId, QObject* parent = nullptr);
     ~AudioUnitViewModel() override;
 
     Q_INVOKABLE void deinit();

@@ -20,8 +20,8 @@ const LimiterSettingModel::LabelMap labelMap = {
 };
 }
 
-LimiterSettingModel::LimiterSettingModel(QObject* parent)
-    : EffectSettingModelImpl<LimiterEffect>(parent, labelMap, [this](const LimiterEffect& effect) {
+LimiterSettingModel::LimiterSettingModel(const EffectInstanceId instanceId, QObject* parent)
+    : EffectSettingModelImpl<LimiterEffect>(instanceId, parent, labelMap, [this](const LimiterEffect& effect) {
     if (m_paramId == "thresholdDb") {
         return effect.thresholdDb;
     } else if (m_paramId == "makeupTargetDb") {

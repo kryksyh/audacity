@@ -26,7 +26,7 @@ public:
     muse::Inject<IEffectsProvider> effectsProvider;
 
 public:
-    BuiltinEffectModel(QObject* parent = nullptr);
+    BuiltinEffectModel(EffectInstanceId instanceId, QObject* parent = nullptr);
 
     QString effectId() const;
 
