@@ -1,0 +1,29 @@
+/*
+* Audacity: A Digital Audio Editor
+*/
+#pragma once
+
+#include "uicomponents/qml/Muse/UiComponents/abstracttoolbarmodel.h"
+
+#include "modularity/ioc.h"
+#include "context/iglobalcontext.h"
+
+#include <QtQml/qqmlregistration.h>
+
+namespace au::projectscene {
+class UndoRedoToolBarModel : public muse::uicomponents::AbstractToolBarModel
+{
+    Q_OBJECT
+    QML_ELEMENT
+
+    muse::Inject<au::context::IGlobalContext> context { this };
+
+public:
+
+    Q_INVOKABLE void load() override;
+
+private:
+
+    bool m_loaded = false;
+};
+}

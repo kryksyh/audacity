@@ -5,6 +5,7 @@
 #define AU_PROJECTSCENE_TRACKTYPES_H
 
 #include <qobjectdefs.h>
+#include <QtQml/qqmlregistration.h>
 
 #include "actions/actiontypes.h"
 #include "global/types/number.h"
@@ -15,6 +16,8 @@ namespace au::projectscene {
 class TrackTypes
 {
     Q_GADGET
+    QML_NAMED_ELEMENT(TrackType)
+    QML_UNCREATABLE("Not creatable from QML")
 
 public:
     //! NOTE: must be in sync with au::trackedit::TrackType
@@ -30,6 +33,8 @@ public:
 class TrackItemKey
 {
     Q_GADGET
+    QML_NAMED_ELEMENT(ClipKey)
+    QML_UNCREATABLE("Not creatable from QML")
 
 public:
 
@@ -139,6 +144,8 @@ enum class TimelineRulerMode {
 class ClipStyles
 {
     Q_GADGET
+    QML_NAMED_ELEMENT(ClipStyle)
+    QML_UNCREATABLE("Not creatable from QML")
 public:
     enum class Style {
         COLORFUL = 0,
@@ -150,6 +157,8 @@ public:
 class DirectionType
 {
     Q_GADGET
+    QML_NAMED_ELEMENT(Direction)
+    QML_UNCREATABLE("Not creatable from QML")
 public:
     enum class Direction {
         Left = 0,
@@ -162,6 +171,8 @@ public:
 class ClipBoundary
 {
     Q_GADGET
+    QML_NAMED_ELEMENT(ClipBoundaryAction)
+    QML_UNCREATABLE("Not creatable from QML")
 public:
     enum class Action {
         Shrink, // trim or time-stretch inward
@@ -174,6 +185,8 @@ public:
 class StereoHeightsPref
 {
     Q_GADGET
+    QML_NAMED_ELEMENT(AsymmetricStereoHeights)
+    QML_UNCREATABLE("Not creatable from QML")
 public:
     enum class AsymmetricStereoHeights {
         ALWAYS = 0,

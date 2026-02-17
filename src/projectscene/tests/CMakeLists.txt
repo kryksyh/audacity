@@ -18,6 +18,7 @@ set(MODULE_TEST_SRC
 
 set(MODULE_TEST_LINK
     projectscene
+    projectscene_qml
     trackedit
     playback
     record
