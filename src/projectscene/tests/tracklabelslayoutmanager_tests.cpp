@@ -3,8 +3,8 @@
  */
 #include <gtest/gtest.h>
 
-#include "projectscene/view/tracksitemsview/tracklabelslayoutmanager.h"
-#include "projectscene/view/tracksitemsview/tracklabelslistmodel.h"
+#include "projectscene/qml/Audacity/ProjectScene/tracksitemsview/tracklabelslayoutmanager.h"
+#include "projectscene/qml/Audacity/ProjectScene/tracksitemsview/tracklabelslistmodel.h"
 
 #include "context/tests/mocks/globalcontextmock.h"
 #include "trackedit/tests/mocks/trackeditprojectmock.h"

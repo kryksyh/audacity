@@ -21,7 +21,6 @@ public:
     void registerResources() override;
     void registerExports() override;
     void resolveImports() override;
-    void registerUiTypes() override;
     void onInit(const muse::IApplication::RunMode& mode) override;
 
 private:
