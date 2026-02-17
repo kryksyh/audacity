@@ -3,7 +3,7 @@
  */
 #include <gtest/gtest.h>
 
-#include "../view/timeline/snaptimeformatter.h"
+#include "../qml/Audacity/ProjectScene/view/timeline/snaptimeformatter.h"
 
 namespace au::projectscene {
 class SnapTimeFormatterTests : public ::testing::Test
