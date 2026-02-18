@@ -9,7 +9,9 @@
 #include "actions/actiontypes.h"
 #include "global/types/number.h"
 #include "trackedit/trackedittypes.h"
+#ifndef AU_PROJECTSCENE_QML_MODULE
 #include "trackedit/dom/track.h"
+#endif
 
 namespace au::projectscene {
 class TrackTypes

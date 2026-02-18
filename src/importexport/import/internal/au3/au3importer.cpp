@@ -18,7 +18,7 @@
 #include "au3wrap/au3types.h"
 #include "au3wrap/internal/wxtypes_convert.h"
 #include "au3wrap/internal/domaccessor.h"
-#include "projectscene/view/tracksitemsview/dropcontroller.h"
+#include "projectscene/qml/Audacity/ProjectScene/view/tracksitemsview/dropcontroller.h"
 #include "trackedit/internal/au3/au3trackdata.h"
 
 using au::trackedit::ITrackDataPtr;

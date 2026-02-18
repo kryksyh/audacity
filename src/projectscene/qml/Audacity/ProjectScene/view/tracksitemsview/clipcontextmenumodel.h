@@ -1,0 +1,47 @@
+/*
+* Audacity: A Digital Audio Editor
+*/
+#pragma once
+
+#include "context/iglobalcontext.h"
+#include "uicomponents/qml/Muse/UiComponents/abstractmenumodel.h"
+
+#include "iprojectsceneconfiguration.h"
+#include "types/projectscenetypes.h"
+
+namespace au::projectscene {
+class ClipContextMenuModel : public muse::uicomponents::AbstractMenuModel
+{
+    Q_OBJECT
+
+    muse::GlobalInject<projectscene::IProjectSceneConfiguration> projectSceneConfiguration;
+
+    muse::Inject<context::IGlobalContext> globalContext{ this };
+
+    Q_PROPERTY(au::projectscene::ClipKey clipKey READ clipKey WRITE setClipKey NOTIFY clipKeyChanged FINAL)
+
+public:
+    ClipContextMenuModel() = default;
+
+    Q_INVOKABLE void load() override;
+    Q_INVOKABLE void handleMenuItem(const QString& itemId) override;
+
+    au::projectscene::ClipKey clipKey() const;
+    void setClipKey(const au::projectscene::ClipKey& newClipKey);
+
+signals:
+    void clipKeyChanged();
+    void clipTitleEditRequested();
+
+private:
+    void onActionsStateChanges(const muse::actions::ActionCodeList& codes) override;
+    void updateStretchEnabledState(muse::uicomponents::MenuItem& item);
+
+    muse::uicomponents::MenuItemList makeClipColourItems();
+    void updateColorCheckedState();
+    void updateColorMenu();
+
+    ClipKey m_clipKey;
+    muse::actions::ActionCodeList m_colorChangeActionCodeList;
+};
+}

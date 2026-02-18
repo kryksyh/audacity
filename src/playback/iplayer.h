@@ -9,7 +9,7 @@
 
 #include "playbacktypes.h"
 
-class TrackList;
+#include "trackedit/dom/track.h"
 namespace au::playback {
 class IPlayer
 {
@@ -59,7 +59,7 @@ public:
     virtual muse::async::Channel<muse::secs_t> playbackPositionChanged() const = 0;
 
     // tracks
-    virtual muse::Ret playTracks(TrackList& trackList, double startTime, double endTime, const PlayTracksOptions& options = {}) = 0;
+    virtual muse::Ret playTracks(au::trackedit::TrackList& trackList, double startTime, double endTime, const PlayTracksOptions& options = {}) = 0;
 };
 
 using IPlayerPtr = std::shared_ptr<IPlayer>;
