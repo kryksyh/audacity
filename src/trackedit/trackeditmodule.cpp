@@ -130,7 +130,7 @@ void TrackeditContext::registerExports()
     m_trackNavigationController = std::make_shared<TrackNavigationController>(iocContext());
     m_trackSpectrogramSettingsUpdater = std::make_shared<TrackSpectrogramSettingsUpdater>(iocContext());
 
-    ioc()->registerExport<ITrackeditProjectCreator>(mname, new Au3TrackeditProjectCreator(iocContext()));
+    globalIoc()->registerExport<ITrackeditProjectCreator>(mname, new Au3TrackeditProjectCreator(iocContext()));
     ioc()->registerExport<ITrackeditInteraction>(mname,
                                                  new TrackeditInteraction(iocContext(), std::make_unique<TrackeditOperationController>(
                                                                               iocContext(), std::make_unique<UndoManager>(iocContext()))));

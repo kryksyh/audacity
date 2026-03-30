@@ -14,7 +14,7 @@
 namespace au::toast {
 class ToastService : public IToastService, public muse::Contextable
 {
-    muse::Inject<IToastProvider> toastProvider { this };
+    muse::GlobalInject<IToastProvider> toastProvider;
 
 public:
     ToastService(muse::modularity::ContextPtr ctx);
