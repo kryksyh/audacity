@@ -37,6 +37,16 @@ set(LOCAL_ROOT_PATH ${FETCHCONTENT_BASE_DIR})
 # work. Empty in a normal git checkout (scripts are fetched instead).
 set(MUSE_DEPS_BUNDLE_DIR "${CMAKE_CURRENT_LIST_DIR}/deps_bundle")
 
+# Pristine source cache (for source/REBUILD builds). Priority: an explicit
+# -DMUSE_DEPS_CACHE, else a pre-existing $MUSE_DEPS_CACHE, else the in-tree
+# vendored sources (offline release tarball), else build_dep_lib's ~/.cache
+# default. Exported to the env so build_dep_lib picks it up without threading.
+if (MUSE_DEPS_CACHE)
+    set(ENV{MUSE_DEPS_CACHE} "${MUSE_DEPS_CACHE}")
+elseif (NOT DEFINED ENV{MUSE_DEPS_CACHE} AND EXISTS "${MUSE_DEPS_BUNDLE_DIR}/sources")
+    set(ENV{MUSE_DEPS_CACHE} "${MUSE_DEPS_BUNDLE_DIR}/sources")
+endif()
+
 function(require_dep name)
     # Manifest entry forms (see DependencyManifest.cmake):
     #   require_dep(<name> <version>)          prebuilt, with source-build fallback
@@ -164,5 +174,14 @@ include(${CMAKE_CURRENT_LIST_DIR}/DependencyManifest.cmake)
 add_custom_target(bundle_deps
     COMMAND ${CMAKE_COMMAND} -P "${CMAKE_CURRENT_LIST_DIR}/BundleDeps.cmake"
     COMMENT "Vendoring muse_deps consume scripts into deps_bundle/ (offline/release)"
+    VERBATIM
+)
+
+# Pre-fetch pristine dependency sources into the cache (optional step 0): lets
+# source/REBUILD builds run offline. Point it at the in-tree bundle to assemble
+# an offline release source tree.
+add_custom_target(prepare_deps_sources
+    COMMAND ${CMAKE_COMMAND} -P "${CMAKE_CURRENT_LIST_DIR}/PrepareDepsSources.cmake"
+    COMMENT "Pre-fetching dependency sources into the cache"
     VERBATIM
 )
