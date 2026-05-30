@@ -1,22 +1,39 @@
-# Audacity dependency version manifest — the single source of truth for which
-# version of each dependency this build uses. muse_deps hosts the recipe for
-# each at <name>/<version>/; populate(<name>) resolves the version from here.
+# Audacity dependency manifest — the single source of truth. One line per dep,
+# declaring its version and how it is obtained:
 #
-# To bump a dependency, change it here only (and ensure muse_deps has that
-# <name>/<version>/ recipe).
+#   require_dep(<name> <version>)           pinned version: prebuilt, else build from source
+#   require_dep(<name> <version> REBUILD)   pinned version: always build from source
+#   require_dep(<name> SYSTEM)              use the system-installed library (no version)
+#
+# Order matters: a dependency must precede anything that links it.
+# Global overrides: -DMUSE_USE_SYSTEM_ALL=ON, -DMUSE_BUILD_ALL=ON, or per-dep
+# -DMUSE_USE_SYSTEM_<NAME>=ON / -DMUSE_BUILD_<NAME>=ON.
 
-set(DEP_VERSION_wxwidgets   "3.2.6")
-set(DEP_VERSION_expat       "2.0.5")
-set(DEP_VERSION_zlib        "1.2.13")
-set(DEP_VERSION_openssl     "1.1.1t")
-set(DEP_VERSION_libcurl     "8.17.0")
-set(DEP_VERSION_ogg         "1.3.5")
-set(DEP_VERSION_vorbis      "1.3.7")
-set(DEP_VERSION_flac        "1.4.2")
-set(DEP_VERSION_opus        "1.5.2")
-set(DEP_VERSION_opusfile    "0.12")
-set(DEP_VERSION_libmp3lame  "3.100")
-set(DEP_VERSION_mpg123      "1.31.2")
-set(DEP_VERSION_wavpack     "5.7.0")
-set(DEP_VERSION_libsndfile  "1.0.31")
-set(DEP_VERSION_portaudio   "19.7.0")
+# Where the dependency recipes/prebuilts come from (raw repo root at a ref).
+set(MUSE_DEPS_URL "https://raw.githubusercontent.com/kryksyh/muse_deps_private/main")
+
+require_dep(expat       2.0.5)
+
+if (NOT OS_IS_LIN)
+    require_dep(zlib    1.2.13)
+endif()
+if (NOT OS_IS_WIN)
+    require_dep(openssl 1.1.1t)
+endif()
+if (AU_USE_LIBCURL)
+    require_dep(libcurl 8.17.0)
+endif()
+
+require_dep(ogg         1.3.5)
+require_dep(vorbis      1.3.7)
+require_dep(flac        1.4.2)
+require_dep(opus        1.5.2)
+require_dep(opusfile    0.12)
+require_dep(libmp3lame  3.100)
+require_dep(mpg123      1.31.2)
+require_dep(wavpack     5.7.0)
+require_dep(libsndfile  1.0.31)
+require_dep(portaudio   19.7.0)
+
+# wxwidgets last: no dependents among our deps, slowest/riskiest source build.
+require_dep(wxwidgets   3.2.6)

@@ -29,25 +29,44 @@ else()
     set(LIB_BUILD_TYPE "debug")
 endif()
 
-set(REMOTE_ROOT_URL https://raw.githubusercontent.com/kryksyh/muse_deps_private/main)
+# MUSE_DEPS_URL (the deps repo root) is set by the manifest, below.
 set(LOCAL_ROOT_PATH ${FETCHCONTENT_BASE_DIR})
 
-# Pinned dependency versions (single source of truth).
-include(${CMAKE_CURRENT_LIST_DIR}/DependencyManifest.cmake)
-
-function(populate name)
-    # Version comes from the manifest (DependencyManifest.cmake) — single source
-    # of truth. The optional 2nd arg names a USE_SYSTEM option.
-    set(version "${DEP_VERSION_${name}}")
-    if (NOT version)
-        message(FATAL_ERROR "[deps] no pinned version for '${name}' in DependencyManifest.cmake")
+function(require_dep name)
+    # Manifest entry forms (see DependencyManifest.cmake):
+    #   require_dep(<name> <version>)          prebuilt, with source-build fallback
+    #   require_dep(<name> <version> REBUILD)  always build from source
+    #   require_dep(<name> SYSTEM)             system library (no version)
+    set(version "")
+    set(mode "prebuilt")
+    if ("${ARGV1}" STREQUAL "SYSTEM")
+        set(mode "system")
+    else()
+        set(version "${ARGV1}")
+        if (ARGC GREATER 2 AND "${ARGV2}" STREQUAL "REBUILD")
+            set(mode "rebuild")
+        endif()
     endif()
-    set(remote_url ${REMOTE_ROOT_URL}/${name}/${version})
-    set(local_path ${LOCAL_ROOT_PATH}/${name})
 
+    # Overrides: global MUSE_USE_SYSTEM_ALL / MUSE_BUILD_ALL, per-dep
+    # MUSE_USE_SYSTEM_<NAME> / MUSE_BUILD_<NAME>.
+    string(TOUPPER ${name} name_upper)
+    if (MUSE_USE_SYSTEM_ALL OR MUSE_USE_SYSTEM_${name_upper})
+        set(mode "system")
+    elseif ((MUSE_BUILD_ALL OR MUSE_BUILD_${name_upper}) AND NOT "${version}" STREQUAL "")
+        set(mode "rebuild")
+    endif()
+
+    if (NOT mode STREQUAL "system" AND "${version}" STREQUAL "")
+        message(FATAL_ERROR "[deps] '${name}' needs a version (or SYSTEM) in DependencyManifest.cmake")
+    endif()
+
+    # Consume script is version-agnostic at <name>/<name>.cmake; the version
+    # (when pinned) is passed to the populate functions for release/recipe paths.
+    set(local_path ${LOCAL_ROOT_PATH}/${name})
     if (NOT EXISTS ${local_path}/${name}.cmake)
         file(MAKE_DIRECTORY ${local_path})
-        file(DOWNLOAD ${remote_url}/${name}.cmake ${local_path}/${name}.cmake
+        file(DOWNLOAD ${MUSE_DEPS_URL}/${name}/${name}.cmake ${local_path}/${name}.cmake
             HTTPHEADER "Cache-Control: no-cache"
         )
     endif()
@@ -55,37 +74,17 @@ function(populate name)
     include(${local_path}/${name}.cmake)
 
     # Resolution order: system -> forced source -> prebuilt -> auto source.
-    # Per-dep: MUSE_USE_SYSTEM_<NAME> (or the option named in the 2nd arg) and
-    # MUSE_BUILD_<NAME>. Global: MUSE_USE_SYSTEM_ALL / MUSE_BUILD_ALL.
-    string(TOUPPER ${name} name_upper)
-    set(build_var "MUSE_BUILD_${name_upper}")
-
-    set(use_system FALSE)
-    if (MUSE_USE_SYSTEM_ALL)
-        set(use_system TRUE)
-    elseif (ARGC GREATER 1)
-        set(use_system_var ${ARGV1})
-        if (${use_system_var})
-            set(use_system TRUE)
-        endif()
-    endif()
-
-    set(force_build FALSE)
-    if (MUSE_BUILD_ALL OR ${build_var})
-        set(force_build TRUE)
-    endif()
-
-    if (use_system)
+    if (mode STREQUAL "system")
         cmake_language(CALL ${name}_PopulateSystem)
-    elseif (force_build)
-        cmake_language(CALL ${name}_PopulateBuild ${remote_url} ${local_path} ${LIB_OS} ${LIB_ARCH} ${LIB_BUILD_TYPE})
+    elseif (mode STREQUAL "rebuild")
+        cmake_language(CALL ${name}_PopulateBuild ${local_path} ${LIB_OS} ${LIB_ARCH} ${LIB_BUILD_TYPE} ${version})
     else()
         set_property(GLOBAL PROPERTY ${name}_AVAILABLE TRUE)
-        cmake_language(CALL ${name}_Populate ${remote_url} ${local_path} ${LIB_OS} ${LIB_ARCH} ${LIB_BUILD_TYPE})
+        cmake_language(CALL ${name}_Populate ${local_path} ${LIB_OS} ${LIB_ARCH} ${LIB_BUILD_TYPE} ${version})
         get_property(prebuilt_available GLOBAL PROPERTY ${name}_AVAILABLE)
         if (NOT prebuilt_available)
             message(STATUS "[${name}] no prebuilt for ${LIB_OS}/${LIB_ARCH}, building from source")
-            cmake_language(CALL ${name}_PopulateBuild ${remote_url} ${local_path} ${LIB_OS} ${LIB_ARCH} ${LIB_BUILD_TYPE})
+            cmake_language(CALL ${name}_PopulateBuild ${local_path} ${LIB_OS} ${LIB_ARCH} ${LIB_BUILD_TYPE} ${version})
         endif()
     endif()
 
@@ -107,34 +106,5 @@ function(populate name)
 
 endfunction()
 
-# Versions come from DependencyManifest.cmake. Ordered so a dependency is
-# populated before anything that links it (matters for source builds:
-# e.g. vorbis/flac/opusfile need ogg).
-populate(expat MUSE_USE_SYSTEM_EXPAT)
-
-if (NOT OS_IS_LIN)
-    populate(zlib MUSE_USE_SYSTEM_ZLIB)
-endif()
-
-if (NOT OS_IS_WIN)
-    populate(openssl MUSE_USE_SYSTEM_OPENSSL)
-endif()
-
-if (AU_USE_LIBCURL)
-    populate(libcurl MUSE_USE_SYSTEM_LIBCURL)
-endif()
-
-populate(ogg MUSE_USE_SYSTEM_OGG)
-populate(vorbis MUSE_USE_SYSTEM_VORBIS)
-populate(flac MUSE_USE_SYSTEM_FLAC)
-populate(opus MUSE_USE_SYSTEM_OPUS)
-populate(opusfile MUSE_USE_SYSTEM_OPUSFILE)
-populate(libmp3lame MUSE_USE_SYSTEM_LAME)
-populate(mpg123 MUSE_USE_SYSTEM_MPG123)
-populate(wavpack MUSE_USE_SYSTEM_WAVPACK)
-populate(libsndfile MUSE_USE_SYSTEM_SNDFILE)
-populate(portaudio MUSE_USE_SYSTEM_PORTAUDIO)
-
-# wxwidgets last: it has no dependents among our deps and is the slowest/riskiest
-# source build, so the rest validate first.
-populate(wxwidgets MUSE_USE_SYSTEM_WXWIDGETS)
+# The dependency set + versions + modes live in the manifest (require_dep calls).
+include(${CMAKE_CURRENT_LIST_DIR}/DependencyManifest.cmake)
