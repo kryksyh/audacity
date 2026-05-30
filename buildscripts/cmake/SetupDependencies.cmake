@@ -47,6 +47,36 @@ elseif (NOT DEFINED ENV{MUSE_DEPS_CACHE} AND EXISTS "${MUSE_DEPS_BUNDLE_DIR}/sou
     set(ENV{MUSE_DEPS_CACHE} "${MUSE_DEPS_BUNDLE_DIR}/sources")
 endif()
 
+# Make a dep's consume script (and, for source builds, the builder + recipe)
+# available under local_path, then set CONSUME_SCRIPT to the script to include.
+# Two modes:
+#   bundle present (deps_bundle/<name>/<name>.cmake) -> offline/distro: use the
+#     vendored script + copy the vendored builder/recipe into local_path so the
+#     version-agnostic PopulateBuild finds them with no network.
+#   no bundle -> dev: fetch the consume script fresh each configure (so muse_deps
+#     changes propagate without clearing the build tree) and drop any stale
+#     builder/recipe so PopulateBuild re-fetches them fresh too.
+function(_prepare_dep_files name local_path)
+    set(bundle "${MUSE_DEPS_BUNDLE_DIR}/${name}")
+    file(MAKE_DIRECTORY "${local_path}")
+    if (EXISTS "${bundle}/${name}.cmake")
+        if (EXISTS "${MUSE_DEPS_BUNDLE_DIR}/buildtools/build_dep_lib.cmake")
+            file(COPY "${MUSE_DEPS_BUNDLE_DIR}/buildtools/build_dep_lib.cmake" DESTINATION "${local_path}")
+        endif()
+        if (EXISTS "${bundle}/recipe")
+            file(REMOVE_RECURSE "${local_path}/recipe")
+            file(COPY "${bundle}/recipe" DESTINATION "${local_path}")
+        endif()
+        set(CONSUME_SCRIPT "${bundle}/${name}.cmake" PARENT_SCOPE)
+    else()
+        file(DOWNLOAD "${MUSE_DEPS_URL}/${name}/${name}.cmake" "${local_path}/${name}.cmake"
+             HTTPHEADER "Cache-Control: no-cache")
+        file(REMOVE "${local_path}/build_dep_lib.cmake")
+        file(REMOVE_RECURSE "${local_path}/recipe")
+        set(CONSUME_SCRIPT "${local_path}/${name}.cmake" PARENT_SCOPE)
+    endif()
+endfunction()
+
 function(require_dep name)
     # Manifest entry forms (see DependencyManifest.cmake):
     #   require_dep(<name> <version>)          prebuilt, with source-build fallback
@@ -78,19 +108,9 @@ function(require_dep name)
 
     # Consume script is version-agnostic at <name>/<name>.cmake; the version
     # (when pinned) is passed to the populate functions for release/recipe paths.
-    # Prefer a vendored copy (offline / release tarball); else fetch it.
     set(local_path ${LOCAL_ROOT_PATH}/${name})
-    if (EXISTS "${MUSE_DEPS_BUNDLE_DIR}/${name}/${name}.cmake")
-        include("${MUSE_DEPS_BUNDLE_DIR}/${name}/${name}.cmake")
-    else()
-        if (NOT EXISTS ${local_path}/${name}.cmake)
-            file(MAKE_DIRECTORY ${local_path})
-            file(DOWNLOAD ${MUSE_DEPS_URL}/${name}/${name}.cmake ${local_path}/${name}.cmake
-                HTTPHEADER "Cache-Control: no-cache"
-            )
-        endif()
-        include(${local_path}/${name}.cmake)
-    endif()
+    _prepare_dep_files(${name} ${local_path})
+    include(${CONSUME_SCRIPT})
 
     # Resolution order: system -> forced source -> prebuilt -> auto source.
     if (mode STREQUAL "system")
@@ -143,21 +163,12 @@ function(populate_source_dep name)
         message(FATAL_ERROR "[deps] '${name}' has no require_source_dep() entry in DependencyManifest.cmake")
     endif()
 
-    # Resolve the consume script (bundle-first for offline), then populate the
-    # source into the build tree. The script fetches its sources cache-first, so
-    # offline builds work when the cache is pre-populated (prepare_deps_sources).
+    # Resolve the consume script (bundle-first offline, fresh in dev), then
+    # populate the source into the build tree. The script fetches its sources
+    # cache-first, so offline works when the cache is pre-populated.
     set(local_path ${LOCAL_ROOT_PATH}/${name})
-    if (EXISTS "${MUSE_DEPS_BUNDLE_DIR}/${name}/${name}.cmake")
-        include("${MUSE_DEPS_BUNDLE_DIR}/${name}/${name}.cmake")
-    else()
-        if (NOT EXISTS ${local_path}/${name}.cmake)
-            file(MAKE_DIRECTORY ${local_path})
-            file(DOWNLOAD ${MUSE_DEPS_URL}/${name}/${name}.cmake ${local_path}/${name}.cmake
-                HTTPHEADER "Cache-Control: no-cache"
-            )
-        endif()
-        include(${local_path}/${name}.cmake)
-    endif()
+    _prepare_dep_files(${name} ${local_path})
+    include(${CONSUME_SCRIPT})
 
     cmake_language(CALL ${name}_PopulateSource ${local_path} ${version})
 endfunction()

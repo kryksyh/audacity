@@ -6,8 +6,9 @@
 #   cmake -P buildscripts/cmake/BundleDeps.cmake
 #
 # Reads the manifest (DependencyManifest.cmake) for MUSE_DEPS_URL and the dep
-# list, and downloads each version-agnostic consume script. SYSTEM resolution
-# then runs entirely offline (find_* against system libraries).
+# list, and vendors each consume script + the shared builder + each source
+# recipe (spec + patches). Combined with prepare_deps_sources (sources into
+# deps_bundle/sources), both SYSTEM and SOURCE builds then run with no network.
 
 cmake_minimum_required(VERSION 3.16)
 
@@ -22,24 +23,70 @@ set(OS_IS_LIN FALSE)
 set(OS_IS_WIN FALSE)
 set(AU_USE_LIBCURL ON)
 
-function(require_dep name)
-    set(dst "${BUNDLE_DIR}/${name}/${name}.cmake")
-    file(DOWNLOAD "${MUSE_DEPS_URL}/${name}/${name}.cmake" "${dst}"
-         HTTPHEADER "Cache-Control: no-cache" STATUS st)
+function(_bundle_fetch url dst)
+    file(DOWNLOAD "${url}" "${dst}" HTTPHEADER "Cache-Control: no-cache" STATUS st)
     list(GET st 0 code)
-    file(READ "${dst}" content)
-    if (NOT code EQUAL 0 OR NOT content MATCHES "function\\(")
-        message(FATAL_ERROR "[bundle_deps] failed to fetch ${name} (${st})")
-    endif()
-    message(STATUS "[bundle_deps] ${name}/${name}.cmake")
+    set(_bundle_code "${code}" PARENT_SCOPE)
 endfunction()
 
-# Source-delivery deps vendor their consume script the same way. Their actual
-# sources are vendored into the cache by prepare_deps_sources (pointed at
-# deps_bundle/sources), so offline builds need no network.
+function(_bundle_consume name)
+    set(dst "${BUNDLE_DIR}/${name}/${name}.cmake")
+    _bundle_fetch("${MUSE_DEPS_URL}/${name}/${name}.cmake" "${dst}")
+    file(READ "${dst}" content)
+    if (NOT _bundle_code EQUAL 0 OR NOT content MATCHES "function\\(")
+        message(FATAL_ERROR "[bundle_deps] failed to fetch ${name} consume script")
+    endif()
+endfunction()
+
+# The shared builder, fetched once.
+function(_bundle_builder)
+    if (NOT EXISTS "${BUNDLE_DIR}/buildtools/build_dep_lib.cmake")
+        _bundle_fetch("${MUSE_DEPS_URL}/buildtools/build_dep_lib.cmake"
+                      "${BUNDLE_DIR}/buildtools/build_dep_lib.cmake")
+        if (NOT _bundle_code EQUAL 0)
+            message(FATAL_ERROR "[bundle_deps] failed to fetch build_dep_lib")
+        endif()
+    endif()
+endfunction()
+
+# A source recipe (spec + its patches). Non-fatal: prebuilt-only deps without a
+# source recipe are skipped (function scope isolates the DEP_* the spec sets).
+function(_bundle_recipe name version)
+    set(rdir "${BUNDLE_DIR}/${name}/recipe")
+    _bundle_fetch("${MUSE_DEPS_URL}/${name}/${version}/recipe/spec.cmake" "${rdir}/spec.cmake")
+    if (NOT _bundle_code EQUAL 0)
+        file(REMOVE "${rdir}/spec.cmake")
+        message(STATUS "[bundle_deps] ${name}: no source recipe (skipped)")
+        return()
+    endif()
+    include("${rdir}/spec.cmake")
+    set(patches ${DEP_PATCHES})
+    foreach(os MACOS LINUX WINDOWS)
+        list(APPEND patches ${DEP_PATCHES_${os}})
+    endforeach()
+    foreach(p ${patches})
+        _bundle_fetch("${MUSE_DEPS_URL}/${name}/${version}/recipe/${p}" "${rdir}/${p}")
+        if (NOT _bundle_code EQUAL 0)
+            message(FATAL_ERROR "[bundle_deps] ${name}: patch ${p} fetch failed")
+        endif()
+    endforeach()
+endfunction()
+
+function(require_dep name)
+    _bundle_consume("${name}")
+    if (NOT "${ARGV1}" STREQUAL "SYSTEM")
+        _bundle_builder()
+        _bundle_recipe("${name}" "${ARGV1}")
+    endif()
+    message(STATUS "[bundle_deps] ${name}")
+endfunction()
+
+# Source-delivery deps vendor their consume script; their sources are vendored
+# into deps_bundle/sources by prepare_deps_sources.
 function(require_source_dep name version)
-    require_dep(${name} ${version})
+    _bundle_consume("${name}")
+    message(STATUS "[bundle_deps] ${name} (source-delivery)")
 endfunction()
 
 include("${_self_dir}/DependencyManifest.cmake")
-message(STATUS "[bundle_deps] consume scripts vendored into ${BUNDLE_DIR}")
+message(STATUS "[bundle_deps] vendored into ${BUNDLE_DIR}")
