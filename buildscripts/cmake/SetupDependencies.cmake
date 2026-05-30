@@ -32,8 +32,17 @@ endif()
 set(REMOTE_ROOT_URL https://raw.githubusercontent.com/kryksyh/muse_deps_private/main)
 set(LOCAL_ROOT_PATH ${FETCHCONTENT_BASE_DIR})
 
-function(populate name remote_suffix)
-    set(remote_url ${REMOTE_ROOT_URL}/${remote_suffix})
+# Pinned dependency versions (single source of truth).
+include(${CMAKE_CURRENT_LIST_DIR}/DependencyManifest.cmake)
+
+function(populate name)
+    # Version comes from the manifest (DependencyManifest.cmake) — single source
+    # of truth. The optional 2nd arg names a USE_SYSTEM option.
+    set(version "${DEP_VERSION_${name}}")
+    if (NOT version)
+        message(FATAL_ERROR "[deps] no pinned version for '${name}' in DependencyManifest.cmake")
+    endif()
+    set(remote_url ${REMOTE_ROOT_URL}/${name}/${version})
     set(local_path ${LOCAL_ROOT_PATH}/${name})
 
     if (NOT EXISTS ${local_path}/${name}.cmake)
@@ -46,7 +55,7 @@ function(populate name remote_suffix)
     include(${local_path}/${name}.cmake)
 
     # Resolution order: system -> forced source -> prebuilt -> auto source.
-    # Per-dep: MUSE_USE_SYSTEM_<NAME> (or the option named in the 3rd arg) and
+    # Per-dep: MUSE_USE_SYSTEM_<NAME> (or the option named in the 2nd arg) and
     # MUSE_BUILD_<NAME>. Global: MUSE_USE_SYSTEM_ALL / MUSE_BUILD_ALL.
     string(TOUPPER ${name} name_upper)
     set(build_var "MUSE_BUILD_${name_upper}")
@@ -54,8 +63,8 @@ function(populate name remote_suffix)
     set(use_system FALSE)
     if (MUSE_USE_SYSTEM_ALL)
         set(use_system TRUE)
-    elseif (ARGC GREATER 2)
-        set(use_system_var ${ARGV2})
+    elseif (ARGC GREATER 1)
+        set(use_system_var ${ARGV1})
         if (${use_system_var})
             set(use_system TRUE)
         endif()
@@ -98,33 +107,34 @@ function(populate name remote_suffix)
 
 endfunction()
 
-# Ordered so that a dependency is populated before anything that links it
-# (matters when a dep is built from source: e.g. vorbis/flac/opusfile need ogg).
-populate(expat "expat/2.0.5" MUSE_USE_SYSTEM_EXPAT)
+# Versions come from DependencyManifest.cmake. Ordered so a dependency is
+# populated before anything that links it (matters for source builds:
+# e.g. vorbis/flac/opusfile need ogg).
+populate(expat MUSE_USE_SYSTEM_EXPAT)
 
 if (NOT OS_IS_LIN)
-    populate(zlib "zlib/1.2.13" MUSE_USE_SYSTEM_ZLIB)
+    populate(zlib MUSE_USE_SYSTEM_ZLIB)
 endif()
 
 if (NOT OS_IS_WIN)
-    populate(openssl "openssl/1.1.1t" MUSE_USE_SYSTEM_OPENSSL)
+    populate(openssl MUSE_USE_SYSTEM_OPENSSL)
 endif()
 
 if (AU_USE_LIBCURL)
-    populate(libcurl "libcurl/8.17.0" MUSE_USE_SYSTEM_LIBCURL)
+    populate(libcurl MUSE_USE_SYSTEM_LIBCURL)
 endif()
 
-populate(ogg "ogg/1.3.5" MUSE_USE_SYSTEM_OGG)
-populate(vorbis "vorbis/1.3.7" MUSE_USE_SYSTEM_VORBIS)
-populate(flac "flac/1.4.2" MUSE_USE_SYSTEM_FLAC)
-populate(opus "opus/1.5.2" MUSE_USE_SYSTEM_OPUS)
-populate(opusfile "opusfile/0.12" MUSE_USE_SYSTEM_OPUSFILE)
-populate(libmp3lame "libmp3lame/3.100" MUSE_USE_SYSTEM_LAME)
-populate(mpg123 "mpg123/1.31.2" MUSE_USE_SYSTEM_MPG123)
-populate(wavpack "wavpack/5.7.0" MUSE_USE_SYSTEM_WAVPACK)
-populate(libsndfile "libsndfile/1.0.31" MUSE_USE_SYSTEM_SNDFILE)
-populate(portaudio "portaudio/19.7.0" MUSE_USE_SYSTEM_PORTAUDIO)
+populate(ogg MUSE_USE_SYSTEM_OGG)
+populate(vorbis MUSE_USE_SYSTEM_VORBIS)
+populate(flac MUSE_USE_SYSTEM_FLAC)
+populate(opus MUSE_USE_SYSTEM_OPUS)
+populate(opusfile MUSE_USE_SYSTEM_OPUSFILE)
+populate(libmp3lame MUSE_USE_SYSTEM_LAME)
+populate(mpg123 MUSE_USE_SYSTEM_MPG123)
+populate(wavpack MUSE_USE_SYSTEM_WAVPACK)
+populate(libsndfile MUSE_USE_SYSTEM_SNDFILE)
+populate(portaudio MUSE_USE_SYSTEM_PORTAUDIO)
 
 # wxwidgets last: it has no dependents among our deps and is the slowest/riskiest
 # source build, so the rest validate first.
-populate(wxwidgets "wxwidgets/3.2.6" MUSE_USE_SYSTEM_WXWIDGETS)
+populate(wxwidgets MUSE_USE_SYSTEM_WXWIDGETS)
