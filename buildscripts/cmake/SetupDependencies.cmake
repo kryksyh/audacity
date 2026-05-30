@@ -101,7 +101,6 @@ endfunction()
 # Ordered so that a dependency is populated before anything that links it
 # (matters when a dep is built from source: e.g. vorbis/flac/opusfile need ogg).
 populate(expat "expat/2.0.5" MUSE_USE_SYSTEM_EXPAT)
-populate(wxwidgets "wxwidgets/3.2.6" MUSE_USE_SYSTEM_WXWIDGETS)
 
 if (NOT OS_IS_LIN)
     populate(zlib "zlib/1.2.13" MUSE_USE_SYSTEM_ZLIB)
@@ -125,3 +124,7 @@ populate(mpg123 "mpg123/1.31.2" MUSE_USE_SYSTEM_MPG123)
 populate(wavpack "wavpack/5.7.0" MUSE_USE_SYSTEM_WAVPACK)
 populate(libsndfile "libsndfile/1.0.31" MUSE_USE_SYSTEM_SNDFILE)
 populate(portaudio "portaudio/19.7.0" MUSE_USE_SYSTEM_PORTAUDIO)
+
+# wxwidgets last: it has no dependents among our deps and is the slowest/riskiest
+# source build, so the rest validate first.
+populate(wxwidgets "wxwidgets/3.2.6" MUSE_USE_SYSTEM_WXWIDGETS)
