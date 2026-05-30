@@ -100,8 +100,8 @@ endfunction()
 
 # Ordered so that a dependency is populated before anything that links it
 # (matters when a dep is built from source: e.g. vorbis/flac/opusfile need ogg).
-populate(wxwidgets "wxwidgets/3.1.3.9" MUSE_USE_SYSTEM_WXWIDGETS)
 populate(expat "expat/2.0.5" MUSE_USE_SYSTEM_EXPAT)
+populate(wxwidgets "wxwidgets/3.2.6" MUSE_USE_SYSTEM_WXWIDGETS)
 
 if (NOT OS_IS_LIN)
     populate(zlib "zlib/1.2.13" MUSE_USE_SYSTEM_ZLIB)
