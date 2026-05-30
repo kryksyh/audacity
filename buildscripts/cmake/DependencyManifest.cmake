@@ -37,3 +37,8 @@ require_dep(portaudio   19.7.0)
 
 # wxwidgets last: no dependents among our deps, slowest/riskiest source build.
 require_dep(wxwidgets   3.2.6)
+
+# Source-delivered deps (pinned source compiled in-tree by the consumer; no
+# prebuilt/system mode). Fetched lazily via populate_source_dep() from the
+# consuming module, so the pin is recorded unconditionally here.
+require_source_dep(lv2sdk 0.24.26)

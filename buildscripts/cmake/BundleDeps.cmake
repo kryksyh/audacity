@@ -34,5 +34,23 @@ function(require_dep name)
     message(STATUS "[bundle_deps] ${name}/${name}.cmake")
 endfunction()
 
+# Source-delivery deps vendor their consume script AND their source tree, so a
+# sandboxed/distro build from the resulting tarball needs no network: the
+# consume script's _PopulateSource extracts into the bundle dir (leaving a
+# .populated marker the consumer detects).
+function(require_source_dep name version)
+    set(dir "${BUNDLE_DIR}/${name}")
+    file(DOWNLOAD "${MUSE_DEPS_URL}/${name}/${name}.cmake" "${dir}/${name}.cmake"
+         HTTPHEADER "Cache-Control: no-cache" STATUS st)
+    list(GET st 0 code)
+    file(READ "${dir}/${name}.cmake" content)
+    if (NOT code EQUAL 0 OR NOT content MATCHES "function\\(")
+        message(FATAL_ERROR "[bundle_deps] failed to fetch ${name} (${st})")
+    endif()
+    include("${dir}/${name}.cmake")
+    cmake_language(CALL ${name}_PopulateSource "${dir}" "${version}")
+    message(STATUS "[bundle_deps] ${name}/${name}.cmake + source tree")
+endfunction()
+
 include("${_self_dir}/DependencyManifest.cmake")
 message(STATUS "[bundle_deps] consume scripts vendored into ${BUNDLE_DIR}")

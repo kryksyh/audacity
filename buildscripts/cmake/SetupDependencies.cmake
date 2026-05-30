@@ -115,6 +115,46 @@ function(require_dep name)
 
 endfunction()
 
+# Source-delivery deps: muse_deps ships a pinned source tree (no prebuilt lib,
+# no system mode); the consumer compiles it in-tree. The manifest only records
+# the pin here (cheap, unconditional); the actual fetch is deferred to
+# populate_source_dep(), called from the consuming module — its build option may
+# not be defined yet at manifest time, and we must not fetch when it is disabled.
+function(require_source_dep name version)
+    set_property(GLOBAL PROPERTY ${name}_PINNED_VERSION ${version})
+endfunction()
+
+# Fetches the source bundle for a dep declared via require_source_dep and exposes
+# its extracted root as the ${name}_SOURCE_DIR global. Call from the module that
+# uses it (guarded by that module's build option).
+function(populate_source_dep name)
+    get_property(version GLOBAL PROPERTY ${name}_PINNED_VERSION)
+    if (NOT version)
+        message(FATAL_ERROR "[deps] '${name}' has no require_source_dep() entry in DependencyManifest.cmake")
+    endif()
+
+    set(local_path ${LOCAL_ROOT_PATH}/${name})
+    set(bundle "${MUSE_DEPS_BUNDLE_DIR}/${name}")
+    if (EXISTS "${bundle}/${name}.cmake")
+        include("${bundle}/${name}.cmake")
+        # Source vendored into the bundle (offline release tarball): use it in
+        # place so the build needs no network.
+        if (EXISTS "${bundle}/.populated")
+            set(local_path "${bundle}")
+        endif()
+    else()
+        if (NOT EXISTS ${local_path}/${name}.cmake)
+            file(MAKE_DIRECTORY ${local_path})
+            file(DOWNLOAD ${MUSE_DEPS_URL}/${name}/${name}.cmake ${local_path}/${name}.cmake
+                HTTPHEADER "Cache-Control: no-cache"
+            )
+        endif()
+        include(${local_path}/${name}.cmake)
+    endif()
+
+    cmake_language(CALL ${name}_PopulateSource ${local_path} ${version})
+endfunction()
+
 # The dependency set + versions + modes live in the manifest (require_dep calls).
 include(${CMAKE_CURRENT_LIST_DIR}/DependencyManifest.cmake)
 
