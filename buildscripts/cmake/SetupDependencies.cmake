@@ -143,15 +143,12 @@ function(populate_source_dep name)
         message(FATAL_ERROR "[deps] '${name}' has no require_source_dep() entry in DependencyManifest.cmake")
     endif()
 
+    # Resolve the consume script (bundle-first for offline), then populate the
+    # source into the build tree. The script fetches its sources cache-first, so
+    # offline builds work when the cache is pre-populated (prepare_deps_sources).
     set(local_path ${LOCAL_ROOT_PATH}/${name})
-    set(bundle "${MUSE_DEPS_BUNDLE_DIR}/${name}")
-    if (EXISTS "${bundle}/${name}.cmake")
-        include("${bundle}/${name}.cmake")
-        # Source vendored into the bundle (offline release tarball): use it in
-        # place so the build needs no network.
-        if (EXISTS "${bundle}/.populated")
-            set(local_path "${bundle}")
-        endif()
+    if (EXISTS "${MUSE_DEPS_BUNDLE_DIR}/${name}/${name}.cmake")
+        include("${MUSE_DEPS_BUNDLE_DIR}/${name}/${name}.cmake")
     else()
         if (NOT EXISTS ${local_path}/${name}.cmake)
             file(MAKE_DIRECTORY ${local_path})

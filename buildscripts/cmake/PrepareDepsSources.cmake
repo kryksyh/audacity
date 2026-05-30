@@ -20,6 +20,8 @@ if (NOT MUSE_DEPS_CACHE)
         set(MUSE_DEPS_CACHE "$ENV{HOME}/.cache/muse_deps")
     endif()
 endif()
+# Export so source-delivery consume scripts (which read $MUSE_DEPS_CACHE) agree.
+set(ENV{MUSE_DEPS_CACHE} "${MUSE_DEPS_CACHE}")
 
 # Consider all deps regardless of the manifest's OS/option guards, so the cache
 # is portable across platforms.
@@ -71,7 +73,7 @@ function(require_dep name)
     _pds_fetch("${name}" "${ARGV1}")
 endfunction()
 
-# Source-delivery deps fetch their source via the consume script's _PopulateSource.
+# Source-delivery deps prefetch their sources into the cache (fetch-only).
 function(require_source_dep name version)
     set(dir "${MUSE_DEPS_CACHE}/downloads/${name}")
     file(DOWNLOAD "${MUSE_DEPS_URL}/${name}/${name}.cmake" "${dir}/${name}.cmake"
@@ -81,7 +83,7 @@ function(require_source_dep name version)
         message(FATAL_ERROR "[prepare] failed to fetch ${name} consume script")
     endif()
     include("${dir}/${name}.cmake")
-    cmake_language(CALL ${name}_PopulateSource "${dir}" "${version}")
+    cmake_language(CALL ${name}_PrepareSources "${version}")
     message(STATUS "[prepare] source ${name}")
 endfunction()
 
