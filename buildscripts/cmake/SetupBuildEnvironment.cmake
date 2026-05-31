@@ -47,6 +47,14 @@ elseif(CC_IS_MSVC)
     add_definitions(-D_USE_MATH_DEFINES)
     add_definitions(-DNOMINMAX)
 
+    # Modern MSVC (incl. ARM64) provides lrint/lrintf in math.h. AU3 sets these
+    # (via check_symbol_exists) so au3's float_cast.h uses the math.h path; the
+    # AU4 build compiles au3 sources without that, so on ARM64 float_cast.h fell
+    # to an `#else` that #defines lrint/lrintf as `(int)`-cast macros, clobbering
+    # <cmath>. Define them here (no-op on x86/x64 — those hit earlier branches).
+    add_definitions(-DHAVE_LRINT=1)
+    add_definitions(-DHAVE_LRINTF=1)
+
 elseif(CC_IS_MINGW)
     message(STATUS "Using Compiler MINGW ${CMAKE_CXX_COMPILER_VERSION}")
 
