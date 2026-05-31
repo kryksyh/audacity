@@ -35,7 +35,10 @@ elseif(CC_IS_MSVC)
     set(CMAKE_C_FLAGS_DEBUG             "/MDd /Zi /Ob0 /Od /RTC1")
     set(CMAKE_C_FLAGS_RELEASE           "/MD /O2 /Ob2")
     set(CMAKE_C_FLAGS_RELWITHDEBINFO    "/MD /Zi /O2 /Ob1")
-    set(CMAKE_EXE_LINKER_FLAGS          "/DYNAMICBASE:NO")
+    # /DYNAMICBASE:NO (disable ASLR) is rejected on ARM64, which mandates ASLR.
+    if (NOT CMAKE_SYSTEM_PROCESSOR MATCHES "[Aa][Rr][Mm]64")
+        set(CMAKE_EXE_LINKER_FLAGS      "/DYNAMICBASE:NO")
+    endif()
 
     set(gtest_force_shared_crt ON CACHE BOOL "" FORCE)
 
