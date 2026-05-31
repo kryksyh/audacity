@@ -30,6 +30,12 @@ require_dep(flac        1.4.2)
 require_dep(opus        1.5.2)
 require_dep(opusfile    0.12)
 require_dep(libmp3lame  3.100)
+
+# mpg123's CMake port assembles its x86/x64 decoder with yasm. Build that tool
+# first on Windows x64 (ARM64 uses NEON, no yasm; other OSes assemble via gas).
+if (OS_IS_WIN AND NOT CMAKE_SYSTEM_PROCESSOR MATCHES "[Aa][Rr][Mm]64")
+    require_tool(yasm 1.3.0)
+endif()
 require_dep(mpg123      1.31.2)
 require_dep(wavpack     5.7.0)
 require_dep(libsndfile  1.0.31)

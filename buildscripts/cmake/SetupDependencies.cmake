@@ -145,6 +145,33 @@ function(require_dep name)
 
 endfunction()
 
+# Build-time tools (host executables a dep needs while building, e.g. yasm for
+# mpg123's x86/x64 asm decoder). Build (or find) the tool, then prepend its bin/
+# to PATH so later dep builds' find_program() locate it. Must precede the deps
+# that need it in the manifest. Honors MUSE_USE_SYSTEM_<NAME> to use a system tool.
+function(require_tool name version)
+    string(TOUPPER ${name} name_upper)
+    set(local_path ${LOCAL_ROOT_PATH}/${name})
+    _prepare_dep_files(${name} ${local_path})
+    include(${CONSUME_SCRIPT})
+
+    if (MUSE_USE_SYSTEM_ALL OR MUSE_USE_SYSTEM_${name_upper})
+        cmake_language(CALL ${name}_PopulateSystem)
+    else()
+        cmake_language(CALL ${name}_PopulateBuild ${local_path} ${LIB_OS} ${LIB_ARCH} ${LIB_BUILD_TYPE} ${version})
+    endif()
+
+    get_property(bindir GLOBAL PROPERTY ${name}_BIN_DIR)
+    if (bindir)
+        if (WIN32)
+            set(ENV{PATH} "${bindir};$ENV{PATH}")
+        else()
+            set(ENV{PATH} "${bindir}:$ENV{PATH}")
+        endif()
+        message(STATUS "[tool] ${name} available on PATH (${bindir})")
+    endif()
+endfunction()
+
 # Source-delivery deps: muse_deps ships a pinned source tree (no prebuilt lib,
 # no system mode); the consumer compiles it in-tree. The manifest only records
 # the pin here (cheap, unconditional); the actual fetch is deferred to
