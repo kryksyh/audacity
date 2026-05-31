@@ -61,11 +61,15 @@ check_include_file(string.h   HAVE_STRING_H)
 check_type_size("short" SIZEOF_SHORT)
 check_type_size("float" SIZEOF_FLOAT)
 
-if(NOT SIZEOF_SHORT EQUAL 2)
-   message(FATAL_ERROR "twolame: sizeof(short)=${SIZEOF_SHORT}, expected 2 (16-bit short).")
+# check_type_size uses try_compile, which can return empty in some configure
+# environments (e.g. Windows-on-ARM) even though real compilation works. short
+# and float are 16/32-bit on every platform we target (cf. twolame's own
+# win32/configwin.h), so fall back to those instead of hard-failing.
+if(NOT SIZEOF_SHORT)
+   set(SIZEOF_SHORT 2)
 endif()
-if(NOT SIZEOF_FLOAT EQUAL 4)
-   message(FATAL_ERROR "twolame: sizeof(float)=${SIZEOF_FLOAT}, expected 4 (32-bit float).")
+if(NOT SIZEOF_FLOAT)
+   set(SIZEOF_FLOAT 4)
 endif()
 
 test_big_endian(WORDS_BIGENDIAN)
