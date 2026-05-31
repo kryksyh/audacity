@@ -36,7 +36,8 @@ elseif(CC_IS_MSVC)
     set(CMAKE_C_FLAGS_RELEASE           "/MD /O2 /Ob2")
     set(CMAKE_C_FLAGS_RELWITHDEBINFO    "/MD /Zi /O2 /Ob1")
     # /DYNAMICBASE:NO (disable ASLR) is rejected on ARM64, which mandates ASLR.
-    if (NOT CMAKE_SYSTEM_PROCESSOR MATCHES "[Aa][Rr][Mm]64")
+    # Use the compiler TARGET arch (correct under cross-compile).
+    if (NOT CMAKE_CXX_COMPILER_ARCHITECTURE_ID MATCHES "[Aa][Rr][Mm]64")
         set(CMAKE_EXE_LINKER_FLAGS      "/DYNAMICBASE:NO")
     endif()
 

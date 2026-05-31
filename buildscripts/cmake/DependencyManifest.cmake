@@ -33,7 +33,9 @@ require_dep(libmp3lame  3.100)
 
 # mpg123's CMake port assembles its x86/x64 decoder with yasm. Build that tool
 # first on Windows x64 (ARM64 uses NEON, no yasm; other OSes assemble via gas).
-if (OS_IS_WIN AND NOT CMAKE_SYSTEM_PROCESSOR MATCHES "[Aa][Rr][Mm]64")
+# Use the compiler's TARGET arch (correct under cross-compile, unlike
+# CMAKE_SYSTEM_PROCESSOR which reflects the host).
+if (OS_IS_WIN AND NOT CMAKE_CXX_COMPILER_ARCHITECTURE_ID MATCHES "[Aa][Rr][Mm]64")
     require_tool(yasm 1.3.0)
 endif()
 require_dep(mpg123      1.31.2)
