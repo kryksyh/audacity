@@ -60,6 +60,15 @@ check_cxx_source_compiles("
 " HAVE_LRINTF)
 set(CMAKE_REQUIRED_LIBRARIES)
 
+# Modern MSVC (incl. ARM64) always has lrint/lrintf in <cmath>. Force them on:
+# check_cxx_source_compiles relies on try_compile, which can come back empty in
+# the Windows-on-ARM configure, dropping real.h into its x86 _asm fallback
+# (which doesn't compile on ARM64 and conflicts with the intrinsics).
+if(MSVC)
+    set(HAVE_LRINT 1)
+    set(HAVE_LRINTF 1)
+endif()
+
 list( APPEND OPTIONS
    PRIVATE
       $<$<CXX_COMPILER_ID:AppleClang,Clang,GNU>:-w>
