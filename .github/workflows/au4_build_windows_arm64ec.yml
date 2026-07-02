@@ -1,0 +1,114 @@
+name: '[AU4] Build: Windows ARM64EC (experimental)'
+
+# EXPERIMENTAL: builds Audacity for the Windows ARM64EC ABI.
+#
+# Reuses prebuilt experimental dependencies (nothing here builds Qt or the C
+# libs from source):
+#   * ARM64EC Qt + a matching native-arm64 host Qt, from a release of
+#     kryksyh/qt-arm64ec-builds (Qt 6.12; the first Qt with win32-arm64ec-msvc).
+#   * ARM64EC C-library prebuilts from the muse_deps woa-arm64ec branch
+#     (submodule already points there; EXTDEPS_PREBUILT_URL -> kryksyh fork).
+#
+# Why the flags: ARM64EC defines _M_X64 but NOT _M_ARM64, so it is a cross build
+# (needs QT_HOST_PATH) that the toolchain mistakes for native on an arm64 host
+# (needs QT_FORCE_CROSSCOMPILING), and its objects must be compiled /arm64EC and
+# linked /MACHINE:ARM64EC.
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [arm64ec-experimental]
+
+env:
+  QT_RELEASE_REPO: kryksyh/qt-arm64ec-builds
+  QT_RELEASE_TAG:  qt-full-v6.12.0-beta1-arm64ec-1
+  QT_EC_ASSET:     qt-v6.12.0-beta1-windows-arm64ec.7z
+  QT_HOST_ASSET:   qt-host-v6.12.0-beta1-windows-arm64.7z
+  EXTDEPS_PREBUILT_URL: https://github.com/kryksyh/muse_deps/releases/download
+
+jobs:
+  build:
+    runs-on: windows-11-arm
+    timeout-minutes: 180
+    steps:
+      - name: Checkout (recursive submodules)
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+          fetch-depth: 1
+
+      - name: Setup x64 Python (WoA)
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          architecture: x64
+
+      - name: Setup CMake + Ninja
+        uses: lukka/get-cmake@latest
+
+      - name: Setup MSVC (arm64 native, provides arm64ec cross tools)
+        uses: ilammy/msvc-dev-cmd@v1
+        with:
+          arch: arm64
+
+      - name: Download prebuilt ARM64EC Qt + host Qt
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release download "$env:QT_RELEASE_TAG" --repo "$env:QT_RELEASE_REPO" `
+            -p "$env:QT_EC_ASSET" -p "$env:QT_HOST_ASSET"
+          # arm64ec archive holds prefix contents at root -> extract into qt-arm64ec/
+          7z x "$env:QT_EC_ASSET" -o"$env:GITHUB_WORKSPACE\qt-arm64ec" -y | Out-Null
+          # host archive holds a top-level qt-host/ folder -> extract at root
+          7z x "$env:QT_HOST_ASSET" -o"$env:GITHUB_WORKSPACE" -y | Out-Null
+          if (-not (Test-Path "$env:GITHUB_WORKSPACE\qt-arm64ec\lib\cmake\Qt6\qt.toolchain.cmake")) { throw "arm64ec Qt missing" }
+          if (-not (Test-Path "$env:GITHUB_WORKSPACE\qt-host\bin\moc.exe")) { throw "host Qt missing" }
+
+      - name: Configure (ARM64EC)
+        shell: cmd
+        run: |
+          set CFLAGS=-arm64EC
+          set CXXFLAGS=-arm64EC
+          cmake -S . -B build.arm64ec -G Ninja ^
+            -DCMAKE_BUILD_TYPE=RelWithDebInfo ^
+            -DLIB_ARCH=arm64ec ^
+            -DMUSE_ENABLE_UNIT_TESTS=OFF ^
+            -DEXTDEPS_PREBUILT_URL=%EXTDEPS_PREBUILT_URL% ^
+            -DCMAKE_TOOLCHAIN_FILE=%GITHUB_WORKSPACE%\qt-arm64ec\lib\cmake\Qt6\qt.toolchain.cmake ^
+            -DQT_HOST_PATH=%GITHUB_WORKSPACE%\qt-host ^
+            -DQT_FORCE_CROSSCOMPILING=ON ^
+            -DCMAKE_EXE_LINKER_FLAGS=/MACHINE:ARM64EC ^
+            -DCMAKE_SHARED_LINKER_FLAGS=/MACHINE:ARM64EC ^
+            -DCMAKE_MODULE_LINKER_FLAGS=/MACHINE:ARM64EC ^
+            -DAU4_BUILD_MODE=dev ^
+            -DAU4_BUILD_CONFIGURATION=app ^
+            -DCMAKE_INSTALL_PREFIX=%GITHUB_WORKSPACE%\build.install ^
+            -DMUSE_MODULE_DIAGNOSTICS_CRASHPAD_CLIENT=OFF || exit /b 1
+
+      - name: Build
+        shell: cmd
+        run: cmake --build build.arm64ec --parallel || exit /b 1
+
+      - name: Install (deploys Qt runtime)
+        shell: cmd
+        run: cmake --install build.arm64ec || exit /b 1
+
+      - name: Verify - assert Audacity4.exe is ARM64EC
+        shell: pwsh
+        run: |
+          $dumpbin = (Get-ChildItem "$env:VCToolsInstallDir\bin\Hostarm64\arm64\dumpbin.exe" | Select-Object -First 1).FullName
+          $h = & $dumpbin /headers "$env:GITHUB_WORKSPACE\build.install\bin\Audacity4.exe"
+          $h | Select-String "machine \(" | ForEach-Object { $_.Line.Trim() }
+          if (-not ($h -match "ARM64X" -or $h -match "ARM64EC")) { Write-Error "Audacity4.exe is not ARM64EC"; exit 1 }
+
+      - name: Verify - plugin registration self-test
+        shell: cmd
+        run: build.install\bin\Audacity4.exe --plugin-registration-self-test || exit /b 1
+
+      - name: Upload Audacity ARM64EC build
+        uses: actions/upload-artifact@v4
+        with:
+          name: audacity-windows-arm64ec
+          path: build.install/
+          retention-days: 7
