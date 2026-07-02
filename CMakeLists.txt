@@ -193,6 +193,21 @@ endif(MUSE_COMPILE_USE_CCACHE)
 set(QT_MIN_VERSION "6.2.4")
 include(SetupQt6)
 
+# ARM64EC bring-up: Qt 6.12 (the only Qt with the win32-arm64ec-msvc mkspec) emits
+# AOT-compiled QML that references QQmlPrivate::AOTLookupValidation::Type, which
+# clashes with muse's own ::Type symbols (error C2872). muse targets Qt 6.10.
+# Force qmlcachegen to bytecode-only (disable AOT) for every QML module; this is
+# functionally equivalent (bytecode is still cached, only the C++ AOT path is off).
+if (COMMAND qt6_add_qml_module AND NOT DEFINED AU_ARM64EC_NO_QML_AOT_OVERRIDE)
+    set(AU_ARM64EC_NO_QML_AOT_OVERRIDE ON)
+    function(qt_add_qml_module target)
+        qt6_add_qml_module(${target} ${ARGN})
+        if (TARGET ${target})
+            set_property(TARGET ${target} APPEND PROPERTY QT_QMLCACHEGEN_ARGUMENTS "--only-bytecode")
+        endif()
+    endfunction()
+endif()
+
 # This should be called after all options() are resolved
 include(SetupDependencies)
 

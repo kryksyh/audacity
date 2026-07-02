@@ -41,6 +41,18 @@ elseif(CC_IS_MSVC)
         set(CMAKE_EXE_LINKER_FLAGS      "/DYNAMICBASE:NO")
     endif()
 
+    # Windows ARM64EC: this block hard-resets CMAKE_CXX_FLAGS, so the /arm64EC
+    # target flag must be (re)applied here or everything compiles as native ARM64.
+    # Linker must also target the ARM64EC machine. Keyed off -DLIB_ARCH=arm64ec.
+    if (LIB_ARCH STREQUAL "arm64ec")
+        set(CMAKE_CXX_FLAGS            "${CMAKE_CXX_FLAGS} /arm64EC")
+        set(CMAKE_C_FLAGS              "${CMAKE_C_FLAGS} /arm64EC")
+        set(CMAKE_EXE_LINKER_FLAGS     "${CMAKE_EXE_LINKER_FLAGS} /MACHINE:ARM64EC")
+        set(CMAKE_SHARED_LINKER_FLAGS  "${CMAKE_SHARED_LINKER_FLAGS} /MACHINE:ARM64EC")
+        set(CMAKE_MODULE_LINKER_FLAGS  "${CMAKE_MODULE_LINKER_FLAGS} /MACHINE:ARM64EC")
+        message(STATUS "ARM64EC build: added /arm64EC and /MACHINE:ARM64EC")
+    endif()
+
     set(gtest_force_shared_crt ON CACHE BOOL "" FORCE)
 
     add_definitions(-DWIN32)

@@ -17,3 +17,9 @@ set(INCLUDES
 
 target_sources( ${TARGET} PRIVATE ${SOURCES} )
 target_include_directories( ${TARGET} PUBLIC ${INCLUDES} )
+
+# ARM64EC defines _M_X64, so pffft would pull x86 SSE intrinsic headers
+# (xmmintrin.h), which are invalid for the EC target. Build the scalar path.
+if (LIB_ARCH STREQUAL "arm64ec")
+    target_compile_definitions( ${TARGET} PRIVATE PFFFT_SIMD_DISABLE )
+endif()

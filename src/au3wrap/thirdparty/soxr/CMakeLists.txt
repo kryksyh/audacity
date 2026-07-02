@@ -65,12 +65,23 @@ set( WITH_CR64 YES )
 set( WITH_CR64S NO )
 set( WITH_VR32 YES )
 
-find_package( SIMD32 )
-if( SIMD32_FOUND )
-   set( WITH_CR32S YES )
-   string( STRIP "${SIMD32_C_FLAGS}" SIMD32_C_FLAGS )
-   string( REPLACE " " ";" SIMD32_C_FLAGS "${SIMD32_C_FLAGS}" )
-   list( APPEND OPTIONS ${SIMD32_C_FLAGS} )
+# ARM64EC: MSVC defines _M_X64, so soxr's SIMD cores select the x86 SSE headers
+# (xmmintrin/emmintrin), which are invalid for the EC target. Build scalar: drop
+# the SIMD sources, keep CR32S off, and use fft4g instead of the SIMD pffft.
+if (LIB_ARCH STREQUAL "arm64ec")
+   set( WITH_PFFFT NO )
+   list( REMOVE_ITEM SOURCES
+      ${TARGET_ROOT}/src/cr32s.c
+      ${TARGET_ROOT}/src/pffft32s.c
+      ${TARGET_ROOT}/src/util32s.c )
+else()
+   find_package( SIMD32 )
+   if( SIMD32_FOUND )
+      set( WITH_CR32S YES )
+      string( STRIP "${SIMD32_C_FLAGS}" SIMD32_C_FLAGS )
+      string( REPLACE " " ";" SIMD32_C_FLAGS "${SIMD32_C_FLAGS}" )
+      list( APPEND OPTIONS ${SIMD32_C_FLAGS} )
+   endif()
 endif()
 
 # Disabling since we do not want AVX instructions in distribution builds

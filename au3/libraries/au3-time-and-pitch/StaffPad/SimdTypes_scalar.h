@@ -8,7 +8,11 @@
 
 #if _MSC_VER
 #define __finl __forceinline
+#if defined(_M_ARM64EC)
+#define __vecc
+#else
 #define __vecc __vectorcall
+#endif
 #else
 #define __finl inline __attribute__((always_inline))
 #define __vecc

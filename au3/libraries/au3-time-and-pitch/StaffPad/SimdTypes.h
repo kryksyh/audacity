@@ -9,13 +9,20 @@
 
 #if _MSC_VER
 #define __finl __forceinline
+// ARM64EC does not support the __vectorcall calling convention.
+#if defined(_M_ARM64EC)
+#define __vecc
+#else
 #define __vecc __vectorcall
+#endif
 #else
 #define __finl inline __attribute__((always_inline))
 #define __vecc
 #endif
 
-#if defined(__SSE2__) || (defined(_M_AMD64) || defined(_M_X64)) || (defined(_M_IX86_FP) && _M_IX86_FP >= 2)
+// ARM64EC defines _M_X64 but cannot use x86 SSE2 intrinsics here; fall through to
+// the scalar implementation (it does not define _M_ARM64, so no NEON path either).
+#if (defined(__SSE2__) || (defined(_M_AMD64) || defined(_M_X64)) || (defined(_M_IX86_FP) && _M_IX86_FP >= 2)) && !defined(_M_ARM64EC)
 #include "SimdTypes_sse2.h"
 #elif defined(__arm64__) || defined(__aarch64__) || defined(_M_ARM64)
 #include "SimdTypes_neon.h"
