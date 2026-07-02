@@ -25,6 +25,11 @@ env:
   QT_EC_ASSET:     qt-v6.12.0-beta1-windows-arm64ec.7z
   QT_HOST_ASSET:   qt-host-v6.12.0-beta1-windows-arm64.7z
   EXTDEPS_PREBUILT_URL: https://github.com/kryksyh/muse_deps/releases/download
+  # Source deps (vst3sdk, nyquist, rapidjson, tft, ...) are fetched from a mirror
+  # whose base is read from prebuilt_url.txt (musescore) unless EXTDEPS_MIRROR is
+  # set. Point it at the kryksyh release, which hosts the -src archives for this
+  # tag; otherwise fresh runners (no download cache) fail to fetch them.
+  EXTDEPS_MIRROR: https://github.com/kryksyh/muse_deps/releases/download/deps-20260701-103718
 
 jobs:
   build:
