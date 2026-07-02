@@ -69,6 +69,14 @@ jobs:
           7z x "$env:QT_HOST_ASSET" -o"$env:GITHUB_WORKSPACE" -y | Out-Null
           if (-not (Test-Path "$env:GITHUB_WORKSPACE\qt-arm64ec\lib\cmake\Qt6\qt.toolchain.cmake")) { throw "arm64ec Qt missing" }
           if (-not (Test-Path "$env:GITHUB_WORKSPACE\qt-host\bin\moc.exe")) { throw "host Qt missing" }
+          # The prebuilt arm64ec Qt's qtpaths wrapper bakes the absolute host path
+          # from the machine that BUILT Qt (a different runner). Rewrite it to the
+          # host we just extracted so windeployqt can query qtpaths during install.
+          # (target_qt.conf's HostPrefix is already the relative ../../qt-host.)
+          $hostqtpaths = "$env:GITHUB_WORKSPACE\qt-host\bin\qtpaths6.exe"
+          $bat = "@echo off`r`n`"$hostqtpaths`" -qtconf `"%~dp0target_qt.conf`" %*`r`n"
+          Set-Content "$env:GITHUB_WORKSPACE\qt-arm64ec\bin\qtpaths6.bat" $bat -Encoding ascii -NoNewline
+          Set-Content "$env:GITHUB_WORKSPACE\qt-arm64ec\bin\qtpaths.bat"  $bat -Encoding ascii -NoNewline
 
       - name: Configure (ARM64EC)
         shell: cmd
