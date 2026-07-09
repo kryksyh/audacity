@@ -9,10 +9,12 @@
 #include "effects/effects_base/effectstypes.h"
 #include "effects/effects_base/ieffectsconfiguration.h"
 #include "effects/effects_base/ieffectsprovider.h"
+#include "pluginhost/ipluginhostservice.h"
 #include "async/asyncable.h"
 #include "modularity/ioc.h"
 
 #include <QObject>
+#include <QVariantList>
 
 namespace au::appshell {
 class PluginPreferencesModel : public QObject, public muse::async::Asyncable
@@ -30,6 +32,7 @@ class PluginPreferencesModel : public QObject, public muse::async::Asyncable
 
     muse::GlobalInject<effects::IEffectsConfiguration> effectsConfiguration;
     muse::GlobalInject<effects::IEffectsProvider> effectsProvider;
+    muse::GlobalInject<au::pluginhost::IPluginHostService> pluginHostService;
 
 public:
     explicit PluginPreferencesModel(QObject* parent = nullptr);
@@ -52,6 +55,10 @@ public:
     Q_INVOKABLE void removeVst3Path(int index);
 
     Q_INVOKABLE bool pathExists(const QString& path) const;
+
+    //! { id, name } for each loaded plugin that ships a plugin-level
+    //! (not per-effect) configuration view.
+    Q_INVOKABLE QVariantList pluginConfigViews() const;
 
     Q_INVOKABLE void init();
 

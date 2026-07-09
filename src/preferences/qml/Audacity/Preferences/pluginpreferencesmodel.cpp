@@ -4,6 +4,7 @@
 #include "pluginpreferencesmodel.h"
 
 #include "io/dir.h"
+#include "pluginhost/api/audacity_plugin.h"
 
 namespace au::appshell {
 static QStringList toQStringList(const muse::io::paths_t& paths)
@@ -151,5 +152,20 @@ bool PluginPreferencesModel::lv2Supported() const
 bool PluginPreferencesModel::vst3Supported() const
 {
     return effectsProvider()->hasEffectFamily(effects::EffectFamily::VST3);
+}
+
+QVariantList PluginPreferencesModel::pluginConfigViews() const
+{
+    QVariantList result;
+    for (const au::pluginhost::PluginView& view : pluginHostService()->views()) {
+        if (view.role != AUPLUG_VIEW_PLUGIN_CONFIG) {
+            continue;
+        }
+        QVariantMap item;
+        item["id"] = view.pluginId.toQString();
+        item["name"] = view.pluginName.toQString();
+        result << item;
+    }
+    return result;
 }
 }

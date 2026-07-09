@@ -108,5 +108,24 @@ PreferencesPage {
                 }
             }
         }
+
+        SeparatorLine {
+            visible: pluginConfigSection.visible
+        }
+
+        PluginConfigSection {
+            id: pluginConfigSection
+
+            pluginPreferencesModel: pluginPreferencesModel
+
+            navigation.section: root.navigationSection
+            navigation.order: vst3Section.navigation.order + 1
+
+            onFocusChanged: {
+                if (activeFocus) {
+                    root.ensureContentVisibleRequested(Qt.rect(x, y, width, height))
+                }
+            }
+        }
     }
 }

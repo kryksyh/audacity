@@ -18,6 +18,8 @@ qt_add_qml_module(preferences_qml
         musicpreferencesmodel.h
         playbackpreferencesmodel.cpp
         playbackpreferencesmodel.h
+        pluginconfigviewloader.cpp
+        pluginconfigviewloader.h
         pluginpreferencesmodel.cpp
         pluginpreferencesmodel.h
         preferencepageitem.cpp
@@ -70,6 +72,8 @@ qt_add_qml_module(preferences_qml
         internal/NumberFormatSection.qml
         internal/PasteBehaviorSection.qml
         internal/PlaybackPerformanceSection.qml
+        internal/PluginConfigDialog.qml
+        internal/PluginConfigSection.qml
         internal/PluginLocationsSection.qml
         internal/PreferencesButtonsPanel.qml
         internal/PreferencesMenu.qml
