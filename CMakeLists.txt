@@ -124,6 +124,8 @@ option(AU_MODULE_EFFECTS_VST "Build audacity vst module" ON)
 
 option(AU_MODULE_EFFECTS_NYQUIST "Build audacity nyquist module" ON)
 
+option(AU_BUILD_PLUGIN_HOST "Build support for dynamically loaded plugins (stable C ABI)" ON)
+
 if (OS_IS_LIN)
     option(AU_MODULE_EFFECTS_LV2 "Build audacity lv2 module" ON)
 endif(OS_IS_LIN)

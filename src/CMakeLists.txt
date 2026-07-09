@@ -58,6 +58,10 @@ if (AU_BUILD_RECORD_MODULE)
     add_subdirectory(record)
 endif()
 
+if (AU_BUILD_PLUGIN_HOST)
+    add_subdirectory(pluginhost)
+endif()
+
 if (AU_BUILD_EFFECTS_MODULE)
     add_subdirectory(effects)
 endif()

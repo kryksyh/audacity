@@ -68,6 +68,10 @@
 #include "effects/nyquist/nyquisteffectsmodule.h"
 #endif
 
+#ifdef AU_BUILD_PLUGIN_HOST
+#include "pluginhost/pluginhostmodule.h"
+#endif
+
 #ifdef AU_MODULE_EFFECTS_LV2
 #include "effects/lv2/lv2effectsmodule.h"
 #else
@@ -160,6 +164,9 @@ std::shared_ptr<muse::IApplication> AppFactory::newGuiApp(const std::shared_ptr<
     app->addModule(new au::effects::Lv2EffectsModule());
     app->addModule(new au::effects::VstEffectsModule());
     app->addModule(new au::effects::NyquistEffectsModule());
+#ifdef AU_BUILD_PLUGIN_HOST
+    app->addModule(new au::pluginhost::PluginHostModule());
+#endif
     app->addModule(new au::context::ContextModule());
     app->addModule(new au::audio::AudioModule());
     app->addModule(new au::au3audio::Au3AudioModule());
