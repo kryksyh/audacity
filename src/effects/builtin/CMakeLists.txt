@@ -25,6 +25,8 @@ set(MODULE_SRC
     ${CMAKE_CURRENT_LIST_DIR}/view/builtineffectinstanceaccess.h
     ${CMAKE_CURRENT_LIST_DIR}/view/builtineffectmodel.cpp
     ${CMAKE_CURRENT_LIST_DIR}/view/builtineffectmodel.h
+    ${CMAKE_CURRENT_LIST_DIR}/view/plugineffectviewbridge.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/view/plugineffectviewbridge.h
     ${CMAKE_CURRENT_LIST_DIR}/view/builtineffectviewloader.cpp
     ${CMAKE_CURRENT_LIST_DIR}/view/builtineffectviewloader.h
     ${CMAKE_CURRENT_LIST_DIR}/view/builtineffectsviewregister.cpp

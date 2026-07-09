@@ -70,6 +70,7 @@
 
 #ifdef AU_BUILD_PLUGIN_HOST
 #include "pluginhost/pluginhostmodule.h"
+#include "effects/plugins/plugineffectsmodule.h"
 #endif
 
 #ifdef AU_MODULE_EFFECTS_LV2
@@ -166,6 +167,7 @@ std::shared_ptr<muse::IApplication> AppFactory::newGuiApp(const std::shared_ptr<
     app->addModule(new au::effects::NyquistEffectsModule());
 #ifdef AU_BUILD_PLUGIN_HOST
     app->addModule(new au::pluginhost::PluginHostModule());
+    app->addModule(new au::effects::PluginEffectsModule());
 #endif
     app->addModule(new au::context::ContextModule());
     app->addModule(new au::audio::AudioModule());

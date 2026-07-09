@@ -6,6 +6,10 @@
 // TODO: au3 EffectInterface shouldn't be a dependency in Qt models
 #include "au3-components/EffectInterface.h"
 
+#include "au3-effects/Effect.h"
+#include "au3wrap/internal/wxtypes_convert.h"
+#include "effects/builtin/ibuiltineffectsviewregister.h"
+
 namespace au::effects {
 DestructiveEffectViewerDialogModel::DestructiveEffectViewerDialogModel(QObject* parent)
     : QObject(parent), muse::Contextable(muse::iocCtxForQmlObject(this))
@@ -105,6 +109,18 @@ ViewerComponentType DestructiveEffectViewerDialogModel::viewerComponentType() co
     }
 
     if (family == EffectFamily::Nyquist) {
+        return ViewerComponentType::Generated;
+    }
+
+    // Module effects use a custom QML view when their module ships one,
+    // served through the builtin viewer path; otherwise the generated UI.
+    if (family == EffectFamily::Plugin) {
+        const auto viewsRegister = muse::modularity::globalIoc()->resolve<IBuiltinEffectsViewRegister>("effects_base");
+        const Effect* effect = effectsProvider()->effect(m_effectId);
+        if (viewsRegister && effect
+            && !viewsRegister->viewUrl(au3::wxToString(effect->GetSymbol().Internal())).isEmpty()) {
+            return ViewerComponentType::Builtin;
+        }
         return ViewerComponentType::Generated;
     }
 

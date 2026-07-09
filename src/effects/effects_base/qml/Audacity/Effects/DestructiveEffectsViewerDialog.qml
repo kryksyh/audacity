@@ -35,13 +35,13 @@ EffectStyledDialogView {
         property alias viewer: viewerLoader.item
 
         property int minimumWidth: viewerModel.effectFamily === EffectFamily.LV2 ? 500 : 250
-        property int panelMargins: (viewerModel.effectFamily === EffectFamily.Builtin || viewerModel.viewerComponentType === ViewerComponentType.Generated) ? 16 : 4
-        property int viewMargins: (viewerModel.effectFamily === EffectFamily.Builtin || viewerModel.viewerComponentType === ViewerComponentType.Generated) ? 16 : 0
-        property int separatorHeight: (viewerModel.effectFamily === EffectFamily.Builtin || viewerModel.viewerComponentType === ViewerComponentType.Generated) ? separator.height + prv.panelMargins : 0
-        property bool showTopPanel: viewerModel.effectFamily !== EffectFamily.Builtin || (viewer && viewer.usesPresets)
+        property int panelMargins: (viewerModel.viewerComponentType === ViewerComponentType.Builtin || viewerModel.viewerComponentType === ViewerComponentType.Generated) ? 16 : 4
+        property int viewMargins: (viewerModel.viewerComponentType === ViewerComponentType.Builtin || viewerModel.viewerComponentType === ViewerComponentType.Generated) ? 16 : 0
+        property int separatorHeight: (viewerModel.viewerComponentType === ViewerComponentType.Builtin || viewerModel.viewerComponentType === ViewerComponentType.Generated) ? separator.height + prv.panelMargins : 0
+        property bool showTopPanel: viewerModel.viewerComponentType !== ViewerComponentType.Builtin || (viewer && viewer.usesPresets)
         property bool showBottomPanel: true
 
-        property bool isApplyAllowed: viewerModel.effectFamily != EffectFamily.Builtin || (viewer && viewer.isApplyAllowed)
+        property bool isApplyAllowed: viewerModel.viewerComponentType != ViewerComponentType.Builtin || (viewer && viewer.isApplyAllowed)
         property bool isPreviewAllowed: !viewer || viewer.isPreviewAllowed !== false
         property bool shouldRollbackOnClose: true
 
@@ -228,7 +228,7 @@ EffectStyledDialogView {
                     anchors.left: parent.left
                     anchors.right: parent.right
 
-                    visible: (viewerModel.effectFamily == EffectFamily.Builtin || viewerModel.viewerComponentType == ViewerComponentType.Generated)
+                    visible: (viewerModel.viewerComponentType == ViewerComponentType.Builtin || viewerModel.viewerComponentType == ViewerComponentType.Generated)
                 }
             }
         }

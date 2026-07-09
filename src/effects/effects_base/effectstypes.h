@@ -196,6 +196,7 @@ public:
         AudioUnit,
 #endif
         Nyquist,
+        Plugin,
         _count
     };
     Q_ENUM(EffectFamily)

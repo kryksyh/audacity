@@ -111,7 +111,7 @@ EffectsProvider::NewPluginsRegistered EffectsProvider::doScanPlugins(
         thirdPartyPluginPaths.begin(), thirdPartyPluginPaths.end(),
         [&](const auto& path) {
         const auto family = utils::effectFamilyFromCacheType(pathToMetaReader.at(path)->metaType());
-        return !(family == EffectFamily::Nyquist || family == EffectFamily::Builtin);
+        return !(family == EffectFamily::Nyquist || family == EffectFamily::Builtin || family == EffectFamily::Plugin);
     });
 
     muse::io::paths_t audacityPluginPaths(mid, thirdPartyPluginPaths.end());

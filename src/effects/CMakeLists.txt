@@ -21,3 +21,7 @@ endif()
 if (AU_MODULE_EFFECTS_NYQUIST)
     add_subdirectory(nyquist)
 endif()
+
+if (AU_BUILD_PLUGIN_HOST)
+    add_subdirectory(plugins)
+endif()

@@ -18,21 +18,25 @@ void EffectsMenuProvider::init()
 
 muse::uicomponents::MenuItemList EffectsMenuProvider::destructiveEffectMenu(IEffectMenuItemFactory& effectMenu, EffectFilter filterType)
 {
+    // Make sure all OpenVINO effects are grouped in the same menu under /Effect,
+    // whatever their type (same special case as in Audacity 3)
+    auto isOpenVino = [](const EffectMeta& meta) { return meta.vendor == u"OpenVINO AI Effects"; };
+
     std::function<bool(const EffectMeta&)> filter;
     switch (filterType) {
     case EffectFilter::GeneratorsOnly:
-        filter = [](const EffectMeta& meta) { return meta.type != EffectType::Generator; };
+        filter = [=](const EffectMeta& meta) { return meta.type != EffectType::Generator || isOpenVino(meta); };
         break;
     case EffectFilter::RealtimeProcessorsOnly:
         LOGE() << "Unexpected filter type RealtimeProcessorsOnly for destructiveEffectMenu";
     case EffectFilter::ProcessorsOnly:
-        filter = [](const EffectMeta& meta) { return meta.type != EffectType::Processor; };
+        filter = [=](const EffectMeta& meta) { return meta.type != EffectType::Processor && !isOpenVino(meta); };
         break;
     case EffectFilter::ToolsOnly:
-        filter = [](const EffectMeta& meta) { return meta.type != EffectType::Tool; };
+        filter = [=](const EffectMeta& meta) { return meta.type != EffectType::Tool || isOpenVino(meta); };
         break;
     case EffectFilter::AnalyzersOnly:
-        filter = [](const EffectMeta& meta) { return meta.type != EffectType::Analyzer; };
+        filter = [=](const EffectMeta& meta) { return meta.type != EffectType::Analyzer || isOpenVino(meta); };
         break;
     default:
         LOGE() << "EffectsMenuProvider::destructiveEffectMenu: Unknown filter type:" << static_cast<int>(filterType);

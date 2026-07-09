@@ -113,6 +113,11 @@ void replaceIdenticalTitlesWithPaths(EffectMetaList& effects)
 
     for (auto i = 0u; i < effects.size(); ++i) {
         const auto& effect = effects[i];
+        // Non-loadable (e.g. missing) plugins never appear in menus; letting
+        // them count as duplicates would mangle the loadable one's title.
+        if (!effect.isLoadable()) {
+            continue;
+        }
         DuplicationKey key{ effect.family, effect.type, effect.category, effect.title };
         duplicateMap[key].push_back(i);
     }
