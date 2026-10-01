@@ -4,6 +4,8 @@
 
 #include "au3projecthistory.h"
 
+#include "shared/perf/perftrace.h"
+
 #include "au3-project-history/ProjectHistory.h"
 #include "au3-project-history/UndoManager.h"
 #include "au3-project/Project.h"
@@ -31,6 +33,7 @@ bool au::trackedit::Au3ProjectHistory::undoAvailable() const
 
 void au::trackedit::Au3ProjectHistory::undo()
 {
+    AU_PERF_ZONE("Au3ProjectHistory::undo", Backend);
     doUndo();
 
     m_interactionOngoing = false;
@@ -49,6 +52,7 @@ bool au::trackedit::Au3ProjectHistory::redoAvailable() const
 
 void au::trackedit::Au3ProjectHistory::redo()
 {
+    AU_PERF_ZONE("Au3ProjectHistory::redo", Backend);
     doRedo();
 
     m_interactionOngoing = false;
@@ -62,6 +66,7 @@ void au::trackedit::Au3ProjectHistory::pushHistoryState(const std::string& longD
 
 void Au3ProjectHistory::pushHistoryState(const std::string& longDescription, const std::string& shortDescription, UndoPushType flags)
 {
+    AU_PERF_ZONE("Au3ProjectHistory::pushHistoryState", Backend);
     LOGI() << "pushHistoryState(\"" << shortDescription << "\", " << flags << ")";
     auto& project = projectRef();
     UndoPush undoFlags = static_cast<UndoPush>(flags);
@@ -75,6 +80,7 @@ void Au3ProjectHistory::pushHistoryState(const std::string& longDescription, con
 
 void au::trackedit::Au3ProjectHistory::rollbackState()
 {
+    AU_PERF_ZONE("Au3ProjectHistory::rollbackState", Backend);
     auto& project = projectRef();
     ::ProjectHistory::Get(project).RollbackState();
     m_interactionOngoing = false;
@@ -83,6 +89,7 @@ void au::trackedit::Au3ProjectHistory::rollbackState()
 
 void Au3ProjectHistory::startUserInteraction()
 {
+    AU_PERF_ZONE("Au3ProjectHistory::startUserInteraction", Backend);
     LOGI() << "startUserInteraction()";
     IF_ASSERT_FAILED(!m_interactionOngoing) {
         return;
@@ -95,6 +102,7 @@ void Au3ProjectHistory::startUserInteraction()
 
 void Au3ProjectHistory::endUserInteraction(bool modifyState)
 {
+    AU_PERF_ZONE("Au3ProjectHistory::endUserInteraction", Backend);
     LOGI() << "endUserInteraction()";
     if (m_interactionOngoing) {
         m_interactionOngoing = false;
@@ -107,6 +115,7 @@ void Au3ProjectHistory::endUserInteraction(bool modifyState)
 
 void Au3ProjectHistory::modifyState(bool autoSave)
 {
+    AU_PERF_ZONE("Au3ProjectHistory::modifyState", Backend);
     LOGD() << "modifyState(" << (autoSave ? "true" : "false") << ")";
     if (m_interactionOngoing) {
         LOGW() << "Attempt to modify state during undoable action";
@@ -118,6 +127,7 @@ void Au3ProjectHistory::modifyState(bool autoSave)
 
 void Au3ProjectHistory::modifyState(const std::type_index& restorerType)
 {
+    AU_PERF_ZONE("Au3ProjectHistory::modifyState", Backend);
     if (m_interactionOngoing) {
         return;
     }
@@ -134,6 +144,7 @@ void Au3ProjectHistory::markUnsaved()
 
 void Au3ProjectHistory::undoRedoToIndex(size_t index)
 {
+    AU_PERF_ZONE("Au3ProjectHistory::undoRedoToIndex", Backend);
     if (currentStateIndex() == index) {
         return;
     }

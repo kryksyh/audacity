@@ -1,5 +1,7 @@
 #include "timelinecontext.h"
 
+#include "shared/perf/perftrace.h"
+
 #include <QWheelEvent>
 #include <cmath>
 
@@ -455,6 +457,7 @@ void TimelineContext::onResizeFrameContentHeight(double frameHeight)
 
 void TimelineContext::moveToFrameTime(double startTime)
 {
+    AU_PERF_ZONE("TimelineContext::moveToFrameTime", Model);
     stopAnimation();
     setFrameStartTime(std::max(startTime, 0.0));
     updateFrameTime();
@@ -772,6 +775,7 @@ void TimelineContext::shiftFrameTimeOnStep(int direction)
 
 void TimelineContext::updateFrameTime()
 {
+    AU_PERF_ZONE("TimelineContext::updateFrameTime", Model);
     setFrameEndTime(positionToTime(m_frameWidth));
     emit frameTimeChanged();
 }
@@ -842,6 +846,7 @@ double TimelineContext::applySnapToTime(double time) const
 
 double TimelineContext::applySnapToItem(double time) const
 {
+    AU_PERF_COUNT_CALL("TimelineContext::applySnapToItem");
     auto viewState = this->viewState();
     if (!viewState || viewState->isSnapEnabled()) {
         return time;
@@ -874,6 +879,7 @@ double TimelineContext::applyDetectedSnap(double time) const
 
 double TimelineContext::findGuideline(double time) const
 {
+    AU_PERF_COUNT_CALL("TimelineContext::findGuideline");
     auto vs = this->viewState();
     if (!vs) {
         return time;
@@ -1156,6 +1162,7 @@ void TimelineContext::updateSingleItemSelected()
 
 void TimelineContext::updateSelectedItemTime()
 {
+    AU_PERF_COUNT_CALL("TimelineContext::updateSelectedItemTime");
     auto itemStart = selectionController()->leftMostSelectedItemStartTime();
     auto itemEnd = selectionController()->rightMostSelectedItemEndTime();
     if (itemStart.has_value() && itemEnd.has_value()) {

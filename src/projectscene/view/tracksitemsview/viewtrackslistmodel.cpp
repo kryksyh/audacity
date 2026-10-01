@@ -3,6 +3,8 @@
 */
 #include "viewtrackslistmodel.h"
 
+#include "shared/perf/perftrace.h"
+
 #include "global/async/async.h"
 
 #include "global/containers.h"
@@ -48,6 +50,7 @@ ViewTracksListModel::ViewTracksListModel(QObject* parent)
 
 void ViewTracksListModel::load()
 {
+    AU_PERF_ZONE("ViewTracksListModel::load", Model);
     globalContext()->currentTrackeditProjectChanged().onNotify(this, [this]() {
         load();
     }, muse::async::Asyncable::Mode::SetReplace);

@@ -3,6 +3,8 @@
 */
 #include "trackclipitem.h"
 
+#include "shared/perf/perftrace.h"
+
 #include "framework/global/realfn.h"
 
 using namespace au::projectscene;
@@ -14,6 +16,7 @@ TrackClipItem::TrackClipItem(QObject* parent)
 
 void TrackClipItem::setClip(const trackedit::Clip& clip)
 {
+    AU_PERF_COUNT_CALL("TrackClipItem::setClip");
     m_key = TrackItemKey(clip.key);
     m_title = clip.title;
     m_color = configuration()->clipColor(clip.colorIndex).toQColor();

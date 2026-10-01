@@ -21,6 +21,8 @@
  */
 #include "projectautosaver.h"
 
+#include "shared/perf/perftrace.h"
+
 // #include "engraving/infrastructure/mscio.h"
 
 #include "defer.h"
@@ -110,6 +112,7 @@ void ProjectAutoSaver::update()
 
 void ProjectAutoSaver::onTrySave()
 {
+    AU_PERF_ZONE("ProjectAutoSaver::onTrySave", Backend);
     TRACEFUNC;
 
     DEFER {

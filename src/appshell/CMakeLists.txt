@@ -31,10 +31,14 @@ target_sources(appshell PRIVATE
     internal/applicationuiactions.h
     internal/appshellconfiguration.cpp
     internal/appshellconfiguration.h
+    api/perfapi.cpp
+    api/perfapi.h
     internal/applicationactioncontroller.cpp
     internal/applicationactioncontroller.h
     internal/framelesswindowcontroller.cpp
     internal/framelesswindowcontroller.h
+    internal/perftracecontroller.cpp
+    internal/perftracecontroller.h
     internal/startupscenario.cpp
     internal/startupscenario.h
     internal/isessionsmanager.h
@@ -104,6 +108,7 @@ qt_add_resources(appshell appshell_resources
 )
 
 target_link_libraries(appshell PRIVATE
+    shared
     muse::ui
     muse::uicomponents
     muse::dockwindow

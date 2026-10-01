@@ -1,5 +1,7 @@
 #include "minmaxrmspainter.h"
 
+#include "shared/perf/perftrace.h"
+
 #include "au3wrap/internal/domaccessor.h"
 #include "wavepainterutils.h"
 #include "WaveformPainter.h"
@@ -34,6 +36,7 @@ float getDBValue(float value, float dbRange)
 namespace au::projectscene {
 void MinMaxRMSPainter::paint(QPainter& painter, const trackedit::ClipKey& clipKey, const IWavePainter::Params& params)
 {
+    AU_PERF_COUNT_CALL("MinMaxRMSPainter::paint");
     au::au3::Au3Project* au3Project = reinterpret_cast<au::au3::Au3Project*>(globalContext()->currentProject()->au3ProjectPtr());
 
     WaveTrack* track = au::au3::DomAccessor::findWaveTrack(*au3Project, TrackId(clipKey.trackId));

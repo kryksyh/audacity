@@ -25,6 +25,8 @@
 
 #include "projectviewstate.h"
 
+#include "shared/perf/perftrace.h"
+
 using namespace au::projectscene;
 
 constexpr int TRACK_DEFAULT_HEIGHT = 116;
@@ -1046,6 +1048,7 @@ void ProjectViewState::setItemsBoundaries(const std::set<muse::secs_t>& boundari
 
 std::set<muse::secs_t> ProjectViewState::itemsBoundaries() const
 {
+    AU_PERF_COUNT_CALL("ProjectViewState::itemsBoundaries");
     return m_itemsBoundaries;
 }
 
@@ -1056,6 +1059,7 @@ void ProjectViewState::setEditedItem(const trackedit::TrackItemKey& key)
 
 void ProjectViewState::updateItemsBoundaries(bool excludeCurrentSelection, const trackedit::TrackItemKey& itemKeyToOmit)
 {
+    AU_PERF_ZONE("ProjectViewState::updateItemsBoundaries", Model);
     auto prj = globalContext()->currentTrackeditProject();
     if (!prj) {
         return;

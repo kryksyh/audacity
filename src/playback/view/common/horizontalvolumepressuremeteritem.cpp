@@ -3,6 +3,8 @@
 */
 #include "horizontalvolumepressuremeteritem.h"
 
+#include "shared/perf/perftrace.h"
+
 #include <QLinearGradient>
 #include <QPainter>
 
@@ -18,6 +20,7 @@ HorizontalVolumePressureMeterItem::HorizontalVolumePressureMeterItem(QQuickItem*
 
 void HorizontalVolumePressureMeterItem::paint(QPainter* painter)
 {
+    AU_PERF_ZONE("HorizontalVolumePressureMeterItem::paint", Paint);
     if (!painter) {
         return;
     }

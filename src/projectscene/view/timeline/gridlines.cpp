@@ -6,6 +6,8 @@
 
 #include "gridlines.h"
 
+#include "shared/perf/perftrace.h"
+
 using namespace au::projectscene;
 
 GridLines::GridLines(QQuickItem* parent)
@@ -15,6 +17,7 @@ GridLines::GridLines(QQuickItem* parent)
 
 void GridLines::paint(QPainter* painter)
 {
+    AU_PERF_ZONE("GridLines::paint", Paint);
     // set background
     QRectF rect = boundingRect();
     QColor canvasColor = uiconfiguration()->currentTheme().values.value(muse::ui::BACKGROUND_QUARTERNARY_COLOR).toString();

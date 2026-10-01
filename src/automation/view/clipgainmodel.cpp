@@ -3,6 +3,8 @@
  */
 #include "clipgainmodel.h"
 
+#include "shared/perf/perftrace.h"
+
 #include "log.h"
 
 using namespace au::automation;
@@ -156,6 +158,7 @@ void ClipGainModel::setClipKey(const ClipKey& key)
 
 void ClipGainModel::reload()
 {
+    AU_PERF_ZONE("ClipGainModel::reload", Model);
     if (!m_clipKey.isValid()) {
         clear();
         return;

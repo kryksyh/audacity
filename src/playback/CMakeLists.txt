@@ -81,6 +81,7 @@ set(MODULE_SRC
     )
 
 set(MODULE_LINK
+        shared
         au3wrap
         au3-audio-io
         au3-project-rate

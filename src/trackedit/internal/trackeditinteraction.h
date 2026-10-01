@@ -9,6 +9,7 @@
 #include "record/irecordcontroller.h"
 #include "au3wrap/internal/progressdialog.h"
 #include "playback/iplaybackcontroller.h"
+#include "shared/perf/perftrace.h"
 
 namespace au::trackedit {
 class TrackeditInteraction : public ITrackeditInteraction, public muse::Contextable
@@ -147,6 +148,7 @@ private:
     template<typename Func, typename ... Args>
     muse::Ret withPlaybackStop(Func method, Args&&... args)
     {
+        AU_PERF_ZONE("TrackeditInteraction op", Backend);
         if (recordController()->isRecording()) {
             return make_ret(trackedit::Err::DisallowedDuringRecording);
         }
@@ -159,6 +161,7 @@ private:
     auto withPlaybackStopRetVal(Func method, Args&&... args)
     -> decltype((m_interaction.get()->*method)(std::forward<Args>(args)...))
     {
+        AU_PERF_ZONE("TrackeditInteraction op", Backend);
         using RetType = decltype((m_interaction.get()->*method)(std::forward<Args>(args)...));
 
         if (recordController()->isRecording()) {

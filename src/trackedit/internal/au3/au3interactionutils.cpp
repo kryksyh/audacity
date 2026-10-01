@@ -3,6 +3,8 @@
  */
 #include "au3interactionutils.h"
 
+#include "shared/perf/perftrace.h"
+
 #include <QCoreApplication>
 
 #include "../../trackedittypes.h"
@@ -297,6 +299,7 @@ muse::Ret au::trackedit::utils::withProgress(muse::IInteractive& interactive, co
 void au::trackedit::utils::trimOrDeleteOverlapping(const ITrackeditProjectPtr& project, au3::Au3WaveTrack* waveTrack,
                                                    secs_t begin, secs_t end, std::shared_ptr<au3::Au3WaveClip> otherClip)
 {
+    AU_PERF_ZONE("utils::trimOrDeleteOverlapping", Backend);
     if (muse::RealIsEqualOrLess(begin, otherClip->GetPlayStartTime())
         && muse::RealIsEqualOrMore(end, otherClip->GetPlayEndTime())) {
         auto clipInfo = au::au3::DomConverter::clip(waveTrack, otherClip.get());

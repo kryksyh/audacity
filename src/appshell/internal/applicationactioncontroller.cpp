@@ -30,6 +30,8 @@
 #include <QFileOpenEvent>
 #include <QWindow>
 #include <QMimeData>
+#include <QDateTime>
+#include <QQuickWindow>
 
 #include "framework/global/async/async.h"
 #include "framework/global/defer.h"
@@ -83,6 +85,8 @@ void ApplicationActionController::init()
     dispatcher()->reg(this, "preference-dialog", this, &ApplicationActionController::openPreferencesDialog);
 
     dispatcher()->reg(this, "revert-factory", this, &ApplicationActionController::revertToFactorySettings);
+
+    dispatcher()->reg(this, "diagnostic-perf-trace", this, &ApplicationActionController::togglePerfTrace);
 
     dispatcher()->reg(this, "audio-settings", this, &ApplicationActionController::openAudioSettingsDialog);
     dispatcher()->reg(this, "shortcuts-preferences", this, &ApplicationActionController::openShortcutsPreferencesDialog);
@@ -336,6 +340,10 @@ bool ApplicationActionController::quit(const muse::io::path_t& installerPath)
         }
     }
 
+    if (m_perfTrace.isRunning()) {
+        m_perfTrace.stopAndSave(perfTraceFilePath());
+    }
+
     if (!installerPath.empty()) {
         //! NOTE: All windows are quitting to complete the update, apply it
         //! in-place, falling back to handing the package to the user.
@@ -489,6 +497,38 @@ void ApplicationActionController::revertToFactorySettings()
             }
         });
     });
+}
+
+bool ApplicationActionController::isPerfTraceRunning() const
+{
+    return m_perfTrace.isRunning();
+}
+
+muse::async::Notification ApplicationActionController::perfTraceRunningChanged() const
+{
+    return m_perfTraceRunningChanged;
+}
+
+muse::io::path_t ApplicationActionController::perfTraceFilePath() const
+{
+    const QString fileName = "trace-" + QDateTime::currentDateTime().toString("yyyyMMdd-HHmmss") + ".json";
+    return globalConfiguration()->userAppDataPath() + "/perftraces/" + fileName;
+}
+
+void ApplicationActionController::togglePerfTrace()
+{
+    if (!m_perfTrace.isRunning()) {
+        m_perfTrace.start(qobject_cast<QQuickWindow*>(mainWindow()->qWindow()));
+        m_perfTraceRunningChanged.notify();
+        return;
+    }
+
+    const muse::io::path_t filePath = perfTraceFilePath();
+    const bool saved = m_perfTrace.stopAndSave(filePath);
+    m_perfTraceRunningChanged.notify();
+    if (saved) {
+        platformInteractive()->revealInFileBrowser(filePath);
+    }
 }
 
 bool ApplicationActionController::isProjectOpened() const

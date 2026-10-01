@@ -26,6 +26,7 @@ set(MODULE_SRC
 )
 
 set(MODULE_LINK
+        shared
         au3-utility # For LockFreeQueue
 )
 

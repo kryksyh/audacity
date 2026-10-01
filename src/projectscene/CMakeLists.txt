@@ -242,6 +242,7 @@ set(MODULE_SRC
 set(MODULE_QML_IMPORT ${CMAKE_CURRENT_LIST_DIR}/qml )
 
 set(MODULE_LINK
+        shared
         au3wrap
         au3-channel
         au3-mixer

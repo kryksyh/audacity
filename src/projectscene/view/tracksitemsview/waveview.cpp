@@ -3,6 +3,8 @@
 */
 #include "waveview.h"
 
+#include "shared/perf/perftrace.h"
+
 #include "global/translation.h"
 
 #include <QPainter>
@@ -189,6 +191,7 @@ void WaveView::applyClassicStyle(IWavePainter::Params& params, bool selected) co
 
 void WaveView::paint(QPainter* painter)
 {
+    AU_PERF_ZONE("WaveView::paint", Paint);
     IWavePainter::Params params = getWavePainterParams();
     IWavePainter::PlotType pType = wavepainterutils::getPlotType(globalContext()->currentProject(), m_clipKey.key, params.zoom);
 

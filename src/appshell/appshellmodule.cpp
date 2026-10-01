@@ -24,12 +24,14 @@
 
 #include <QQmlEngine>
 
+#include "framework/global/api/iapiregister.h"
 #include "framework/global/iapplicationeventcontroller.h"
 #include "framework/global/modularity/ioc.h"
 
 #include "framework/interactive/iinteractiveuriregister.h"
 #include "framework/ui/iuiactionsregister.h"
 
+#include "api/perfapi.h"
 #include "internal/applicationuiactions.h"
 #include "internal/applicationactioncontroller.h"
 #include "internal/appshellconfiguration.h"
@@ -70,6 +72,11 @@ void AppShellModule::registerExports()
 
 void AppShellModule::resolveImports()
 {
+    auto ar = globalIoc()->resolve<muse::api::IApiRegister>(mname);
+    if (ar) {
+        ar->regApiCreator(mname, "Audacity.Perf", new muse::api::ApiCreator<api::PerfApi>());
+    }
+
     auto ir = globalIoc()->resolve<muse::interactive::IInteractiveUriRegister>(mname);
     if (ir) {
         ir->registerPageUri(muse::Uri("audacity://home"));

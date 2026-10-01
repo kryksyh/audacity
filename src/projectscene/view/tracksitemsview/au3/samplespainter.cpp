@@ -1,5 +1,7 @@
 #include "samplespainter.h"
 
+#include "shared/perf/perftrace.h"
+
 #include <set>
 
 #include "au3wrap/internal/domaccessor.h"
@@ -93,6 +95,7 @@ void drawSampleStalk(const au::projectscene::SampleData& samples, int yZero, con
 namespace au::projectscene {
 void SamplesPainter::paint(QPainter& painter, const trackedit::ClipKey& clipKey, const IWavePainter::Params& params)
 {
+    AU_PERF_COUNT_CALL("SamplesPainter::paint");
     painter.save();
     painter.setRenderHint(QPainter::Antialiasing, false);
 

@@ -1,5 +1,7 @@
 #include "au3trackeditproject.h"
 
+#include "shared/perf/perftrace.h"
+
 #include <algorithm>
 
 #include "au3-label-track/LabelTrack.h"
@@ -153,6 +155,7 @@ void Au3TrackeditProject::setHasLabels(bool has)
 
 au::trackedit::TrackList Au3TrackeditProject::trackList() const
 {
+    AU_PERF_COUNT_CALL("Au3TrackeditProject::trackList");
     au::trackedit::TrackList au4tracks;
 
     for (const Au3Track* t : *m_impl->trackList) {
@@ -165,6 +168,7 @@ au::trackedit::TrackList Au3TrackeditProject::trackList() const
 
 std::optional<au::trackedit::Track> Au3TrackeditProject::track(TrackId trackId) const
 {
+    AU_PERF_COUNT_CALL("Au3TrackeditProject::track");
     std::optional<au::trackedit::Track> toReturn;
 
     for (const Au3Track* t : *m_impl->trackList) {
@@ -284,6 +288,7 @@ au::trackedit::Labels Au3TrackeditProject::getLabels(const TrackId& trackId) con
 
 muse::async::NotifyList<au::trackedit::Clip> Au3TrackeditProject::clipList(const au::trackedit::TrackId& trackId) const
 {
+    AU_PERF_COUNT_CALL("Au3TrackeditProject::clipList");
     au::trackedit::Clips clips = getClips(trackId);
     muse::async::NotifyList<au::trackedit::Clip> clipNotifyList;
 
@@ -300,6 +305,7 @@ muse::async::NotifyList<au::trackedit::Clip> Au3TrackeditProject::clipList(const
 
 muse::async::NotifyList<au::trackedit::Label> Au3TrackeditProject::labelList(const au::trackedit::TrackId& trackId) const
 {
+    AU_PERF_COUNT_CALL("Au3TrackeditProject::labelList");
     au::trackedit::Labels labels = getLabels(trackId);
     muse::async::NotifyList<au::trackedit::Label> labelNotifyList;
 
@@ -379,12 +385,14 @@ void Au3TrackeditProject::reload()
 
 void Au3TrackeditProject::notifyAboutTrackAdded(const Track& track)
 {
+    AU_PERF_COUNT_CALL("Au3TrackeditProject::notifyAboutTrackAdded");
     m_trackAdded.send(track);
     updateHasLabels();
 }
 
 void Au3TrackeditProject::notifyAboutTrackChanged(const Track& track)
 {
+    AU_PERF_COUNT_CALL("Au3TrackeditProject::notifyAboutTrackChanged");
     m_trackChanged.send(track);
     updateHasAudioContent();
     updateHasLabels();
@@ -392,23 +400,27 @@ void Au3TrackeditProject::notifyAboutTrackChanged(const Track& track)
 
 void Au3TrackeditProject::notifyAboutTrackRemoved(const Track& track)
 {
+    AU_PERF_COUNT_CALL("Au3TrackeditProject::notifyAboutTrackRemoved");
     m_trackRemoved.send(track);
     updateHasLabels();
 }
 
 void Au3TrackeditProject::notifyAboutTrackInserted(const Track& track, int pos)
 {
+    AU_PERF_COUNT_CALL("Au3TrackeditProject::notifyAboutTrackInserted");
     m_trackInserted.send(track, pos);
     updateHasLabels();
 }
 
 void Au3TrackeditProject::notifyAboutTrackMoved(const Track& track, int pos)
 {
+    AU_PERF_COUNT_CALL("Au3TrackeditProject::notifyAboutTrackMoved");
     return m_trackMoved.send(track, pos);
 }
 
 au::trackedit::Clip Au3TrackeditProject::clip(const ClipKey& key) const
 {
+    AU_PERF_COUNT_CALL("Au3TrackeditProject::clip");
     Au3WaveTrack* waveTrack = DomAccessor::findWaveTrack(*m_impl->prj, Au3TrackId(key.trackId));
     if (!waveTrack) {
         return Clip();
@@ -439,17 +451,20 @@ au::trackedit::Label Au3TrackeditProject::label(const LabelKey& key) const
 
 void Au3TrackeditProject::notifyAboutTrackClipListChanged(const Track& track)
 {
+    AU_PERF_COUNT_CALL("Au3TrackeditProject::notifyAboutTrackClipListChanged");
     m_trackClipListChanged.send(track);
 }
 
 void Au3TrackeditProject::notifyAboutClipChanged(const Clip& clip)
 {
+    AU_PERF_COUNT_CALL("Au3TrackeditProject::notifyAboutClipChanged");
     async::ChangedNotifier<Clip>& notifier = m_clipsChanged[clip.key.trackId];
     notifier.itemChanged(clip);
 }
 
 void Au3TrackeditProject::notifyAboutClipRemoved(const Clip& clip)
 {
+    AU_PERF_COUNT_CALL("Au3TrackeditProject::notifyAboutClipRemoved");
     async::ChangedNotifier<Clip>& notifier = m_clipsChanged[clip.key.trackId];
     notifier.itemRemoved(clip);
 
@@ -458,6 +473,7 @@ void Au3TrackeditProject::notifyAboutClipRemoved(const Clip& clip)
 
 void Au3TrackeditProject::notifyAboutClipAdded(const Clip& clip)
 {
+    AU_PERF_COUNT_CALL("Au3TrackeditProject::notifyAboutClipAdded");
     async::ChangedNotifier<Clip>& notifier = m_clipsChanged[clip.key.trackId];
     notifier.itemAdded(clip);
 
@@ -466,12 +482,14 @@ void Au3TrackeditProject::notifyAboutClipAdded(const Clip& clip)
 
 void Au3TrackeditProject::notifyAboutLabelChanged(const Label& label)
 {
+    AU_PERF_COUNT_CALL("Au3TrackeditProject::notifyAboutLabelChanged");
     async::ChangedNotifier<Label>& notifier = m_labelsChanged[label.key.trackId];
     notifier.itemChanged(label);
 }
 
 void Au3TrackeditProject::notifyAboutLabelRemoved(const Label& label)
 {
+    AU_PERF_COUNT_CALL("Au3TrackeditProject::notifyAboutLabelRemoved");
     async::ChangedNotifier<Label>& notifier = m_labelsChanged[label.key.trackId];
     notifier.itemRemoved(label);
 
@@ -480,6 +498,7 @@ void Au3TrackeditProject::notifyAboutLabelRemoved(const Label& label)
 
 void Au3TrackeditProject::notifyAboutLabelAdded(const Label& label)
 {
+    AU_PERF_COUNT_CALL("Au3TrackeditProject::notifyAboutLabelAdded");
     async::ChangedNotifier<Label>& notifier = m_labelsChanged[label.key.trackId];
     notifier.itemAdded(label);
 

@@ -1,5 +1,7 @@
 #include "changedetection.h"
 
+#include "shared/perf/perftrace.h"
+
 #include "log.h"
 
 using namespace au::trackedit;
@@ -199,6 +201,7 @@ void notifyOfUndoRedo(const TracksAndItems& before,
                       const TracksAndItems& after,
                       ITrackeditProjectPtr trackeditProject)
 {
+    AU_PERF_ZONE("changedetection::notifyOfUndoRedo", Backend);
     bool changed = false;
 
     auto trackIdCheck = [](const Track& first, const Track& second) {

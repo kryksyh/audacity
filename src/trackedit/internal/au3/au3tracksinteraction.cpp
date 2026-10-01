@@ -3,6 +3,8 @@
 */
 #include "au3tracksinteraction.h"
 
+#include "shared/perf/perftrace.h"
+
 #include <algorithm>
 #include <cmath>
 
@@ -185,6 +187,7 @@ bool Au3TracksInteraction::changeTracksColor(const TrackIdList& tracksIds, ClipC
 muse::Ret Au3TracksInteraction::paste(const std::vector<ITrackDataPtr>& data, secs_t begin, bool moveClips, bool moveAllTracks,
                                       bool isMultiSelectionCopy, bool& projectWasModified)
 {
+    AU_PERF_ZONE("Au3TracksInteraction::paste", Backend);
     if (data.empty()) {
         return make_ret(trackedit::Err::TrackEmpty);
     }
@@ -275,6 +278,7 @@ muse::Ret Au3TracksInteraction::pasteClips(const std::vector<Au3TrackDataPtr>& c
                                            bool pasteIntoExistingClip,
                                            bool& projectWasModified)
 {
+    AU_PERF_ZONE("Au3TracksInteraction::pasteClips", Backend);
     // Convert Au3TrackDataPtr to ITrackDataPtr for helper method
     std::vector<ITrackDataPtr> copiedDataBase(copiedData.begin(), copiedData.end());
 
@@ -1439,6 +1443,7 @@ void Au3TracksInteraction::removeDragAddedTracks(size_t numTracksWhenDragStarted
 
 TrackIdList Au3TracksInteraction::pasteIntoNewTracks(const std::vector<Au3TrackDataPtr>& tracksData)
 {
+    AU_PERF_ZONE("Au3TracksInteraction::pasteIntoNewTracks", Backend);
     auto& project = projectRef();
     auto& tracks = Au3TrackList::Get(project);
     auto prj = globalContext()->currentTrackeditProject();

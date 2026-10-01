@@ -5,6 +5,8 @@
 
 #include "timelineruler.h"
 
+#include "shared/perf/perftrace.h"
+
 namespace {
 constexpr int MINORMINOR_TICK_HEIGHT_RATIO = 8;
 constexpr int MINOR_TICK_HEIGHT_RATIO = 4;
@@ -57,6 +59,7 @@ void TimelineRuler::setFormatter(const TimelineRulerMode mode)
 
 void TimelineRuler::paint(QPainter* painter)
 {
+    AU_PERF_ZONE("TimelineRuler::paint", Paint);
     const qreal w = width();
     const qreal h = height();
 

@@ -2,6 +2,8 @@
  * Audacity: A Digital Audio Editor
  */
 #include "./clipchannelspectrogramview.h"
+
+#include "shared/perf/perftrace.h"
 #include "framework/global/types/number.h"
 
 namespace au::spectrogram {
@@ -161,6 +163,7 @@ void ClipChannelSpectrogramView::setClipSelected(bool selected)
 
 void ClipChannelSpectrogramView::paint(QPainter* painter)
 {
+    AU_PERF_ZONE("ClipChannelSpectrogramView::paint", Paint);
     const auto project = globalContext()->currentProject();
 
     const auto indentTime = m_timelineIndentWidth / m_zoom;

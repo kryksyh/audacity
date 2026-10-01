@@ -3,6 +3,8 @@
 */
 #include "au3player.h"
 
+#include "shared/perf/perftrace.h"
+
 #include "framework/global/types/number.h"
 #include "framework/global/defer.h"
 #include "framework/global/log.h"
@@ -562,6 +564,7 @@ muse::secs_t Au3Player::playbackPosition() const
 
 void Au3Player::updatePlaybackPosition()
 {
+    AU_PERF_ZONE("Au3Player::updatePlaybackPosition", Backend);
     using namespace std::chrono;
 
     if (!globalContext()->currentProject()) {

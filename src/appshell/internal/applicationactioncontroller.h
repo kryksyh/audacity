@@ -27,8 +27,10 @@
 #include "../iapplicationactioncontroller.h"
 
 #include "framework/global/async/asyncable.h"
+#include "framework/global/async/notification.h"
 #include "framework/global/modularity/ioc.h"
 #include "framework/global/iapplicationeventcontroller.h"
+#include "framework/global/iglobalconfiguration.h"
 #include "framework/actions/actionable.h"
 #include "framework/actions/iactionsdispatcher.h"
 #include "framework/rcommand/icommanddispatcher.h"
@@ -41,6 +43,7 @@
 #include "iappshellconfiguration.h"
 #include "iapplication.h"
 #include "startupscenario.h"
+#include "perftracecontroller.h"
 #include "project/iprojectfilescontroller.h"
 #include "record/irecordcontroller.h"
 #include "context/iuicontextresolver.h"
@@ -63,6 +66,7 @@ class ApplicationActionController : public QObject, public IApplicationActionCon
     muse::GlobalInject<muse::IPlatformInteractive> platformInteractive;
     muse::GlobalInject<muse::mi::IMultiWindowsProvider> multiwindowsProvider;
     muse::GlobalInject<muse::IApplicationEventController> applicationEventController;
+    muse::GlobalInject<muse::IGlobalConfiguration> globalConfiguration;
 
     muse::ContextInject<muse::actions::IActionsDispatcher> dispatcher { this };
     muse::ContextInject<muse::rcommand::ICommandDispatcher> commandDispatcher { this };
@@ -91,6 +95,9 @@ public:
     const std::vector<muse::actions::ActionCode>& prohibitedActionsWhileRecording() const;
 
     muse::ValCh<bool> isFullScreen() const;
+
+    bool isPerfTraceRunning() const;
+    muse::async::Notification perfTraceRunningChanged() const;
 
     void onDragEnterEvent(QDragEnterEvent* event) override;
     void onDragMoveEvent(QDragMoveEvent* event) override;
@@ -122,6 +129,9 @@ private:
 
     void revertToFactorySettings();
 
+    void togglePerfTrace();
+    muse::io::path_t perfTraceFilePath() const;
+
     bool isProjectOpened() const;
     bool isProjectOpenedAndFocused() const;
 
@@ -138,6 +148,8 @@ private:
     void doGlobalContextMenu();
 
     bool m_quiting = false;
+    PerfTraceController m_perfTrace;
+    muse::async::Notification m_perfTraceRunningChanged;
 
     muse::async::Channel<muse::actions::ActionCodeList> m_actionsReceiveAvailableChanged;
 };

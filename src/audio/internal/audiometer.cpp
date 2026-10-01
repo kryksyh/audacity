@@ -8,6 +8,8 @@
 #include "audiometer.h"
 #include "auqttimer.h"
 
+#include "shared/perf/perftrace.h"
+
 #include "global/log.h"
 #include "global/types/ratio.h" // muse::linear_to_db
 
@@ -60,6 +62,7 @@ AudioMeter::AudioMeter(std::unique_ptr<ITimer> playingTimer, std::unique_ptr<ITi
 
     m_playingTimer->setInterval(std::chrono::milliseconds { static_cast<int>(updatePeriod * 1000) });
     m_playingTimer->setCallback([this]() {
+        AU_PERF_ZONE("AudioMeter tick", Backend);
         for (auto& [_, trackData] : m_trackData) {
             for (auto& [_, levels] : trackData.channelLevels) {
                 decay(levels.peak);

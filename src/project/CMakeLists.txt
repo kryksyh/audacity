@@ -139,6 +139,7 @@ else() # MSVC
 endif()
 
 set(MODULE_LINK
+        shared
         au3wrap
         au3-tags
         Qt::Widgets

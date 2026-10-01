@@ -3,6 +3,8 @@
 */
 #include "trackitemsmovecontroller.h"
 
+#include "shared/perf/perftrace.h"
+
 #include <algorithm>
 #include <QScopedValueRollback>
 
@@ -115,6 +117,7 @@ void TrackItemsMoveController::start(const TrackItemKey& key)
 
 void TrackItemsMoveController::start(const TrackItemKey& key, bool keyboard)
 {
+    AU_PERF_ZONE("TrackItemsMoveController::start", Model);
     if (active() || !m_context || !key.isValid()) {
         return;
     }
@@ -187,6 +190,7 @@ bool TrackItemsMoveController::keyboardActive() const
 
 void TrackItemsMoveController::moveByKeyboard(double timeOffset, int trackOffset)
 {
+    AU_PERF_ZONE("TrackItemsMoveController::moveByKeyboard", Model);
     if (m_updating || (active() && !keyboardActive())) {
         return;
     }
@@ -303,6 +307,7 @@ int TrackItemsMoveController::pointerTrackOffset() const
 
 void TrackItemsMoveController::update()
 {
+    AU_PERF_ZONE("TrackItemsMoveController::update", Model);
     if (!active() || keyboardActive() || !m_context || m_updating || globalContext()->currentTrackeditProject() != m_project) {
         return;
     }
@@ -345,6 +350,7 @@ void TrackItemsMoveController::update()
 
 void TrackItemsMoveController::updatePreview(double timeOffset, int trackOffset)
 {
+    AU_PERF_ZONE("TrackItemsMoveController::updatePreview", Model);
     double endTime = 0.0;
     for (const trackedit::ClipKey& key : m_clips) {
         const Clip clip = m_project->clip(key);
@@ -415,6 +421,7 @@ TrackItemKeyList TrackItemsMoveController::itemsOnTrack(TrackId trackId) const
 
 au::projectscene::TrackItemKey TrackItemsMoveController::finish()
 {
+    AU_PERF_ZONE("TrackItemsMoveController::finish", Model);
     if (!active() || m_updating) {
         return {};
     }
@@ -455,6 +462,7 @@ au::projectscene::TrackItemKey TrackItemsMoveController::finish()
 
 bool TrackItemsMoveController::cancel()
 {
+    AU_PERF_ZONE("TrackItemsMoveController::cancel", Model);
     if (!active() || m_updating) {
         return false;
     }

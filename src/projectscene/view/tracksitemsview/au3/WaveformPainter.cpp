@@ -3,6 +3,8 @@
 #include "WaveformPainter.h"
 #include "au3-screen-geometry/ZoomInfo.h"
 
+#include "shared/perf/perftrace.h"
+
 namespace au::projectscene {
 struct WaveBitmapCacheElementQt final : public WaveBitmapCacheElement
 {
@@ -92,8 +94,12 @@ void WaveformPainter::Draw(size_t channelIndex,
     const ZoomInfo zoomInfo(0.0, metrics.zoom);
     bitmapCache->SetSelection(zoomInfo, metrics.selectionStartTime, metrics.selectionEndTime, true);
 
-    auto range = bitmapCache->PerformLookup(zoomInfo, metrics.fromTime, metrics.toTime);
+    auto range = [&]() {
+        AU_PERF_ZONE("WaveformPainter lookup", Paint);
+        return bitmapCache->PerformLookup(zoomInfo, metrics.fromTime, metrics.toTime);
+    }();
 
+    AU_PERF_ZONE("WaveformPainter blit", Paint);
     double left = metrics.left;
     int height = metrics.height;
 

@@ -1,5 +1,7 @@
 #include "audacityproject.h"
 
+#include "shared/perf/perftrace.h"
+
 #include "framework/global/log.h"
 #include "framework/global/io/fileinfo.h"
 #include "framework/global/io/ioretcodes.h"
@@ -396,6 +398,7 @@ Ret Audacity4Project::save(const muse::io::path_t& path, SaveMode saveMode)
 
 Ret Audacity4Project::saveProject(const muse::io::path_t& path, bool generateBackup, bool createThumbnail)
 {
+    AU_PERF_ZONE("Audacity4Project::saveProject", Backend);
     return doSave(path, generateBackup, createThumbnail);
 }
 

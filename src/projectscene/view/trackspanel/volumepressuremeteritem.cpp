@@ -3,6 +3,8 @@
 */
 #include "volumepressuremeteritem.h"
 
+#include "shared/perf/perftrace.h"
+
 #include <QLinearGradient>
 #include <QPainter>
 #include <QPainterPath>
@@ -59,6 +61,7 @@ VolumePressureMeterItem::VolumePressureMeterItem(QQuickItem* parent)
 
 void VolumePressureMeterItem::paint(QPainter* painter)
 {
+    AU_PERF_ZONE("VolumePressureMeterItem::paint", Paint);
     if (!painter) {
         return;
     }

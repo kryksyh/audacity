@@ -1,5 +1,7 @@
 #include "connectingdotspainter.h"
 
+#include "shared/perf/perftrace.h"
+
 #include "au3-wave-track/WaveClip.h"
 #include "au3-track/PendingTracks.h"
 
@@ -26,6 +28,7 @@ void drawConnectingPoints(const au::projectscene::SampleData& samples, const au:
 namespace au::projectscene {
 void ConnectingDotsPainter::paint(QPainter& painter, const trackedit::ClipKey& clipKey, const IWavePainter::Params& params)
 {
+    AU_PERF_COUNT_CALL("ConnectingDotsPainter::paint");
     au::au3::Au3Project* au3Project = reinterpret_cast<au::au3::Au3Project*>(globalContext()->currentProject()->au3ProjectPtr());
 
     WaveTrack* track = au::au3::DomAccessor::findWaveTrack(*au3Project, TrackId(clipKey.trackId));

@@ -22,6 +22,8 @@
 
 #include "playcursorcontroller.h"
 
+#include "shared/perf/perftrace.h"
+
 #include <algorithm>
 #include <cmath>
 
@@ -169,6 +171,7 @@ au::context::IPlaybackStatePtr PlayCursorController::playbackState() const
 
 void PlayCursorController::updatePositionX(muse::secs_t secs)
 {
+    AU_PERF_ZONE("PlayCursorController::updatePositionX", Model);
     const bool seekAnimated = std::exchange(m_seekAnimated, false);
     const bool keepView = std::exchange(m_keepViewOnSeek, false);
 

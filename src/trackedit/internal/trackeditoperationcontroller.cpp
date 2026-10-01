@@ -4,6 +4,8 @@
 
 #include "trackeditoperationcontroller.h"
 
+#include "shared/perf/perftrace.h"
+
 #include "trackediterrors.h"
 
 namespace au::trackedit {
@@ -23,6 +25,7 @@ secs_t TrackeditOperationController::clipEndTime(const ClipKey& clipKey) const
 
 bool TrackeditOperationController::changeClipStartTime(const ClipKey& clipKey, secs_t newStartTime, bool completed)
 {
+    AU_PERF_ZONE("TrackeditOperationController::changeClipStartTime", Backend);
     return clipsInteraction()->changeClipStartTime(clipKey, newStartTime, completed);
 }
 
@@ -180,6 +183,7 @@ void TrackeditOperationController::clearClipboard()
 
 muse::Ret TrackeditOperationController::pasteFromClipboard(secs_t begin, bool moveClips, bool moveAllTracks)
 {
+    AU_PERF_ZONE("TrackeditOperationController::pasteFromClipboard", Backend);
     auto modifiedState = false;
     muse::Ret ret;
     const auto paths = clipboard()->systemClipboardFilePaths();
@@ -222,6 +226,7 @@ muse::Ret TrackeditOperationController::pasteFromClipboard(secs_t begin, bool mo
 
 bool TrackeditOperationController::cutClipIntoClipboard(const ClipKey& clipKey)
 {
+    AU_PERF_ZONE("TrackeditOperationController::cutClipIntoClipboard", Backend);
     clipboard()->clearSystemClipboard();
     ITrackDataPtr data = clipsInteraction()->cutClip(clipKey);
     if (!data) {
@@ -235,6 +240,7 @@ bool TrackeditOperationController::cutClipIntoClipboard(const ClipKey& clipKey)
 bool TrackeditOperationController::cutItemDataIntoClipboard(const TrackIdList& tracksIds, secs_t begin, secs_t end, bool moveClips,
                                                             bool isRangeSelection)
 {
+    AU_PERF_ZONE("TrackeditOperationController::cutItemDataIntoClipboard", Backend);
     clipboard()->clearSystemClipboard();
     std::vector<ITrackDataPtr> tracksData;
     for (const auto& trackId : tracksIds) {
@@ -254,6 +260,7 @@ bool TrackeditOperationController::cutItemDataIntoClipboard(const TrackIdList& t
 
 bool TrackeditOperationController::copyClipIntoClipboard(const ClipKey& clipKey)
 {
+    AU_PERF_ZONE("TrackeditOperationController::copyClipIntoClipboard", Backend);
     clipboard()->clearSystemClipboard();
     ITrackDataPtr data = clipsInteraction()->copyClip(clipKey);
     if (!data) {
@@ -266,6 +273,7 @@ bool TrackeditOperationController::copyClipIntoClipboard(const ClipKey& clipKey)
 bool TrackeditOperationController::copyNonContinuousTrackDataIntoClipboard(const TrackId trackId, const TrackItemKeyList& itemKeys,
                                                                            secs_t offset)
 {
+    AU_PERF_ZONE("TrackeditOperationController::copyNonContinuousTrackDataIntoClipboard", Backend);
     clipboard()->clearSystemClipboard();
     ITrackDataPtr data = tracksInteraction()->copyNonContinuousTrackData(trackId, itemKeys, offset);
     if (!data) {
@@ -280,6 +288,7 @@ bool TrackeditOperationController::copyNonContinuousTrackDataIntoClipboard(const
 
 bool TrackeditOperationController::copyContinuousTrackDataIntoClipboard(const TrackId trackId, secs_t begin, secs_t end)
 {
+    AU_PERF_ZONE("TrackeditOperationController::copyContinuousTrackDataIntoClipboard", Backend);
     clipboard()->clearSystemClipboard();
     ITrackDataPtr data = tracksInteraction()->copyContinuousTrackData(trackId, begin, end);
     if (!data) {
@@ -292,6 +301,7 @@ bool TrackeditOperationController::copyContinuousTrackDataIntoClipboard(const Tr
 
 bool TrackeditOperationController::removeClip(const ClipKey& clipKey)
 {
+    AU_PERF_ZONE("TrackeditOperationController::removeClip", Backend);
     if (const std::optional<TimeSpan> span = clipsInteraction()->removeClip(clipKey)) {
         pushProjectHistoryDeleteState(span->start(), span->duration());
         return true;
@@ -301,6 +311,7 @@ bool TrackeditOperationController::removeClip(const ClipKey& clipKey)
 
 bool TrackeditOperationController::removeClips(const ClipKeyList& clipKeyList, bool moveClips)
 {
+    AU_PERF_ZONE("TrackeditOperationController::removeClips", Backend);
     if (clipsInteraction()->removeClips(clipKeyList, moveClips)) {
         bool hasLabels = isLabelsSelected();
         if (hasLabels) {
@@ -317,6 +328,7 @@ bool TrackeditOperationController::removeClips(const ClipKeyList& clipKeyList, b
 
 bool TrackeditOperationController::removeTracksData(const TrackIdList& tracksIds, secs_t begin, secs_t end, bool moveClips)
 {
+    AU_PERF_ZONE("TrackeditOperationController::removeTracksData", Backend);
     if (tracksInteraction()->removeTracksData(tracksIds, begin, end, moveClips)) {
         //: Undo history entry name; shown after Undo and Redo in the Edit menu
         projectHistory()->pushHistoryState(muse::trc("trackedit", "Delete"), muse::trc("trackedit", "Delete and close gap"));
@@ -328,6 +340,7 @@ bool TrackeditOperationController::removeTracksData(const TrackIdList& tracksIds
 muse::RetVal<ClipKeyList> TrackeditOperationController::moveClips(const ClipKeyList& clipKeyList, secs_t timePositionOffset,
                                                                   int trackPositionOffset)
 {
+    AU_PERF_ZONE("TrackeditOperationController::moveClips", Backend);
     const auto result = moveItems(clipKeyList, selectedLabels(), timePositionOffset, trackPositionOffset);
     return result.ret ? muse::RetVal<ClipKeyList>::make_ok(result.val.clips) : muse::RetVal<ClipKeyList>::make_ret(result.ret);
 }
@@ -335,6 +348,7 @@ muse::RetVal<ClipKeyList> TrackeditOperationController::moveClips(const ClipKeyL
 muse::RetVal<TrackeditOperationController::MovedItems> TrackeditOperationController::moveItems(
     const ClipKeyList& clips, const LabelKeyList& labels, secs_t timeOffset, int trackOffset)
 {
+    AU_PERF_ZONE("TrackeditOperationController::moveItems", Backend);
     for (const ClipKey& key : clips) {
         timeOffset = std::max(timeOffset, -clipsInteraction()->clipStartTime(key));
     }
@@ -404,6 +418,7 @@ muse::RetVal<TrackeditOperationController::MovedItems> TrackeditOperationControl
 
 bool TrackeditOperationController::moveRangeSelection(secs_t timePositionOffset, bool completed)
 {
+    AU_PERF_ZONE("TrackeditOperationController::moveRangeSelection", Backend);
     ClipKeyList clipsInRange = selectionController()->clipsIntersectingRangeSelection();
     LabelKeyList labelsInRange = selectionController()->labelsIntersectingRangeSelection();
 
@@ -463,6 +478,7 @@ void TrackeditOperationController::cancelItemDragEdit()
 
 bool TrackeditOperationController::splitTracksAt(const TrackIdList& tracksIds, std::vector<secs_t> pivots)
 {
+    AU_PERF_ZONE("TrackeditOperationController::splitTracksAt", Backend);
     if (tracksInteraction()->splitTracksAt(tracksIds, pivots)) {
         //: Undo history entry name; shown after Undo and Redo in the Edit menu
         projectHistory()->pushHistoryState(muse::trc("trackedit", "Split"), muse::trc("trackedit", "Split"));
@@ -519,6 +535,7 @@ bool TrackeditOperationController::mergeSelectedOnTracks(const TrackIdList& trac
 
 bool TrackeditOperationController::duplicateSelectedOnTracks(const TrackIdList& tracksIds, secs_t begin, secs_t end)
 {
+    AU_PERF_ZONE("TrackeditOperationController::duplicateSelectedOnTracks", Backend);
     if (tracksInteraction()->duplicateSelectedOnTracks(tracksIds, begin, end)) {
         pushProjectHistoryDuplicateState();
         return true;
@@ -528,11 +545,13 @@ bool TrackeditOperationController::duplicateSelectedOnTracks(const TrackIdList& 
 
 bool TrackeditOperationController::duplicateClip(const ClipKey& clipKey)
 {
+    AU_PERF_ZONE("TrackeditOperationController::duplicateClip", Backend);
     return clipsInteraction()->duplicateClip(clipKey);
 }
 
 bool TrackeditOperationController::duplicateClips(const ClipKeyList& clipKeyList)
 {
+    AU_PERF_ZONE("TrackeditOperationController::duplicateClips", Backend);
     if (clipsInteraction()->duplicateClips(clipKeyList)) {
         pushProjectHistoryDuplicateState();
         return true;
@@ -542,6 +561,7 @@ bool TrackeditOperationController::duplicateClips(const ClipKeyList& clipKeyList
 
 bool TrackeditOperationController::clipSplitCut(const ClipKey& clipKey)
 {
+    AU_PERF_ZONE("TrackeditOperationController::clipSplitCut", Backend);
     ITrackDataPtr data = clipsInteraction()->clipSplitCut(clipKey);
     if (!data) {
         return false;
@@ -553,6 +573,7 @@ bool TrackeditOperationController::clipSplitCut(const ClipKey& clipKey)
 
 bool TrackeditOperationController::clipSplitDelete(const ClipKey& clipKey)
 {
+    AU_PERF_ZONE("TrackeditOperationController::clipSplitDelete", Backend);
     if (clipsInteraction()->clipSplitDelete(clipKey)) {
         pushProjectHistorySplitDeleteState();
         return true;
@@ -562,6 +583,7 @@ bool TrackeditOperationController::clipSplitDelete(const ClipKey& clipKey)
 
 bool TrackeditOperationController::splitCutSelectedOnTracks(const TrackIdList tracksIds, secs_t begin, secs_t end)
 {
+    AU_PERF_ZONE("TrackeditOperationController::splitCutSelectedOnTracks", Backend);
     std::vector<ITrackDataPtr> tracksData = tracksInteraction()->splitCutSelectedOnTracks(tracksIds, begin, end);
     if (tracksData.empty()) {
         return false;
@@ -576,6 +598,7 @@ bool TrackeditOperationController::splitCutSelectedOnTracks(const TrackIdList tr
 
 bool TrackeditOperationController::splitDeleteSelectedOnTracks(const TrackIdList tracksIds, secs_t begin, secs_t end)
 {
+    AU_PERF_ZONE("TrackeditOperationController::splitDeleteSelectedOnTracks", Backend);
     if (tracksInteraction()->splitDeleteSelectedOnTracks(tracksIds, begin, end)) {
         pushProjectHistorySplitDeleteState();
         return true;
@@ -586,6 +609,7 @@ bool TrackeditOperationController::splitDeleteSelectedOnTracks(const TrackIdList
 bool TrackeditOperationController::trimClipsLeft(const ClipKeyList& clipKeyList, secs_t deltaSec, secs_t minClipDuration, bool completed,
                                                  UndoPushType type)
 {
+    AU_PERF_ZONE("TrackeditOperationController::trimClipsLeft", Backend);
     const auto labelKeys = selectedLabels();
     deltaSec = clampBoundaryDeltaToSelectedItems(deltaSec, minClipDuration, labelKeys);
 
@@ -610,6 +634,7 @@ bool TrackeditOperationController::trimClipsLeft(const ClipKeyList& clipKeyList,
 bool TrackeditOperationController::trimClipsRight(const ClipKeyList& clipKeyList, secs_t deltaSec, secs_t minClipDuration, bool completed,
                                                   UndoPushType type)
 {
+    AU_PERF_ZONE("TrackeditOperationController::trimClipsRight", Backend);
     const auto labelKeys = selectedLabels();
     deltaSec = clampBoundaryDeltaToSelectedItems(deltaSec, minClipDuration, labelKeys);
 
@@ -632,6 +657,7 @@ bool TrackeditOperationController::trimClipsRight(const ClipKeyList& clipKeyList
 bool TrackeditOperationController::stretchClipsLeft(const ClipKeyList& clipKeyList, secs_t deltaSec, secs_t minClipDuration, bool completed,
                                                     UndoPushType type)
 {
+    AU_PERF_ZONE("TrackeditOperationController::stretchClipsLeft", Backend);
     const auto labelKeys = selectedLabels();
     deltaSec = clampBoundaryDeltaToSelectedItems(deltaSec, minClipDuration, labelKeys);
 
@@ -657,6 +683,7 @@ bool TrackeditOperationController::stretchClipsRight(const ClipKeyList& clipKeyL
                                                      bool completed,
                                                      UndoPushType type)
 {
+    AU_PERF_ZONE("TrackeditOperationController::stretchClipsRight", Backend);
     const auto labelKeys = selectedLabels();
     deltaSec = clampBoundaryDeltaToSelectedItems(deltaSec, minClipDuration, labelKeys);
 
@@ -739,6 +766,7 @@ muse::RetVal<TrackId> TrackeditOperationController::newLabelTrack(const muse::St
 
 bool TrackeditOperationController::deleteTracks(const TrackIdList& trackIds)
 {
+    AU_PERF_ZONE("TrackeditOperationController::deleteTracks", Backend);
     if (tracksInteraction()->deleteTracks(trackIds)) {
         projectHistory()->pushHistoryState(muse::trc("trackedit", "Delete track"), muse::trc("trackedit", "Delete track"));
         return true;
@@ -748,6 +776,7 @@ bool TrackeditOperationController::deleteTracks(const TrackIdList& trackIds)
 
 bool TrackeditOperationController::duplicateTracks(const TrackIdList& trackIds)
 {
+    AU_PERF_ZONE("TrackeditOperationController::duplicateTracks", Backend);
     if (tracksInteraction()->duplicateTracks(trackIds)) {
         projectHistory()->pushHistoryState(muse::trc("trackedit", "Duplicate track"), muse::trc("trackedit", "Duplicate track"));
         return true;
@@ -776,6 +805,7 @@ ClipKeyList TrackeditOperationController::clipsOnTrack(const TrackId trackId)
 
 bool TrackeditOperationController::undo()
 {
+    AU_PERF_ZONE("TrackeditOperationController::undo", Backend);
     return m_undoManager->undo();
 }
 
@@ -786,6 +816,7 @@ bool TrackeditOperationController::canUndo()
 
 bool TrackeditOperationController::redo()
 {
+    AU_PERF_ZONE("TrackeditOperationController::redo", Backend);
     return m_undoManager->redo();
 }
 
@@ -796,6 +827,7 @@ bool TrackeditOperationController::canRedo()
 
 bool TrackeditOperationController::undoRedoToIndex(size_t index)
 {
+    AU_PERF_ZONE("TrackeditOperationController::undoRedoToIndex", Backend);
     return m_undoManager->undoRedoToIndex(index);
 }
 
@@ -811,6 +843,7 @@ muse::async::Notification TrackeditOperationController::cancelDragEditRequested(
 
 bool TrackeditOperationController::insertSilence(const TrackIdList& trackIds, secs_t begin, secs_t end, secs_t duration)
 {
+    AU_PERF_ZONE("TrackeditOperationController::insertSilence", Backend);
     if (tracksInteraction()->insertSilence(trackIds, begin, end, duration)) {
         projectHistory()->pushHistoryState(muse::trc("trackedit", "Insert silence"), muse::trc("trackedit", "Insert silence"));
         return true;
@@ -820,6 +853,7 @@ bool TrackeditOperationController::insertSilence(const TrackIdList& trackIds, se
 
 bool TrackeditOperationController::toggleStretchToMatchProjectTempo(const ClipKey& clipKey)
 {
+    AU_PERF_ZONE("TrackeditOperationController::toggleStretchToMatchProjectTempo", Backend);
     return clipsInteraction()->toggleStretchToMatchProjectTempo(clipKey);
 }
 

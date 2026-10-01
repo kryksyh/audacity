@@ -3,6 +3,8 @@
 */
 #include "trackitemslistmodel.h"
 
+#include "shared/perf/perftrace.h"
+
 #include <algorithm>
 
 #include "global/realfn.h"
@@ -64,11 +66,13 @@ void TrackItemsListModel::setTimelineContext(TimelineContext* newContext)
 
 void TrackItemsListModel::onTimelineZoomChanged()
 {
+    AU_PERF_ZONE("TrackItemsListModel::onTimelineZoomChanged", Model);
     updateItemsMetrics();
 }
 
 void TrackItemsListModel::onTimelineFrameTimeChanged()
 {
+    AU_PERF_ZONE("TrackItemsListModel::onTimelineFrameTimeChanged", Model);
     updateItemsMetrics();
 }
 
@@ -95,6 +99,7 @@ void TrackItemsListModel::setMoveController(TrackItemsMoveController* controller
 
 void TrackItemsListModel::updateItemsMetrics()
 {
+    AU_PERF_ZONE("TrackItemsListModel::updateItemsMetrics", Model);
     for (int i = 0; i < m_items.size(); ++i) {
         updateItemMetrics(m_items[i]);
     }
@@ -149,6 +154,7 @@ int TrackItemsListModel::indexByKey(const trackedit::TrackItemKey& key) const
 
 void TrackItemsListModel::onSelectedItem(const trackedit::TrackItemKey& k)
 {
+    AU_PERF_ZONE("TrackItemsListModel::onSelectedItem", Model);
     // ignore if item already selected
     for (const auto& selectedItem : m_selectedItems) {
         if (selectedItem->key().key == k) {
@@ -180,6 +186,7 @@ void TrackItemsListModel::onSelectedItem(const trackedit::TrackItemKey& k)
 
 void TrackItemsListModel::onSelectedItems(const trackedit::TrackItemKeyList& keyList)
 {
+    AU_PERF_ZONE("TrackItemsListModel::onSelectedItems", Model);
     // Multiple-item selection can only be done programmatically, hence there is no need to check for the Shift key ;
     // we can begin by clearing everything.
     clearSelectedItems();
@@ -210,6 +217,7 @@ bool TrackItemsListModel::containsItem(const TrackItemKey& key) const
 
 double TrackItemsListModel::findGuideline(const TrackItemKey& key, DirectionType::Direction direction) const
 {
+    AU_PERF_COUNT_CALL("TrackItemsListModel::findGuideline");
     ViewTrackItem* item = itemByKey(key.key);
     if (!item) {
         return TimelineContext::INVALID_GUIDELINE_TIME;
@@ -243,6 +251,7 @@ void TrackItemsListModel::resetFocusedItem()
 
 QVariant TrackItemsListModel::neighbor(const TrackItemKey& key, int offset) const
 {
+    AU_PERF_COUNT_CALL("TrackItemsListModel::neighbor");
     auto it = std::find_if(m_items.begin(), m_items.end(), [key](ViewTrackItem* viewItem) {
         return viewItem->key().key.itemId == key.key.itemId;
     });
@@ -426,6 +435,7 @@ void TrackItemsListModel::init()
 
 void TrackItemsListModel::reload()
 {
+    AU_PERF_ZONE("TrackItemsListModel::reload", Model);
     if (m_trackId < 0) {
         return;
     }
@@ -543,6 +553,7 @@ bool TrackItemsListModel::cancelItemDragEdit(const TrackItemKey& key)
 
 void TrackItemsListModel::onItemsMoveChanged()
 {
+    AU_PERF_ZONE("TrackItemsListModel::onItemsMoveChanged", Model);
     for (ViewTrackItem* item : std::as_const(m_items)) {
         item->setDragged(m_moveController && m_moveController->isDragged(item->key().key));
     }

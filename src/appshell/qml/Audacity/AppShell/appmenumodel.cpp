@@ -524,6 +524,8 @@ muse::uicomponents::MenuItem* AppMenuModel::makeDiagnosticMenu()
         makeMenuItem("diagnostic-show-paths"),
         makeMenuItem("diagnostic-show-graphicsinfo"),
         makeMenuItem("diagnostic-show-profiler"),
+        makeSeparator(),
+        makeMenuItem("diagnostic-perf-trace"),
     };
 
     MenuItemList items {

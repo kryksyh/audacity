@@ -4,6 +4,8 @@
 
 #include "au3clipsinteraction.h"
 
+#include "shared/perf/perftrace.h"
+
 #include <algorithm>
 #include <set>
 
@@ -145,6 +147,7 @@ bool Au3ClipsInteraction::changeClipStartTime(const trackedit::ClipKey& clipKey,
 
 bool Au3ClipsInteraction::changeClipsStartTime(const ClipKeyList& clipKeys, secs_t timePositionOffset, bool completed)
 {
+    AU_PERF_ZONE("Au3ClipsInteraction::changeClipsStartTime", Backend);
     for (const ClipKey& clipKey : clipKeys) {
         changeClipStartTime(clipKey, clipStartTime(clipKey) + timePositionOffset, false);
     }
@@ -381,6 +384,7 @@ std::optional<TimeSpan> Au3ClipsInteraction::removeClip(const trackedit::ClipKey
 
 bool Au3ClipsInteraction::removeClips(const ClipKeyList& clipKeyList, bool moveClips)
 {
+    AU_PERF_ZONE("Au3ClipsInteraction::removeClips", Backend);
     if (clipKeyList.empty()) {
         return false;
     }
@@ -409,6 +413,7 @@ bool Au3ClipsInteraction::removeClips(const ClipKeyList& clipKeyList, bool moveC
 muse::RetVal<ClipKeyList> Au3ClipsInteraction::moveClips(const ClipKeyList& clipKeyList, secs_t timePositionOffset,
                                                          int trackPositionOffset)
 {
+    AU_PERF_ZONE("Au3ClipsInteraction::moveClips", Backend);
     ClipKeyList newClipKeyList = clipKeyList;
 
     //! NOTE: cannot start moving until previous move is handled
@@ -564,6 +569,7 @@ bool Au3ClipsInteraction::duplicateClip(const ClipKey& clipKey)
 
 bool Au3ClipsInteraction::duplicateClips(const ClipKeyList& clipKeyList)
 {
+    AU_PERF_ZONE("Au3ClipsInteraction::duplicateClips", Backend);
     trackedit::ITrackeditProjectPtr prj = globalContext()->currentTrackeditProject();
     if (!prj) {
         return false;
@@ -685,6 +691,7 @@ bool Au3ClipsInteraction::clipSplitDelete(const ClipKey& clipKey)
 
 bool Au3ClipsInteraction::trimClipsLeft(const ClipKeyList& clipKeyList, secs_t deltaSec, secs_t minClipDuration, bool completed)
 {
+    AU_PERF_ZONE("Au3ClipsInteraction::trimClipsLeft", Backend);
     secs_t adjustedDelta = clampLeftTrimDelta(clipKeyList, deltaSec, minClipDuration);
 
     //! NOTE: don't be tempted to early return if delta is 0.0 or by any other reason:
@@ -695,6 +702,7 @@ bool Au3ClipsInteraction::trimClipsLeft(const ClipKeyList& clipKeyList, secs_t d
 
 bool Au3ClipsInteraction::trimClipsRight(const ClipKeyList& clipKeyList, secs_t deltaSec, secs_t minClipDuration, bool completed)
 {
+    AU_PERF_ZONE("Au3ClipsInteraction::trimClipsRight", Backend);
     secs_t adjustedDelta = clampRightTrimDelta(clipKeyList, deltaSec, minClipDuration);
 
     //! NOTE: don't be tempted to early return if delta is 0.0 or by any other reason:
@@ -741,6 +749,7 @@ muse::Ret Au3ClipsInteraction::makeRoomForClip(const ClipKey& clipKey)
 
 muse::Ret Au3ClipsInteraction::makeRoomForClips(const ClipKeyList& clipKeys)
 {
+    AU_PERF_ZONE("Au3ClipsInteraction::makeRoomForClips", Backend);
     TrackIdList affectedTrackIds;
     for (const ClipKey& clipKey : clipKeys) {
         const muse::Ret ret = doMakeRoomForClip(clipKey);
@@ -1274,6 +1283,7 @@ bool Au3ClipsInteraction::trimClipsRight(const ClipKeyList& clipKeys, secs_t del
 
 bool Au3ClipsInteraction::stretchClipsLeft(const ClipKeyList& clipKeys, secs_t deltaSec, secs_t minClipDuration, bool completed)
 {
+    AU_PERF_ZONE("Au3ClipsInteraction::stretchClipsLeft", Backend);
     const secs_t adjustedDelta = clampLeftStretchDelta(clipKeys, deltaSec, minClipDuration);
     return applyClipEdit(clipKeys, completed, [adjustedDelta](Au3WaveClip& clip) {
         clip.StretchLeftTo(clip.GetPlayStartTime() + adjustedDelta);
@@ -1283,6 +1293,7 @@ bool Au3ClipsInteraction::stretchClipsLeft(const ClipKeyList& clipKeys, secs_t d
 
 bool Au3ClipsInteraction::stretchClipsRight(const ClipKeyList& clipKeys, secs_t deltaSec, secs_t minClipDuration, bool completed)
 {
+    AU_PERF_ZONE("Au3ClipsInteraction::stretchClipsRight", Backend);
     const secs_t adjustedDelta = clampRightStretchDelta(clipKeys, deltaSec, minClipDuration);
     return applyClipEdit(clipKeys, completed, [adjustedDelta](Au3WaveClip& clip) {
         clip.StretchRightTo(clip.GetPlayEndTime() - adjustedDelta);
@@ -1292,6 +1303,7 @@ bool Au3ClipsInteraction::stretchClipsRight(const ClipKeyList& clipKeys, secs_t 
 
 bool Au3ClipsInteraction::doChangeClipSpeed(const ClipKey& clipKey, double speed)
 {
+    AU_PERF_ZONE("Au3ClipsInteraction::doChangeClipSpeed", Backend);
     WaveTrack* waveTrack = DomAccessor::findWaveTrack(projectRef(), ::TrackId(clipKey.trackId));
     IF_ASSERT_FAILED(waveTrack) {
         return false;

@@ -3,6 +3,8 @@
 */
 #include "trackclipslistmodel.h"
 
+#include "shared/perf/perftrace.h"
+
 #include "global/realfn.h"
 #include "global/async/async.h"
 
@@ -71,6 +73,7 @@ void TrackClipsListModel::onInit()
 
 void TrackClipsListModel::onReload()
 {
+    AU_PERF_ZONE("TrackClipsListModel::onReload", Model);
     ITrackeditProjectPtr prj = globalContext()->currentTrackeditProject();
     IF_ASSERT_FAILED(prj) {
         return;
@@ -110,6 +113,7 @@ void TrackClipsListModel::onReload()
     }, muse::async::Asyncable::Mode::SetReplace);
 
     m_allClipList.onItemChanged(this, [this](const Clip& clip) {
+        AU_PERF_ZONE("TrackClipsListModel::onItemChanged", Model);
         for (size_t i = 0; i < m_allClipList.size(); ++i) {
             if (m_allClipList.at(i).key != clip.key) {
                 continue;
@@ -130,6 +134,7 @@ void TrackClipsListModel::onReload()
     }, muse::async::Asyncable::Mode::SetReplace);
 
     m_allClipList.onItemAdded(this, [this](const Clip& clip) {
+        AU_PERF_ZONE("TrackClipsListModel::onItemAdded", Model);
         IF_ASSERT_FAILED(!muse::contains_if(m_allClipList, [&clip](const Clip& c) { return c.key == clip.key; })) {
             return;
         }
@@ -150,6 +155,7 @@ void TrackClipsListModel::onReload()
     }, muse::async::Asyncable::Mode::SetReplace);
 
     m_allClipList.onItemRemoved(this, [this](const Clip& clip) {
+        AU_PERF_ZONE("TrackClipsListModel::onItemRemoved", Model);
         for (auto it = m_allClipList.begin(); it != m_allClipList.end(); ++it) {
             if (it->key == clip.key) {
                 m_allClipList.erase(it);
@@ -169,6 +175,7 @@ TrackClipItem* TrackClipsListModel::clipItemByKey(const trackedit::ClipKey& k) c
 
 void TrackClipsListModel::update()
 {
+    AU_PERF_ZONE("TrackClipsListModel::update", Model);
     std::unordered_map<ClipId, TrackClipItem*> oldItems;
     for (int row = 0; row < m_items.size(); ++row) {
         TrackClipItem* clipItem = static_cast<TrackClipItem*>(m_items[row]);
@@ -250,6 +257,7 @@ void TrackClipsListModel::update()
 
 void TrackClipsListModel::updateItemMetrics(ViewTrackItem* viewItem)
 {
+    AU_PERF_COUNT_CALL("TrackClipsListModel::updateItemMetrics");
     TrackClipItem* item = static_cast<TrackClipItem*>(viewItem);
 
     ITrackeditProjectPtr prj = globalContext()->currentTrackeditProject();

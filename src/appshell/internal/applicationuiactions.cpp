@@ -38,6 +38,7 @@ using namespace muse::actions;
 using namespace muse::dock;
 
 static const ActionCode FULL_SCREEN_CODE("fullscreen");
+static const ActionCode PERF_TRACE_CODE("diagnostic-perf-trace");
 
 const UiActionList ApplicationUiActions::m_actions = {
     UiAction("quit",
@@ -246,6 +247,15 @@ const UiActionList ApplicationUiActions::m_actions = {
              //: Action description: shown as a tooltip; can be a full sentence
              TranslatableString("action_description", "Open the context menu of the focused item")
              ),
+    UiAction(PERF_TRACE_CODE,
+             au::context::UiCtxAny,
+             au::context::CTX_ANY,
+             //: Action title: shown as a menu item or a button label; keep it short
+             TranslatableString("action", "Record performance trace"),
+             //: Action description: shown as a tooltip; can be a full sentence
+             TranslatableString("action_description", "Record a performance trace; uncheck to save it"),
+             Checkable::Yes
+             ),
 };
 
 ApplicationUiActions::ApplicationUiActions(const muse::modularity::ContextPtr& ctx, std::shared_ptr<ApplicationActionController> controller)
@@ -257,6 +267,10 @@ void ApplicationUiActions::init()
 {
     mainWindow()->isFullScreenChanged().onNotify(this, [this]() {
         m_actionCheckedChanged.send({ FULL_SCREEN_CODE });
+    });
+
+    m_controller->perfTraceRunningChanged().onNotify(this, [this]() {
+        m_actionCheckedChanged.send({ PERF_TRACE_CODE });
     });
 
     dockWindowProvider()->windowChanged().onNotify(this, [this]() {
@@ -312,6 +326,10 @@ bool ApplicationUiActions::actionChecked(const UiAction& act) const
 {
     if (act.code == FULL_SCREEN_CODE) {
         return mainWindow()->isFullScreen();
+    }
+
+    if (act.code == PERF_TRACE_CODE) {
+        return m_controller && m_controller->isPerfTraceRunning();
     }
 
     QMap<ActionCode, DockName> toggleDockActions = ApplicationUiActions::toggleDockActions();

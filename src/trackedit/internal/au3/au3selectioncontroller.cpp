@@ -3,6 +3,8 @@
 */
 #include "au3selectioncontroller.h"
 
+#include "shared/perf/perftrace.h"
+
 #include "global/containers.h"
 #include "global/realfn.h"
 
@@ -193,6 +195,7 @@ TrackIdList Au3SelectionController::selectedTracks() const
 
 void Au3SelectionController::setSelectedTracks(const TrackIdList& tracksIds, bool complete)
 {
+    AU_PERF_ZONE("Au3SelectionController::setSelectedTracks", Backend);
     MYLOG() << "[SELECTION] setSelectedTracks: " << tracksIds;
 
     auto& tracks = Au3TrackList::Get(projectRef());
@@ -399,6 +402,7 @@ ItemKeys Au3SelectionController::itemsTouchingSelectionBox(secs_t time, const Tr
 
 void Au3SelectionController::setSelectedClips(const ClipKeyList& clipKeys, bool complete)
 {
+    AU_PERF_ZONE("Au3SelectionController::setSelectedClips", Backend);
     //! NOTE: sync clip selection with au3 persistence
     au3::DomAccessor::clearAllClipSelection(projectRef());
     for (const ClipKey& key : clipKeys) {
@@ -860,6 +864,7 @@ void Au3SelectionController::setSelectedTrackAudioData(TrackId trackId)
 
 void Au3SelectionController::resetDataSelection()
 {
+    AU_PERF_ZONE("Au3SelectionController::resetDataSelection", Backend);
     MYLOG() << "[SELECTION] resetDataSelection";
 
     const auto initialPlaybackPosition = globalContext()->playbackState()->playbackPosition();
@@ -932,6 +937,7 @@ ClipKeyList Au3SelectionController::clipsIntersectingRangeSelection() const
 
 void Au3SelectionController::setClipsIntersectingRangeSelection(const ClipKeyList& clipKeys)
 {
+    AU_PERF_ZONE("Au3SelectionController::setClipsIntersectingRangeSelection", Backend);
     m_clipsIntersectingRangeSelection.set(clipKeys, true);
 }
 
@@ -974,6 +980,7 @@ au::trackedit::secs_t Au3SelectionController::dataSelectedStartTime() const
 
 void Au3SelectionController::setDataSelectedStartTime(au::trackedit::secs_t time, bool complete)
 {
+    AU_PERF_ZONE("Au3SelectionController::setDataSelectedStartTime", Backend);
     MYLOG() << "[SELECTION] setDataSelectedStartTime: " << time << ", complete: " << complete;
 
     auto& selectedRegion = ViewInfo::Get(projectRef()).selectedRegion;
@@ -1005,6 +1012,7 @@ au::trackedit::secs_t Au3SelectionController::dataSelectedEndTime() const
 
 void Au3SelectionController::setDataSelectedEndTime(au::trackedit::secs_t time, bool complete)
 {
+    AU_PERF_ZONE("Au3SelectionController::setDataSelectedEndTime", Backend);
     MYLOG() << "[SELECTION] setDataSelectedEndTime: " << time << ", complete: " << complete;
 
     auto& selectedRegion = ViewInfo::Get(projectRef()).selectedRegion;
@@ -1119,6 +1127,7 @@ void Au3SelectionController::setSelectionStartTime(secs_t time)
 
 void Au3SelectionController::updateSelectionController()
 {
+    AU_PERF_ZONE("Au3SelectionController::updateSelectionController", Backend);
     auto& tracks = Au3TrackList::Get(projectRef());
     TrackIdList selectedTracks;
     for (const auto& selectedTrack : tracks.Selected()) {

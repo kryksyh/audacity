@@ -4,6 +4,8 @@
 
 #include "paneltrackslistmodel.h"
 
+#include "shared/perf/perftrace.h"
+
 #include "global/async/async.h"
 #include "global/containers.h"
 
@@ -56,6 +58,7 @@ PanelTracksListModel::~PanelTracksListModel()
 
 void PanelTracksListModel::load()
 {
+    AU_PERF_ZONE("PanelTracksListModel::load", Model);
     if (m_isLoadingBlocked) {
         return;
     }
@@ -656,6 +659,7 @@ void PanelTracksListModel::onFocusedTrack(const trackedit::TrackId& trackId)
 
 void PanelTracksListModel::onTracksChanged(const std::vector<au::trackedit::Track>& tracks)
 {
+    AU_PERF_ZONE("PanelTracksListModel::onTracksChanged", Model);
     Q_UNUSED(tracks);
     muse::async::Async::call(this, [this]() {
         if (const auto prj = globalContext()->currentTrackeditProject()) {
@@ -668,6 +672,7 @@ void PanelTracksListModel::onTracksChanged(const std::vector<au::trackedit::Trac
 
 void PanelTracksListModel::onTrackAdded(const trackedit::Track& track)
 {
+    AU_PERF_ZONE("PanelTracksListModel::onTrackAdded", Model);
     const int size = static_cast<int>(m_trackList.size());
     beginInsertRows(QModelIndex(), size, size);
     m_trackList.push_back(buildTrackItem(track));
@@ -677,6 +682,7 @@ void PanelTracksListModel::onTrackAdded(const trackedit::Track& track)
 
 void PanelTracksListModel::onTrackRemoved(const trackedit::Track& track)
 {
+    AU_PERF_ZONE("PanelTracksListModel::onTrackRemoved", Model);
     for (int i = 0; i < m_trackList.size(); ++i) {
         if (m_trackList.at(i)->trackId() == track.id) {
             beginRemoveRows(QModelIndex(), i, i);
@@ -692,6 +698,7 @@ void PanelTracksListModel::onTrackRemoved(const trackedit::Track& track)
 
 void PanelTracksListModel::onTrackChanged(const trackedit::Track& track)
 {
+    AU_PERF_ZONE("PanelTracksListModel::onTrackChanged", Model);
     auto trackItem = findTrackItem(track.id);
     if (!trackItem) {
         return;

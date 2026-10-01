@@ -1,5 +1,7 @@
 #include "thumbnailcreator.h"
 
+#include "shared/perf/perftrace.h"
+
 #include <QEventLoop>
 
 using namespace au::project;
@@ -16,6 +18,7 @@ muse::async::Notification ThumbnailCreator::captureThumbnailRequested() const
 
 std::optional<std::vector<uint8_t> > ThumbnailCreator::createThumbnail()
 {
+    AU_PERF_ZONE("ThumbnailCreator::createThumbnail", Backend);
     std::optional<std::vector<uint8_t> > result;
     QEventLoop loop;
     m_thumbnailCreated.onReceive(this, [&loop, &result](std::vector<uint8_t> data) {
