@@ -34,7 +34,7 @@ if kill -0 $pid 2>/dev/null; then
     kill -9 $pid
 fi
 
-grep -h "effectChurn" "$OUT/$label.log" | sed 's/.*| "//'
+grep -h "configureAudio\\|effectChurn" "$OUT/$label.log" | sed 's/.*| "//'
 if grep -q "AddressSanitizer" "$OUT/$label.log"; then
     echo "ASAN FINDING:"
     grep -A30 "ERROR: AddressSanitizer" "$OUT/$label.log" | head -40

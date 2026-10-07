@@ -9,6 +9,7 @@
 #include <QUrl>
 #include <QWheelEvent>
 
+#include <optional>
 #include <set>
 #include <string>
 #include <vector>
@@ -99,6 +100,25 @@ QString PerfApi::audioConfiguration() const
            .arg(c.defaultSampleRate);
 }
 
+namespace {
+// trackIndex < 0 means the master track
+std::optional<au::trackedit::TrackId> trackAt(const au::context::IGlobalContext& context, int trackIndex)
+{
+    if (trackIndex < 0) {
+        return au::effects::IRealtimeEffectService::masterTrackId;
+    }
+    const auto project = context.currentTrackeditProject();
+    if (!project) {
+        return std::nullopt;
+    }
+    const std::vector<au::trackedit::TrackId> tracks = project->trackIdList();
+    if (trackIndex >= static_cast<int>(tracks.size())) {
+        return std::nullopt;
+    }
+    return tracks[trackIndex];
+}
+}
+
 QVariantMap PerfApi::audioEngineHealth() const
 {
     const au::audio::AudioEngineDiagnostics d = audioEngineDiagnostics()->diagnostics();
@@ -143,47 +163,25 @@ QVariantMap PerfApi::latencyMeasurement() const
 
 bool PerfApi::addRealtimeEffect(int trackIndex, const QString& effectId)
 {
-    const auto project = globalContext()->currentTrackeditProject();
-    if (!project) {
-        return false;
-    }
-    const std::vector<au::trackedit::TrackId> tracks = project->trackIdList();
-    if (trackIndex < 0 || trackIndex >= static_cast<int>(tracks.size())) {
-        return false;
-    }
-    return realtimeEffectService()->addRealtimeEffect(tracks[trackIndex], muse::String::fromQString(effectId)) != nullptr;
+    const auto track = trackAt(*globalContext(), trackIndex);
+    return track && realtimeEffectService()->addRealtimeEffect(*track, muse::String::fromQString(effectId)) != nullptr;
 }
 
 bool PerfApi::replaceRealtimeEffect(int trackIndex, int effectIndex, const QString& effectId)
 {
-    const auto project = globalContext()->currentTrackeditProject();
-    if (!project) {
-        return false;
-    }
-    const std::vector<au::trackedit::TrackId> tracks = project->trackIdList();
-    if (trackIndex < 0 || trackIndex >= static_cast<int>(tracks.size())) {
-        return false;
-    }
-    return realtimeEffectService()->replaceRealtimeEffect(tracks[trackIndex], effectIndex,
-                                                          muse::String::fromQString(effectId)) != nullptr;
+    const auto track = trackAt(*globalContext(), trackIndex);
+    return track && realtimeEffectService()->replaceRealtimeEffect(*track, effectIndex, muse::String::fromQString(effectId)) != nullptr;
 }
 
 int PerfApi::removeRealtimeEffects(int trackIndex)
 {
-    const auto project = globalContext()->currentTrackeditProject();
-    if (!project) {
-        return 0;
-    }
-    const std::vector<au::trackedit::TrackId> tracks = project->trackIdList();
-    if (trackIndex < 0 || trackIndex >= static_cast<int>(tracks.size())) {
-        return 0;
-    }
-    const auto stack = realtimeEffectService()->effectStack(tracks[trackIndex]);
+    const auto track = trackAt(*globalContext(), trackIndex);
+    const auto stack = track ? realtimeEffectService()->effectStack(*track) : std::nullopt;
     if (!stack) {
         return 0;
     }
     for (const auto& state : *stack) {
-        realtimeEffectService()->removeRealtimeEffect(tracks[trackIndex], state);
+        realtimeEffectService()->removeRealtimeEffect(*track, state);
     }
     return static_cast<int>(stack->size());
 }

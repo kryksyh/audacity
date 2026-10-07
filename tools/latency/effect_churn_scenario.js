@@ -19,6 +19,14 @@ var testCase = {
             }
         },
         {
+            name: "Configure audio", func: function () {
+                var bufferMs = Perf.env("AU_LAT_BUFFER_MS")
+                Perf.configureAudio(bufferMs ? parseFloat(bufferMs) : -1, Perf.env("AU_LAT_OUTPUT"), Perf.env("AU_LAT_INPUT"))
+                api.log.info("latency", "configureAudio: " + Perf.audioConfiguration())
+                api.testflow.sleep(1000)
+            }
+        },
+        {
             name: "Churn", func: function () {
                 var effectId = Perf.env("AU_LAT_EFFECT")
                 var rounds = parseInt(Perf.env("AU_LAT_ROUNDS") || "100")
@@ -28,14 +36,18 @@ var testCase = {
                 var added = 0
                 var replaced = 0
                 var removed = 0
+                // Track 0 is processed by the producer thread, the master (-1) by the audio callback
                 for (var i = 0; i < rounds; ++i) {
                     for (var k = 0; k < 3; ++k) {
                         added += Perf.addRealtimeEffect(0, effectId) ? 1 : 0
+                        added += Perf.addRealtimeEffect(-1, effectId) ? 1 : 0
                     }
                     api.testflow.sleep(20)
                     replaced += Perf.replaceRealtimeEffect(0, 1, effectId) ? 1 : 0
+                    replaced += Perf.replaceRealtimeEffect(-1, 1, effectId) ? 1 : 0
                     api.testflow.sleep(20)
                     removed += Perf.removeRealtimeEffects(0)
+                    removed += Perf.removeRealtimeEffects(-1)
                     api.testflow.sleep(20)
                 }
                 api.dispatcher.dispatch("action://playback/toggle-play-stop")

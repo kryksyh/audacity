@@ -55,7 +55,8 @@ public:
     Q_INVOKABLE void startLatencyMeasurement();
     //! Empty until the measurement started by startLatencyMeasurement() is done
     Q_INVOKABLE QVariantMap latencyMeasurement() const;
-    //! Appends a realtime effect to the track at `trackIndex` of the current project
+    //! Appends a realtime effect to the track at `trackIndex` of the current project;
+    //! a negative index means the master track
     Q_INVOKABLE bool addRealtimeEffect(int trackIndex, const QString& effectId);
     Q_INVOKABLE bool replaceRealtimeEffect(int trackIndex, int effectIndex, const QString& effectId);
     //! Returns how many were removed
