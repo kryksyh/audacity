@@ -23,7 +23,8 @@ mkdir -p "$OUT"
 [ -f "$OUT/control.wav" ] || python3 "$SCRIPT_DIR/make_test_signals.py" "$OUT"
 rm -f "$OUT/$label.json"
 
-env "$@" AU_LAT_SIGNAL="$OUT/control.wav" AU_LAT_TRACE="$OUT/$label.json" \
+# Never hand the run over to an Audacity that is already open
+env "$@" AU_ALLOW_MULTIPLE_PROCESSES=1 AU_LAT_SIGNAL="$OUT/control.wav" AU_LAT_TRACE="$OUT/$label.json" \
     "$APP" --test-case "$SCRIPT_DIR/latency_scenario.js" > "$OUT/$label.log" 2>&1 &
 pid=$!
 # The imported signal leaves an unsaved project, so quitting may wait on a
@@ -38,7 +39,7 @@ if kill -0 $pid 2>/dev/null; then
     kill -0 $pid 2>/dev/null && { echo "app did not exit, killing"; kill -9 $pid; }
 fi
 
-grep -h "configureAudio\|addRealtimeEffect" "$OUT/$label.log"
+grep -h "configureAudio\|addRealtimeEffect\|audioEngineHealth" "$OUT/$label.log"
 if [ -f "$OUT/$label.json" ]; then
     python3 "$SCRIPT_DIR/analyze_trace.py" "$OUT/$label.json"
 else

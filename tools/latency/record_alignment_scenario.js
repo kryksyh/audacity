@@ -15,7 +15,7 @@ var testCase = {
     steps: [
         {
             name: "Open signal", func: function () {
-                Perf.openProject(Perf.env("AU_LAT_SIGNAL"))
+                Perf.importAudio(Perf.env("AU_LAT_SIGNAL"))
                 api.testflow.sleep(5000)
             }
         },

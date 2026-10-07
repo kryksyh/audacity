@@ -99,6 +99,23 @@ QString PerfApi::audioConfiguration() const
            .arg(c.defaultSampleRate);
 }
 
+QVariantMap PerfApi::audioEngineHealth() const
+{
+    const au::audio::AudioEngineDiagnostics d = audioEngineDiagnostics()->diagnostics();
+    return {
+        { "framesPerBuffer", static_cast<qulonglong>(d.framesPerBuffer) },
+        { "averageLoad", d.averageLoad },
+        { "peakLoad", d.peakLoad },
+        { "callbacks", static_cast<qulonglong>(d.callbacks) },
+        { "dropouts", static_cast<qulonglong>(d.dropouts) },
+        { "overBudgetCallbacks", static_cast<qulonglong>(d.overBudgetCallbacks) },
+        { "outputUnderflows", static_cast<qulonglong>(d.outputUnderflows) },
+        { "inputOverflows", static_cast<qulonglong>(d.inputOverflows) },
+        { "playbackStarvations", static_cast<qulonglong>(d.playbackStarvations) },
+        { "lostCaptureFrames", static_cast<qulonglong>(d.lostCaptureFrames) },
+    };
+}
+
 bool PerfApi::addRealtimeEffect(int trackIndex, const QString& effectId)
 {
     const auto project = globalContext()->currentTrackeditProject();
@@ -147,6 +164,14 @@ void PerfApi::mark(const QString& name)
     const char* interned = names.insert(name.toStdString()).first->c_str();
     const int64_t now = au::perf::Tracer::nowNs();
     au::perf::Tracer::instance().recordZone(interned, au::perf::Category::Backend, now, now);
+}
+
+void PerfApi::importAudio(const QString& path)
+{
+    if (!globalContext()->currentProject()) {
+        dispatcher()->dispatch("file-new");
+    }
+    dispatcher()->dispatch("project-import", muse::actions::ActionData::make_arg1<QStringList>({ path }));
 }
 
 void PerfApi::openProject(const QString& path)

@@ -13,6 +13,7 @@
 #include "framework/ui/imainwindow.h"
 
 #include "audio/driver/iaudiodrivercontroller.h"
+#include "audio/iaudioenginediagnostics.h"
 #include "importexport/export/iexporter.h"
 #include "context/iglobalcontext.h"
 #include "effects/effects_base/irealtimeeffectservice.h"
@@ -30,6 +31,7 @@ class PerfApi : public muse::api::ApiObject
     muse::ContextInject<muse::actions::IActionsDispatcher> dispatcher = { this };
     muse::ContextInject<muse::ui::IMainWindow> mainWindow = { this };
     muse::GlobalInject<au::audio::IAudioDriverController> audioDriverController;
+    muse::GlobalInject<au::audio::IAudioEngineDiagnostics> audioEngineDiagnostics;
     muse::ContextInject<au::importexport::IExporter> exporter = { this };
     muse::ContextInject<au::context::IGlobalContext> globalContext = { this };
     muse::ContextInject<au::effects::IRealtimeEffectService> realtimeEffectService = { this };
@@ -39,12 +41,15 @@ public:
 
     Q_INVOKABLE QString env(const QString& name) const;
     Q_INVOKABLE void openProject(const QString& path);
+    //! Into the project of this window; file-open would put an audio file into a new window
+    Q_INVOKABLE void importAudio(const QString& path);
 
     //! Applied like the preferences page does. bufferMs < 0, empty device names and
     //! autoLatencyCompensation < 0 keep the current values
     Q_INVOKABLE bool configureAudio(double bufferMs, const QString& outputDevice, const QString& inputDevice,
                                     int autoLatencyCompensation = -1);
     Q_INVOKABLE QString audioConfiguration() const;
+    Q_INVOKABLE QVariantMap audioEngineHealth() const;
     //! Appends a realtime effect to the track at `trackIndex` of the current project
     Q_INVOKABLE bool addRealtimeEffect(int trackIndex, const QString& effectId);
     //! Each track as a 48 kHz WAV file in `directory`

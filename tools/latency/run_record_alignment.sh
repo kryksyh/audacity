@@ -22,7 +22,8 @@ python3 "$SCRIPT_DIR/make_test_signals.py" "$OUT"
 rm -rf "$OUT/$label" "$OUT/$label.json"
 mkdir -p "$OUT/$label"
 
-env "$@" AU_LAT_SIGNAL="$OUT/bursts.wav" AU_LAT_TRACE="$OUT/$label.json" AU_LAT_EXPORT_DIR="$OUT/$label" \
+# Never hand the run over to an Audacity that is already open
+env "$@" AU_ALLOW_MULTIPLE_PROCESSES=1 AU_LAT_SIGNAL="$OUT/bursts.wav" AU_LAT_TRACE="$OUT/$label.json" AU_LAT_EXPORT_DIR="$OUT/$label" \
     "$APP" --test-case "$SCRIPT_DIR/record_alignment_scenario.js" > "$OUT/$label.log" 2>&1 &
 pid=$!
 for i in {1..120}; do
