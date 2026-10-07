@@ -106,6 +106,10 @@ public:
     //! Test only in the worker thread, or else when there is no processing
     bool IsActive() const noexcept;
 
+    //! Latency that playback compensates for this effect, as frames and rate.
+    //! Known once the effect has processed audio; kept after playback stops
+    std::optional<std::pair<EffectInstance::SampleCount, double> > GetCompensatedLatency() const;
+
     //! Set only in the main thread
     void SetActive(bool active);
 
@@ -188,6 +192,9 @@ private:
 
     //! How many samples must be discarded
     std::optional<EffectInstance::SampleCount> mLatency;
+    //! Written by the worker thread when it reads the latency; negative until then
+    std::atomic<long long> mCompensatedLatencyFrames{ -1 };
+    std::atomic<double> mCompensatedLatencyRate{ 0.0 };
     //! Assigned in the worker thread at the start of each processing scope
     bool mLastActive{};
 

@@ -700,6 +700,8 @@ size_t RealtimeEffectState::Process(
                 // after processing one block
                 mLatency.emplace(
                     pInstance->GetLatency(mWorkerSettings.settings, pair.second));
+                mCompensatedLatencyRate.store(pair.second, std::memory_order_relaxed);
+                mCompensatedLatencyFrames.store(static_cast<long long>(*mLatency), std::memory_order_release);
             }
             for (size_t i = 0; i < numAudioIn; i++) {
                 if (clientIn[i]) {
@@ -751,6 +753,15 @@ bool RealtimeEffectState::ProcessEnd()
 bool RealtimeEffectState::IsEnabled() const noexcept
 {
     return mMainSettings.settings.extra.GetActive();
+}
+
+std::optional<std::pair<EffectInstance::SampleCount, double> > RealtimeEffectState::GetCompensatedLatency() const
+{
+    const long long frames = mCompensatedLatencyFrames.load(std::memory_order_acquire);
+    if (frames < 0) {
+        return std::nullopt;
+    }
+    return std::make_pair(static_cast<EffectInstance::SampleCount>(frames), mCompensatedLatencyRate.load(std::memory_order_relaxed));
 }
 
 bool RealtimeEffectState::IsActive() const noexcept
