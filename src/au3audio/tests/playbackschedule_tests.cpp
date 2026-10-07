@@ -55,4 +55,21 @@ TEST_F(PlaybackScheduleTimeQueueTests, ConsumerKeepsTimeWhenProducerFillsWrapped
         EXPECT_NEAR(consumeGrain(), i * GRAIN_SECONDS, 1e-9) << "grain " << i;
     }
 }
+
+// The producer writes one slice of several grains per call; when the queue
+// grows in the middle of a call, the grains already written to the old node
+// must still reach the consumer
+TEST_F(PlaybackScheduleTimeQueueTests, ConsumerKeepsTimeWhenQueueGrowsWithinOneSlice)
+{
+    m_schedule.mTimeQueue.Init(4);
+    m_schedule.mTimeQueue.Prime(0.0);
+
+    constexpr size_t grains = 6;
+    constexpr size_t frames = grains * TimeQueueGrainSize;
+    m_schedule.mTimeQueue.Producer(m_schedule, PlaybackSlice { frames, frames, frames });
+
+    for (size_t i = 1; i <= grains; ++i) {
+        EXPECT_NEAR(consumeGrain(), i * GRAIN_SECONDS, 1e-9) << "grain " << i;
+    }
+}
 }
