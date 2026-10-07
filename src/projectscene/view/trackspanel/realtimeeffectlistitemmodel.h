@@ -31,6 +31,8 @@ public:
     effects::RealtimeEffectStatePtr effectStatePtr() const;
     Q_INVOKABLE QString effectName() const;
     Q_INVOKABLE void showEffectDialog();
+    //! The latency that playback compensates for this effect
+    Q_INVOKABLE QString latencyText() const;
 
     bool prop_isAvailable() const;
     bool prop_isActive() const;

@@ -321,6 +321,22 @@ ListItemBlank {
             navigation.name: "show ui btn - " + prv.title
             //: Tooltip of the button that opens the effect dialog; %1 is an effect name
             toolTipTitle: qsTrc("projectscene", "Open %1").arg(prv.title)
+            // Shown by the handler below, which reads the latency at hover time:
+            // it becomes known once playback has started
+            toolTipShowLocked: true
+
+            Connections {
+                target: effectNameButton.mouseArea
+
+                function onContainsMouseChanged() {
+                    if (effectNameButton.mouseArea.containsMouse) {
+                        ui.tooltip.show(effectNameButton, effectNameButton.toolTipTitle,
+                                        root.item ? root.item.latencyText() : "", "")
+                    } else {
+                        ui.tooltip.hide(effectNameButton)
+                    }
+                }
+            }
 
             Layout.fillWidth: true
             Layout.fillHeight: true

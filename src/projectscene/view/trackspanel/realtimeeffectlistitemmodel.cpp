@@ -44,6 +44,26 @@ bool RealtimeEffectListItemModel::prop_isMasterEffect() const
     return realtimeEffectService()->trackId(state) == effects::IRealtimeEffectService::masterTrackId;
 }
 
+QString RealtimeEffectListItemModel::latencyText() const
+{
+    const auto state = m_effectState.lock();
+    if (!state) {
+        return {};
+    }
+    const auto latency = state->GetCompensatedLatency();
+    if (!latency) {
+        return muse::qtrc("projectscene", "Latency is known after playback starts");
+    }
+    const auto [frames, rate] = *latency;
+    if (frames == 0 || rate <= 0) {
+        return muse::qtrc("projectscene", "No latency");
+    }
+    //: Latency of a realtime effect, e.g. "Latency: 3.0 ms (144 samples)"
+    return muse::qtrc("projectscene", "Latency: %1 ms (%2 samples)")
+           .arg(1000.0 * frames / rate, 0, 'f', 1)
+           .arg(frames);
+}
+
 bool RealtimeEffectListItemModel::prop_isAvailable() const
 {
     return realtimeEffectService()->isAvailable(m_effectState.lock());
