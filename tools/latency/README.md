@@ -73,6 +73,7 @@ Open a trace in https://ui.perfetto.dev to see the timeline.
 tools/latency/run_latency_scenario.sh <label> [AU_LAT_BUFFER_MS=10] [AU_LAT_OUTPUT=<device>]
 tools/latency/run_record_alignment.sh <label> AU_LAT_INPUT=<device> [AU_LAT_AUTO_COMPENSATION=0|1] ...
 tools/latency/run_pdc_scenario.sh <label> [AU_LAT_BUFFER_MS=5] [AU_LAT_EFFECT=<effect id>]
+tools/latency/run_stress.sh <label> [AU_LAT_BUFFER_MS=7] [AU_LAT_TRACKS=8] [AU_LAT_SECONDS=600] [AU_LAT_EFFECTS=<id>,<id>]
 ```
 
 - `run_latency_scenario.sh` (L5, L6, L7, L8, L10): opens a tone / silence / tone signal. It repeats play, mute, unmute,
@@ -85,6 +86,10 @@ tools/latency/run_pdc_scenario.sh <label> [AU_LAT_BUFFER_MS=5] [AU_LAT_EFFECT=<e
   a seek and after the effect is added during play. No loopback needed. Make the signals at the device rate
   (`make_test_signals.py <dir> 44100`): resampling rings before the click, and a louder track crosses the onset level
   earlier.
+- `run_stress.sh` (L10): plays 120 s of noise on several tracks with realtime effects on each (Compressor and Reverb
+  by default) and prints the engine health counters. The buffer setting is a latency target: PortAudio picks the
+  callback size from it, and the health line shows the result (`framesPerBuffer`). The trace keeps only the first
+  minute or so of a long run; the health counters cover all of it.
 
 Both scripts change the audio preferences of the development profile (buffer, devices, compensation). Write down the
 values first and set them back after the runs.

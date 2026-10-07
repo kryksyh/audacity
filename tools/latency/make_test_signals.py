@@ -9,10 +9,11 @@
 #   click_a.wav, click_b.wav  one click at 1.0 s and at 1.5 s, below the
 #                Compressor threshold. Played as two tracks, the output onsets
 #                are 0.5 s apart when the tracks are aligned (L9).
+#   stress.wav   120 s of noise, the load for the dropout floor runs (L10).
 #
 # usage: make_test_signals.py <out dir> [sample rate, default 48000]
 #
-import math, os, struct, sys
+import math, os, random, struct, sys
 
 RATE = 48000
 BURST_LENGTH = 512
@@ -56,6 +57,9 @@ def main():
         start = int(at * RATE)
         click[start:start + 16] = [0.2] * 16
         write_wav(os.path.join(out_dir, name), click)
+
+    rng = random.Random(1)
+    write_wav(os.path.join(out_dir, "stress.wav"), [rng.uniform(-0.2, 0.2) for _ in range(120 * RATE)])
 
 
 if __name__ == "__main__":
