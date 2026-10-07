@@ -25,11 +25,12 @@ set( LIBRARIES
 PUBLIC
    au3-preferences
    au3-utility
+   # USE_PORTMIXER changes the layout of AudioIOBase, so every includer needs it
+   $<$<BOOL:${AU_USE_PORTMIXER}>:portmixer>
 PRIVATE
    au3-basic-ui
    au3-strings
    portaudio::portaudio
-   $<$<BOOL:${AU_USE_PORTMIXER}>:portmixer>
    wxBase
 )
 audacity_library( ${TARGET} "${SOURCES}" "${LIBRARIES}"
