@@ -268,6 +268,7 @@ muse::Ret Au3Player::doPlayTracks(TrackList& trackList, double startTime, double
 
 void Au3Player::seek(const muse::secs_t newPosition, bool applyIfPlaying)
 {
+    AU_PERF_ZONE("control: seek", Backend);
     LOGD() << "newPosition: " << newPosition;
     auto pos = std::max(0.0, newPosition.raw());
 
@@ -551,6 +552,7 @@ void Au3Player::updatePlaybackState()
     const double time = std::max(0.0, audioEngine()->streamTime() + m_startOffset);
 
     if (!muse::is_equal(time, m_playbackPosition.val.raw())) {
+        AU_PERF_COUNTER("playhead s", time);
         m_playbackPosition.set(time);
     }
 

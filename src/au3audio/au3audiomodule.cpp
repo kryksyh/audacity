@@ -7,6 +7,7 @@
 
 #include "internal/au3audioengine.h"
 #include "internal/au3audiodrivercontroller.h"
+#include "internal/au3audiotrace.h"
 
 #if defined(Q_OS_MAC)
 #include "internal/platform/macos/macossystemaudiodeviceslistener.h"
@@ -50,6 +51,7 @@ void Au3AudioModule::registerExports()
 
 void Au3AudioModule::onInit(const muse::IApplication::RunMode&)
 {
+    installAudioIOTrace();
     m_audioEngine->init();
     m_audioDriverController->init();
     m_systemAudioDevicesListener->startListening();

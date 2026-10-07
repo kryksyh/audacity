@@ -7,6 +7,8 @@
 
 #include "au3trackplaybackcontrol.h"
 
+#include "shared/perf/perftrace.h"
+
 using namespace au::playback;
 using namespace au::au3;
 
@@ -28,6 +30,7 @@ volume_dbfs_t Au3TrackPlaybackControl::volume(long trackId) const
 
 void Au3TrackPlaybackControl::setVolume(long trackId, volume_dbfs_t vol, bool completed)
 {
+    AU_PERF_ZONE("control: track volume", Backend);
     Au3WaveTrack* track = DomAccessor::findWaveTrack(projectRef(), Au3TrackId(trackId));
     IF_ASSERT_FAILED(track) {
         return;
@@ -55,6 +58,7 @@ pan_t Au3TrackPlaybackControl::pan(long trackId) const
 
 void Au3TrackPlaybackControl::setPan(long trackId, au::audio::pan_t pan, bool completed)
 {
+    AU_PERF_ZONE("control: track pan", Backend);
     Au3WaveTrack* track = DomAccessor::findWaveTrack(projectRef(), Au3TrackId(trackId));
     IF_ASSERT_FAILED(track) {
         return;
@@ -108,6 +112,7 @@ bool Au3TrackPlaybackControl::setMuteOrSolo(long trackId, bool value, MuteOrSolo
 
 void Au3TrackPlaybackControl::setSolo(long trackId, bool solo, bool exclusive)
 {
+    AU_PERF_ZONE("control: track solo", Backend);
     if (setMuteOrSolo(trackId, solo, MuteOrSolo::Solo, exclusive)) {
         onMuteOrSoloChanged();
     }
@@ -125,6 +130,7 @@ bool Au3TrackPlaybackControl::solo(long trackId) const
 
 void Au3TrackPlaybackControl::setMuted(long trackId, bool mute, bool exclusive)
 {
+    AU_PERF_ZONE("control: track mute", Backend);
     if (setMuteOrSolo(trackId, mute, MuteOrSolo::Mute, exclusive)) {
         onMuteOrSoloChanged();
     }
@@ -132,6 +138,7 @@ void Au3TrackPlaybackControl::setMuted(long trackId, bool mute, bool exclusive)
 
 void Au3TrackPlaybackControl::setMuted(const trackedit::TrackIdList& trackIds, bool mute)
 {
+    AU_PERF_ZONE("control: track mute", Backend);
     // Apply to every track first (no short-circuiting), then notify and modify the history once.
     bool changed = false;
     for (const trackedit::TrackId trackId : trackIds) {

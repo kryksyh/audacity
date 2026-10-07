@@ -18,6 +18,8 @@ set(MODULE_SRC
     ${CMAKE_CURRENT_LIST_DIR}/internal/au3audiodrivercontroller.cpp
     ${CMAKE_CURRENT_LIST_DIR}/internal/au3audiodrivercontroller.h
     ${CMAKE_CURRENT_LIST_DIR}/internal/au3audioiolistener.h
+    ${CMAKE_CURRENT_LIST_DIR}/internal/au3audiotrace.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/internal/au3audiotrace.h
     ${CMAKE_CURRENT_LIST_DIR}/internal/defaultplaybackpolicy.cpp
     ${CMAKE_CURRENT_LIST_DIR}/internal/defaultplaybackpolicy.h
     )
@@ -63,6 +65,7 @@ else()
 endif()
 
 set(MODULE_LINK
+        shared
         au3-audio-io
         au3wrap
         au3-audio-devices

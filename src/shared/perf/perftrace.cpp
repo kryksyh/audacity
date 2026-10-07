@@ -102,9 +102,43 @@ Tracer::ThreadBuffer& Tracer::threadBuffer()
     return *buffer;
 }
 
+int Tracer::createLane(const char* name)
+{
+    auto newBuffer = std::make_unique<ThreadBuffer>();
+    newBuffer->events.resize(kThreadBufferCapacity);
+    newBuffer->name.store(name, std::memory_order_relaxed);
+
+    std::lock_guard lock(m_buffersMutex);
+    if (m_laneCount == static_cast<int>(m_lanes.size())) {
+        return -1;
+    }
+    newBuffer->tid = static_cast<int>(m_buffers.size()) + 1;
+    m_lanes[m_laneCount] = newBuffer.get();
+    m_buffers.push_back(std::move(newBuffer));
+    return m_laneCount++;
+}
+
+void Tracer::recordLaneZone(int lane, const char* name, Category category, int64_t startNs, int64_t endNs)
+{
+    if (lane >= 0) {
+        push(*m_lanes[lane], { name, startNs, std::max<int64_t>(endNs - startNs, 0), 0.0, category });
+    }
+}
+
+void Tracer::recordLaneCounter(int lane, const char* name, int64_t timeNs, double value)
+{
+    if (lane >= 0) {
+        push(*m_lanes[lane], { name, timeNs, -1, value, Category::Frame });
+    }
+}
+
 void Tracer::push(const Event& event)
 {
-    ThreadBuffer& buffer = threadBuffer();
+    push(threadBuffer(), event);
+}
+
+void Tracer::push(ThreadBuffer& buffer, const Event& event)
+{
     const uint64_t index = buffer.written.load(std::memory_order_relaxed);
     buffer.events[index % kThreadBufferCapacity] = event;
     buffer.written.store(index + 1, std::memory_order_release);
@@ -116,9 +150,18 @@ void Tracer::registerCallCounter(CallCounter* counter)
     m_callCounters.push_back(counter);
 }
 
+void Tracer::registerFlushSource(FlushSource source)
+{
+    std::lock_guard lock(m_callCountersMutex);
+    m_flushSources.push_back(source);
+}
+
 void Tracer::flushCallCounters()
 {
     std::lock_guard lock(m_callCountersMutex);
+    for (FlushSource source : m_flushSources) {
+        source();
+    }
     for (CallCounter* counter : m_callCounters) {
         const int64_t count = counter->m_count.exchange(0, std::memory_order_relaxed);
         // Skip idle repeats, but emit the first zero so the graph drops back down

@@ -12,6 +12,8 @@
 #include "au3wrap/internal/wxtypes_convert.h"
 
 #include "defaultplaybackpolicy.h"
+
+#include "shared/perf/perftrace.h"
 #include "au3audioiolistener.h"
 
 using namespace au::au3audio;
@@ -140,6 +142,7 @@ int Au3AudioEngine::startStream(const TransportSequences& sequences, const doubl
 void Au3AudioEngine::stopStream()
 {
     AudioIO::Get()->StopStream();
+    AU_PERF_ZONE("WaitWhileBusy", Audio);
     AudioIO::Get()->WaitWhileBusy();
 }
 

@@ -3,6 +3,7 @@
  */
 #pragma once
 
+#include <array>
 #include <atomic>
 #include <cstdint>
 #include <memory>
@@ -41,7 +42,16 @@ public:
     void recordZone(const char* name, Category category, int64_t startNs, int64_t endNs);
     void recordCounter(const char* name, double value);
 
+    // A named track written by one thread on behalf of another, e.g. audio
+    // callback records drained on the GUI thread. One writer per lane
+    int createLane(const char* name);
+    void recordLaneZone(int lane, const char* name, Category category, int64_t startNs, int64_t endNs);
+    void recordLaneCounter(int lane, const char* name, int64_t timeNs, double value);
+
     void registerCallCounter(CallCounter* counter);
+    // Called on every flush, on the flushing thread
+    using FlushSource = void (*)();
+    void registerFlushSource(FlushSource source);
     // Emits the calls counted since the previous flush as counter samples
     void flushCallCounters();
 
@@ -67,13 +77,17 @@ private:
 
     ThreadBuffer& threadBuffer();
     void push(const Event& event);
+    static void push(ThreadBuffer& buffer, const Event& event);
 
     std::atomic<bool> m_enabled = false;
     mutable std::mutex m_buffersMutex;
     std::vector<std::unique_ptr<ThreadBuffer> > m_buffers;
+    std::array<ThreadBuffer*, 8> m_lanes {};
+    int m_laneCount = 0;
 
     mutable std::mutex m_callCountersMutex;
     std::vector<CallCounter*> m_callCounters;
+    std::vector<FlushSource> m_flushSources;
 };
 
 class CallCounter

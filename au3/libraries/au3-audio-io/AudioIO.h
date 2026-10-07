@@ -111,6 +111,11 @@ public:
         constSamplePtr inputBuffer, float* outputBuffer, unsigned long framesPerBuffer, const PaStreamCallbackTimeInfo* timeInfo,
         const PaStreamCallbackFlags statusFlags, void* userData);
 
+    //! AudioCallback plus a diagnostics record; used only while tracing
+    int TracedAudioCallback(
+        constSamplePtr inputBuffer, float* outputBuffer, unsigned long framesPerBuffer, const PaStreamCallbackTimeInfo* timeInfo,
+        const PaStreamCallbackFlags statusFlags, void* userData);
+
     //! @name iteration over extensions, supporting range-for syntax
     //! @{
     class AUDIO_IO_API AudioIOExtIterator
@@ -269,6 +274,8 @@ public:
     static int mNextStreamToken;
     double mFactor;
     unsigned long mMaxFramesOutput;      // The actual number of frames output.
+    //! Written and read by the audio callback only
+    unsigned long mTraceRingUnderrunFrames{ 0 };
     /*! Read by a worker thread but unchanging during playback */
     bool mbMicroFades;
 

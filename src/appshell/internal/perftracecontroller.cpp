@@ -113,6 +113,8 @@ bool PerfTraceController::stopAndSave(const muse::io::path_t& filePath)
 
     Tracer& tracer = Tracer::instance();
     tracer.setEnabled(false);
+    // Drain what the audio callback recorded since the last GUI flush
+    tracer.flushCallCounters();
     for (const QMetaObject::Connection& connection : std::as_const(m_connections)) {
         QObject::disconnect(connection);
     }

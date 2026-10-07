@@ -7,6 +7,8 @@
 
 #include "../playbacktypes.h"
 
+#include "shared/perf/perftrace.h"
+
 using namespace muse;
 using namespace au::audio;
 using namespace au::playback;
@@ -349,6 +351,7 @@ void PlaybackController::togglePlayStopAndSetCursorAction()
 
 void PlaybackController::togglePlay(TogglePlayMode mode)
 {
+    AU_PERF_ZONE("control: toggle play", Backend);
     if (!isPlayAllowed()) {
         LOGW() << "playback not allowed";
         return;
@@ -630,6 +633,7 @@ void PlaybackController::stopAction()
 
 void PlaybackController::stop()
 {
+    AU_PERF_ZONE("control: stop", Backend);
     IF_ASSERT_FAILED(player()) {
         return;
     }

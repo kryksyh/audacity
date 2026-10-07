@@ -62,6 +62,7 @@ time warp info and AudioIOListener and whether the playback is looped.
 
 #include "AudioIOExt.h"
 #include "AudioIOListener.h"
+#include "AudioIOTrace.h"
 
 #include "au3-math/float_cast.h"
 #include "au3-math/Resample.h"
@@ -73,6 +74,7 @@ time warp info and AudioIOListener and whether the playback is looped.
 #include <math.h>
 #include <stdlib.h>
 #include <algorithm>
+#include <cmath>
 #include <numeric>
 #include <optional>
 
@@ -722,6 +724,9 @@ bool AudioIO::StartPortAudioStream(const AudioIOStartStreamOptions& options,
 
             mHardwarePlaybackLatencyMs = outputLatency * 1000.0;
             mHardwareCaptureLatencyMs = stream->inputLatency * 1000.0;
+            AudioIOTrace::Counter("suggested latency ms", latencyDuration);
+            AudioIOTrace::Counter("pa output latency ms", stream->outputLatency * 1000.0);
+            AudioIOTrace::Counter("pa input latency ms", stream->inputLatency * 1000.0);
             mHardwarePlaybackLatencyFrames = lrint(outputLatency * stream->sampleRate);
 #ifdef __WXGTK__
             // DV: When using ALSA PortAudio does not report the buffer size.
@@ -939,6 +944,8 @@ int AudioIO::StartStream(const TransportSequences& sequences,
     }
                ));
 
+    AudioIOTrace::ScopedZone startStreamZone("AudioIO::StartStream");
+
     const auto& pStartTime = options.pStartTime;
     t1 = std::min(t1, mixerLimit);
 
@@ -952,7 +959,10 @@ int AudioIO::StartStream(const TransportSequences& sequences,
         return 0;
     }
 
-    StopMonitoring();
+    {
+        AudioIOTrace::ScopedZone zone("StopMonitoring");
+        StopMonitoring();
+    }
 
     // We just want to set mStreamToken to -1 - this way avoids
     // an extremely rare but possible race condition, if two functions
@@ -1091,8 +1101,11 @@ int AudioIO::StartStream(const TransportSequences& sequences,
 
     mCaptureFormat = captureFormat;
     mCaptureRate = captureRate;
-    successAudio
-        =StartPortAudioStream(options, playbackChannels, numCaptureChannels);
+    {
+        AudioIOTrace::ScopedZone zone("StartPortAudioStream");
+        successAudio
+            =StartPortAudioStream(options, playbackChannels, numCaptureChannels);
+    }
 
     // Call this only after reassignment of mRate that might happen in the
     // previous call.
@@ -1125,14 +1138,18 @@ int AudioIO::StartStream(const TransportSequences& sequences,
         if (pStartTime) {
             mixerStart = std::min(mixerStart, *pStartTime);
         }
+        AudioIOTrace::ScopedZone zone("AllocateBuffers");
         if (!AllocateBuffers(options, sequences,
                              mixerStart, mixerLimit, options.rate)) {
             return 0;
         }
     }
 
-    mpTransportState = std::make_unique<TransportState>(mOwningProject, mPlaybackSequences, mNumPlaybackChannels, mRate,
-                                                        mPlaybackSamplesToCopy);
+    {
+        AudioIOTrace::ScopedZone zone("TransportState (realtime effects init)");
+        mpTransportState = std::make_unique<TransportState>(mOwningProject, mPlaybackSequences, mNumPlaybackChannels, mRate,
+                                                            mPlaybackSamplesToCopy);
+    }
 
     if (pStartTime) {
         // Calculate the NEW time position
@@ -1159,14 +1176,17 @@ int AudioIO::StartStream(const TransportSequences& sequences,
     mAudioThreadShouldCallSequenceBufferExchangeOnce
     .store(true, std::memory_order_release);
 
-    while (mAudioThreadShouldCallSequenceBufferExchangeOnce
-           .load(std::memory_order_acquire)) {
-        using namespace std::chrono;
-        auto interval = 50ms;
-        if (options.playbackStreamPrimer) {
-            interval = options.playbackStreamPrimer();
+    {
+        AudioIOTrace::ScopedZone zone("wait for ring buffer prime");
+        while (mAudioThreadShouldCallSequenceBufferExchangeOnce
+               .load(std::memory_order_acquire)) {
+            using namespace std::chrono;
+            auto interval = 50ms;
+            if (options.playbackStreamPrimer) {
+                interval = options.playbackStreamPrimer();
+            }
+            std::this_thread::sleep_for(interval);
         }
-        std::this_thread::sleep_for(interval);
     }
 
     if (mNumPlaybackChannels > 0 || mNumCaptureChannels > 0) {
@@ -1207,7 +1227,10 @@ int AudioIO::StartStream(const TransportSequences& sequences,
 
         // Now start the PortAudio stream!
         PaError err;
-        err = Pa_StartStream(mPortStreamV19);
+        {
+            AudioIOTrace::ScopedZone zone("Pa_StartStream");
+            err = Pa_StartStream(mPortStreamV19);
+        }
 
         if (err != paNoError) {
             mStreamToken = 0;
@@ -1241,7 +1264,10 @@ int AudioIO::StartStream(const TransportSequences& sequences,
 
     commit = true;
 
-    WaitForAudioThreadStarted();
+    {
+        AudioIOTrace::ScopedZone zone("WaitForAudioThreadStarted");
+        WaitForAudioThreadStarted();
+    }
 
     return mStreamToken;
 }
@@ -1554,6 +1580,8 @@ bool AudioIO::IsAvailable(AudacityProject& project) const
 
 void AudioIO::StopStream()
 {
+    AudioIOTrace::ScopedZone stopStreamZone("AudioIO::StopStream");
+
     StopMeters();
     ResetMeters();
 
@@ -1595,6 +1623,7 @@ void AudioIO::StopStream()
         // the sound card, then do so.  If we can't, don't wait around.  Just stop quickly and accept
         // there will be a click.
         if (mbMicroFades && (latency < 150)) {
+            AudioIOTrace::ScopedZone zone("fade-out sleep");
             using namespace std::chrono;
             std::this_thread::sleep_for(milliseconds { latency + 50 });
         }
@@ -1645,6 +1674,7 @@ void AudioIO::StopStream()
   #endif
 
     if (mPortStreamV19) {
+        AudioIOTrace::ScopedZone zone("Pa_AbortStream + Pa_CloseStream");
         // DV: Pa_CloseStream will close Pa_AbortStream internally,
         // but it doesn't hurt to do it ourselves.
         // PA_AbortStream will silently fail if stream is stopped.
@@ -1659,7 +1689,10 @@ void AudioIO::StopStream()
 
     // We previously told AudioThread to stop processing, now let's
     // be sure it has really stopped before resetting mpTransportState
-    WaitForAudioThreadStopped();
+    {
+        AudioIOTrace::ScopedZone zone("WaitForAudioThreadStopped");
+        WaitForAudioThreadStopped();
+    }
 
     for ( auto& ext : Extensions()) {
         ext.StopOtherStream();
@@ -1903,7 +1936,12 @@ void AudioIO::AudioThread(std::atomic<bool>& finish)
         eSkipProcessing, ePrimeProcessing, eMonitoringProcessing, eCallbackProcessing
     } lastState = ProcessingState::eSkipProcessing;
     AudioIO* const gAudioIO = AudioIO::Get();
+    bool tracedThreadNamed = false;
     while (!finish.load(std::memory_order_acquire)) {
+        if (!tracedThreadNamed && AudioIOTrace::IsEnabled()) {
+            AudioIOTrace::ThreadName("Audio producer");
+            tracedThreadNamed = true;
+        }
         using Clock = std::chrono::steady_clock;
         auto loopPassStart = Clock::now();
         auto& schedule = gAudioIO->mPlaybackSchedule;
@@ -1914,7 +1952,10 @@ void AudioIO::AudioThread(std::atomic<bool>& finish)
         .store(true, std::memory_order_relaxed);
         if (gAudioIO->mAudioThreadShouldCallSequenceBufferExchangeOnce
             .load(std::memory_order_acquire)) {
-            gAudioIO->SequenceBufferExchange();
+            {
+                AudioIOTrace::ScopedZone zone("SequenceBufferExchange (prime)");
+                gAudioIO->SequenceBufferExchange();
+            }
             gAudioIO->mAudioThreadShouldCallSequenceBufferExchangeOnce
             .store(false, std::memory_order_release);
 
@@ -1934,7 +1975,14 @@ void AudioIO::AudioThread(std::atomic<bool>& finish)
             // This is unlike the case with mAudioThreadShouldCallSequenceBufferExchangeOnce where the
             // store really means that the one-time exchange was done.
 
-            gAudioIO->SequenceBufferExchange();
+            {
+                AudioIOTrace::ScopedZone zone("SequenceBufferExchange");
+                gAudioIO->SequenceBufferExchange();
+            }
+            if (AudioIOTrace::IsEnabled() && !gAudioIO->mPlaybackBuffers.empty()) {
+                AudioIOTrace::Counter("playback queue ms",
+                                      1000.0 * gAudioIO->GetCommonlyReadyPlayback() / gAudioIO->mRate);
+            }
         } else {
             if ((lastState == ProcessingState::eCallbackProcessing)
                 || (lastState == ProcessingState::eMonitoringProcessing)
@@ -2720,6 +2768,12 @@ int audacityAudioCallback(const void* inputBuffer, void* outputBuffer,
                           const PaStreamCallbackFlags statusFlags, void* userData)
 {
     auto gAudioIO = AudioIO::Get();
+    if (AudioIOTrace::IsEnabled()) {
+        return gAudioIO->TracedAudioCallback(
+            static_cast<constSamplePtr>(inputBuffer),
+            static_cast<float*>(outputBuffer), framesPerBuffer,
+            timeInfo, statusFlags, userData);
+    }
     return gAudioIO->AudioCallback(
         static_cast<constSamplePtr>(inputBuffer),
         static_cast<float*>(outputBuffer), framesPerBuffer,
@@ -2857,6 +2911,8 @@ bool AudioIoCallback::FillOutputBuffers(
             // zeroes and not random garbage.
             memset((void*)&tempBufs[n][numberOfRetrievedFrames], 0,
                    (framesPerBuffer - numberOfRetrievedFrames) * sizeof(float));
+            mTraceRingUnderrunFrames = std::max<unsigned long>(
+                mTraceRingUnderrunFrames, framesPerBuffer - numberOfRetrievedFrames);
         }
 
         // PRL:  More recent rewrites of SequenceBufferExchange should guarantee a
@@ -3331,6 +3387,56 @@ AudioIoCallback::AudioIoCallback()
 
 AudioIoCallback::~AudioIoCallback()
 {
+}
+
+int AudioIoCallback::TracedAudioCallback(
+    constSamplePtr inputBuffer, float* outputBuffer,
+    unsigned long framesPerBuffer,
+    const PaStreamCallbackTimeInfo* timeInfo,
+    const PaStreamCallbackFlags statusFlags, void* userData)
+{
+    AudioIOTrace::CallbackRecord record;
+    record.startNs = AudioIOTrace::NowNs();
+    mTraceRingUnderrunFrames = 0;
+
+    const int result = AudioCallback(inputBuffer, outputBuffer, framesPerBuffer, timeInfo, statusFlags, userData);
+
+    record.durNs = AudioIOTrace::NowNs() - record.startNs;
+    record.outputDacTime = timeInfo ? timeInfo->outputBufferDacTime : 0.0;
+    record.sampleRate = mRate;
+    record.frames = static_cast<uint32_t>(framesPerBuffer);
+    record.statusFlags = static_cast<uint32_t>(statusFlags);
+    record.ringUnderrunFrames = static_cast<uint32_t>(mTraceRingUnderrunFrames);
+
+    if (outputBuffer && mNumPlaybackChannels > 0) {
+        float peak = 0.0f;
+        const size_t count = framesPerBuffer * mNumPlaybackChannels;
+        for (size_t i = 0; i < count; ++i) {
+            peak = std::max(peak, std::fabs(outputBuffer[i]));
+        }
+        record.outputPeak = peak;
+    }
+
+    if (inputBuffer && mNumCaptureChannels > 0) {
+        const size_t count = framesPerBuffer * mNumCaptureChannels;
+        float peak = 0.0f;
+        if (mCaptureFormat == floatSample) {
+            const auto samples = reinterpret_cast<const float*>(inputBuffer);
+            for (size_t i = 0; i < count; ++i) {
+                peak = std::max(peak, std::fabs(samples[i]));
+            }
+            record.inputPeak = peak;
+        } else if (mCaptureFormat == int16Sample) {
+            const auto samples = reinterpret_cast<const int16_t*>(inputBuffer);
+            for (size_t i = 0; i < count; ++i) {
+                peak = std::max(peak, std::fabs(samples[i] / 32768.0f));
+            }
+            record.inputPeak = peak;
+        }
+    }
+
+    AudioIOTrace::PushCallbackRecord(record);
+    return result;
 }
 
 int AudioIoCallback::AudioCallback(
