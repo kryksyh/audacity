@@ -8,6 +8,7 @@ set(MODULE_TEST_SRC
     ${CMAKE_CURRENT_LIST_DIR}/au3audiodrivercontroller_tests.cpp
     ${CMAKE_CURRENT_LIST_DIR}/playbackschedule_tests.cpp
     ${CMAKE_CURRENT_LIST_DIR}/loopbacklatency_tests.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/realtimeeffectlist_tests.cpp
     ${CMAKE_CURRENT_LIST_DIR}/mocks/audioenginemock.h
     )
 
@@ -15,6 +16,7 @@ set(MODULE_TEST_LINK
     au3audio
     au3wrap
     au3-audio-io
+    au3-realtime-effects
     )
 
 set(MODULE_TEST_DATA_ROOT ${CMAKE_CURRENT_LIST_DIR})
