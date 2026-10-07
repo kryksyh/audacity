@@ -457,7 +457,7 @@ public:
     void StopAudioThread();
     void WaitForAudioThreadStopped();
 
-    void ProcessOnceAndWait(std::chrono::milliseconds sleepTime = std::chrono::milliseconds(50));
+    void ProcessOnceAndWait(std::chrono::milliseconds sleepTime = std::chrono::milliseconds(1));
 
     std::atomic<bool> mForceFadeOut{ false };
 

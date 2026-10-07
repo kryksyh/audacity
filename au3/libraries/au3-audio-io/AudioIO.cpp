@@ -1198,7 +1198,9 @@ int AudioIO::StartStream(const TransportSequences& sequences,
         while (mAudioThreadShouldCallSequenceBufferExchangeOnce
                .load(std::memory_order_acquire)) {
             using namespace std::chrono;
-            auto interval = 50ms;
+            // The prime pass takes about a millisecond; a long poll here
+            // delays the first sound by the whole interval
+            auto interval = 1ms;
             if (options.playbackStreamPrimer) {
                 interval = options.playbackStreamPrimer();
             }
@@ -3937,7 +3939,7 @@ void AudioIoCallback::WaitForAudioThreadStarted()
     while (mAudioThreadAcknowledge.load(std::memory_order_acquire) != Acknowledge::eStart)
     {
         using namespace std::chrono;
-        std::this_thread::sleep_for(50ms);
+        std::this_thread::sleep_for(1ms);
     }
     mAudioThreadAcknowledge.store(Acknowledge::eNone, std::memory_order_release);
 }
@@ -3952,7 +3954,7 @@ void AudioIoCallback::WaitForAudioThreadStopped()
     while (mAudioThreadAcknowledge.load(std::memory_order_acquire) != Acknowledge::eStop)
     {
         using namespace std::chrono;
-        std::this_thread::sleep_for(50ms);
+        std::this_thread::sleep_for(1ms);
     }
     mAudioThreadAcknowledge.store(Acknowledge::eNone, std::memory_order_release);
 }
