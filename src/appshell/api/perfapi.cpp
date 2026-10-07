@@ -154,6 +154,40 @@ bool PerfApi::addRealtimeEffect(int trackIndex, const QString& effectId)
     return realtimeEffectService()->addRealtimeEffect(tracks[trackIndex], muse::String::fromQString(effectId)) != nullptr;
 }
 
+bool PerfApi::replaceRealtimeEffect(int trackIndex, int effectIndex, const QString& effectId)
+{
+    const auto project = globalContext()->currentTrackeditProject();
+    if (!project) {
+        return false;
+    }
+    const std::vector<au::trackedit::TrackId> tracks = project->trackIdList();
+    if (trackIndex < 0 || trackIndex >= static_cast<int>(tracks.size())) {
+        return false;
+    }
+    return realtimeEffectService()->replaceRealtimeEffect(tracks[trackIndex], effectIndex,
+                                                          muse::String::fromQString(effectId)) != nullptr;
+}
+
+int PerfApi::removeRealtimeEffects(int trackIndex)
+{
+    const auto project = globalContext()->currentTrackeditProject();
+    if (!project) {
+        return 0;
+    }
+    const std::vector<au::trackedit::TrackId> tracks = project->trackIdList();
+    if (trackIndex < 0 || trackIndex >= static_cast<int>(tracks.size())) {
+        return 0;
+    }
+    const auto stack = realtimeEffectService()->effectStack(tracks[trackIndex]);
+    if (!stack) {
+        return 0;
+    }
+    for (const auto& state : *stack) {
+        realtimeEffectService()->removeRealtimeEffect(tracks[trackIndex], state);
+    }
+    return static_cast<int>(stack->size());
+}
+
 bool PerfApi::exportTracks(const QString& directory)
 {
     using au::importexport::IExporter;

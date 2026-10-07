@@ -57,6 +57,9 @@ public:
     Q_INVOKABLE QVariantMap latencyMeasurement() const;
     //! Appends a realtime effect to the track at `trackIndex` of the current project
     Q_INVOKABLE bool addRealtimeEffect(int trackIndex, const QString& effectId);
+    Q_INVOKABLE bool replaceRealtimeEffect(int trackIndex, int effectIndex, const QString& effectId);
+    //! Returns how many were removed
+    Q_INVOKABLE int removeRealtimeEffects(int trackIndex);
     //! Each track as a 48 kHz WAV file in `directory`
     Q_INVOKABLE bool exportTracks(const QString& directory);
 
