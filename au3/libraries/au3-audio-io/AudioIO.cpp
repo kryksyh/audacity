@@ -3707,13 +3707,30 @@ int AudioIoCallback::TracedAudioCallback(
     record.ringUnderrunFrames = static_cast<uint32_t>(mTraceRingUnderrunFrames);
 
     if (outputBuffer && mNumPlaybackChannels > 0) {
+        // Onsets are compared at frame precision, e.g. to check that tracks
+        // with latent effects stay aligned
+        constexpr float onsetLevel = 1e-4f;
+        constexpr size_t minSilentFrames = 2048;
         float peak = 0.0f;
-        const size_t count = framesPerBuffer * mNumPlaybackChannels;
-        for (size_t i = 0; i < count; ++i) {
-            peak = std::max(peak, std::fabs(outputBuffer[i]));
+        for (size_t i = 0; i < framesPerBuffer; ++i) {
+            float framePeak = 0.0f;
+            for (unsigned c = 0; c < mNumPlaybackChannels; ++c) {
+                framePeak = std::max(framePeak, std::fabs(outputBuffer[i * mNumPlaybackChannels + c]));
+            }
+            if (framePeak < onsetLevel) {
+                ++mTraceSilentFrames;
+            } else {
+                if (record.outputOnset < 0 && mTraceSilentFrames >= minSilentFrames) {
+                    record.outputOnset = static_cast<int32_t>(i);
+                }
+                mTraceSilentFrames = 0;
+            }
+            peak = std::max(peak, framePeak);
         }
         record.outputPeak = peak;
     }
+    record.streamFrame = mTraceStreamFrames;
+    mTraceStreamFrames += framesPerBuffer;
 
     if (inputBuffer && mNumCaptureChannels > 0) {
         const size_t count = framesPerBuffer * mNumCaptureChannels;

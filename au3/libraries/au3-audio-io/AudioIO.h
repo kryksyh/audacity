@@ -356,6 +356,8 @@ public:
     unsigned long mMaxFramesOutput;      // The actual number of frames output.
     //! Written and read by the audio callback only
     unsigned long mTraceRingUnderrunFrames{ 0 };
+    uint64_t mTraceStreamFrames{ 0 };
+    size_t mTraceSilentFrames{ 0 };
 
     struct DiagnosticCounters {
         std::atomic<uint64_t> callbacks{ 0 };

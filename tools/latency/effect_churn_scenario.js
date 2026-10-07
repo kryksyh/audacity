@@ -36,7 +36,7 @@ var testCase = {
                 var added = 0
                 var replaced = 0
                 var removed = 0
-                // Track 0 is processed by the producer thread, the master (-1) by the audio callback
+                // Track 0 and the master (-1); the audio callback processes both
                 for (var i = 0; i < rounds; ++i) {
                     for (var k = 0; k < 3; ++k) {
                         added += Perf.addRealtimeEffect(0, effectId) ? 1 : 0

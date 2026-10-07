@@ -61,7 +61,8 @@ works for a first check. It adds about 3 µs per mm of air.
 
 The app records a Perfetto trace (Chrome JSON) while a testflow script drives it:
 
-- the `Audio callback` lane: duration, load, period, output and input peak, PortAudio status flags, ring underruns;
+- the `Audio callback` lane: duration, load, period, output and input peak, PortAudio status flags, ring underruns,
+  and the output frame of each onset after a silence;
 - zones for the `AudioIO::StartStream` / `StopStream` phases on the GUI thread;
 - `SequenceBufferExchange` and the playback queue level on the producer thread;
 - a `control: ...` zone in each transport and track-control handler, and a `playhead s` counter.
@@ -71,6 +72,7 @@ Open a trace in https://ui.perfetto.dev to see the timeline.
 ```
 tools/latency/run_latency_scenario.sh <label> [AU_LAT_BUFFER_MS=10] [AU_LAT_OUTPUT=<device>]
 tools/latency/run_record_alignment.sh <label> AU_LAT_INPUT=<device> [AU_LAT_AUTO_COMPENSATION=0|1] ...
+tools/latency/run_pdc_scenario.sh <label> [AU_LAT_BUFFER_MS=5] [AU_LAT_EFFECT=<effect id>]
 ```
 
 - `run_latency_scenario.sh` (L5, L6, L7, L8, L10): opens a tone / silence / tone signal. It repeats play, mute, unmute,
@@ -78,6 +80,11 @@ tools/latency/run_record_alignment.sh <label> AU_LAT_INPUT=<device> [AU_LAT_AUTO
   new output level, and adds the output latency that PortAudio reports.
 - `run_record_alignment.sh` (L4): records the burst train back on a new track through a loopback, exports the tracks
   and runs `pa_rtl --align`. A positive offset means the recording is late on the timeline.
+- `run_pdc_scenario.sh` (L9): plays a click at 1.0 s and one at 1.5 s on two tracks, with a latent effect (the built-in
+  Compressor by default) on the second. It prints how far the output onsets are from 0.5 s apart after a start, after
+  a seek and after the effect is added during play. No loopback needed. Make the signals at the device rate
+  (`make_test_signals.py <dir> 44100`): resampling rings before the click, and a louder track crosses the onset level
+  earlier.
 
 Both scripts change the audio preferences of the development profile (buffer, devices, compensation). Write down the
 values first and set them back after the runs.

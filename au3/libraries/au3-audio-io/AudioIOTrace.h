@@ -32,6 +32,11 @@ struct CallbackRecord {
     //! Absolute peak of the final output buffer and of the input buffer; -1 when absent
     float outputPeak = -1.0f;
     float inputPeak = -1.0f;
+    //! Output frames of the stream before this callback
+    uint64_t streamFrame = 0;
+    //! First output frame in this buffer that is not silent after a silence;
+    //! -1 when there is none
+    int32_t outputOnset = -1;
 };
 
 struct Hooks {

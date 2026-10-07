@@ -6,6 +6,9 @@
 #                play, stop, mute and seek reach the audio callback.
 #   bursts.wav   the pa_rtl burst once per second. Record it through a loopback
 #                and run align_take.py to measure record alignment (L4).
+#   click_a.wav, click_b.wav  one click at 1.0 s and at 1.5 s, below the
+#                Compressor threshold. Played as two tracks, the output onsets
+#                are 0.5 s apart when the tracks are aligned (L9).
 #
 # usage: make_test_signals.py <out dir> [sample rate, default 48000]
 #
@@ -47,6 +50,12 @@ def main():
     for _ in range(20):
         train += b + [0.0] * (RATE - len(b))
     write_wav(os.path.join(out_dir, "bursts.wav"), train)
+
+    for name, at in (("click_a.wav", 1.0), ("click_b.wav", 1.5)):
+        click = [0.0] * (3 * RATE)
+        start = int(at * RATE)
+        click[start:start + 16] = [0.2] * 16
+        write_wav(os.path.join(out_dir, name), click)
 
 
 if __name__ == "__main__":
