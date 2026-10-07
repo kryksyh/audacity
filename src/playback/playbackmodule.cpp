@@ -16,6 +16,7 @@
 #include "internal/au3/au3trackplaybackcontrol.h"
 
 #include "view/common/playbackstatemodel.h"
+#include "view/audioengine/audioenginestatusmodel.h"
 #include "view/common/playbackmetermodel.h"
 #include "view/common/metermodel.h"
 #include "view/common/horizontalvolumepressuremeteritem.h"
@@ -58,6 +59,7 @@ void PlaybackModule::registerResources()
 void PlaybackModule::registerUiTypes()
 {
     qmlRegisterType<PlaybackStateModel>("Audacity.Playback", 1, 0, "PlaybackStateModel");
+    qmlRegisterType<AudioEngineStatusModel>("Audacity.Playback", 1, 0, "AudioEngineStatusModel");
     qmlRegisterType<PlaybackMeterPanelModel>("Audacity.Playback", 1, 0, "PlaybackMeterPanelModel");
     qmlRegisterType<PlaybackMeterModel>("Audacity.Playback", 1, 0, "PlaybackMeterModel");
     qmlRegisterType<MeterModel>("Audacity.Playback", 1, 0, "MeterModel");
@@ -75,6 +77,7 @@ void PlaybackModule::resolveImports()
     auto ir = globalIoc()->resolve<muse::interactive::IInteractiveUriRegister>(mname);
     if (ir) {
         ir->registerQmlUri(muse::Uri("audacity://playback/loop_region_in_out"), "Audacity/Playback/dialogs/LoopRegionInOut.qml");
+        ir->registerQmlUri(muse::Uri("audacity://playback/audio_engine_status"), "Audacity/Playback/dialogs/AudioEngineStatusDialog.qml");
     }
 }
 

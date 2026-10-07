@@ -25,6 +25,7 @@ import QtQuick.Layouts
 import Muse.UiComponents
 
 import Audacity.ProjectScene
+import Audacity.Playback
 
 Item {
     id: root
@@ -58,6 +59,16 @@ Item {
         anchors.rightMargin: statusBarRow.rightMargin
 
         height: parent.height
+
+        AudioEngineStatus {
+            Layout.alignment: Qt.AlignLeft | Qt.AlignVCenter
+
+            navigationPanel: navPanel
+        }
+
+        Item {
+            Layout.fillWidth: true
+        }
 
         SelectionStatus {
             Layout.alignment: Qt.AlignRight | Qt.AlignVCenter

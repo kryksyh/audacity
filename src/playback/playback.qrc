@@ -1,6 +1,7 @@
 <RCC>
     <qresource prefix="/">
         <file>qml/Audacity/Playback/qmldir</file>
+        <file>qml/Audacity/Playback/components/AudioEngineStatus.qml</file>
         <file>qml/Audacity/Playback/components/HorizontalVolumePressureMeter.qml</file>
         <file>qml/Audacity/Playback/components/HorizontalVolumePressureRuler.qml</file>
         <file>qml/Audacity/Playback/components/MeterStyle.qml</file>
@@ -10,5 +11,6 @@
         <file>qml/Audacity/Playback/toolbars/PlaybackLevel.qml</file>
         <file>qml/Audacity/Playback/panels/PlaybackMeterPanel.qml</file>
         <file>qml/Audacity/Playback/dialogs/LoopRegionInOut.qml</file>
+        <file>qml/Audacity/Playback/dialogs/AudioEngineStatusDialog.qml</file>
     </qresource>
 </RCC>
