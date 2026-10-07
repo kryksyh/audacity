@@ -7,6 +7,7 @@ set(MODULE_TEST au3audio_tests)
 set(MODULE_TEST_SRC
     ${CMAKE_CURRENT_LIST_DIR}/au3audiodrivercontroller_tests.cpp
     ${CMAKE_CURRENT_LIST_DIR}/playbackschedule_tests.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/loopbacklatency_tests.cpp
     ${CMAKE_CURRENT_LIST_DIR}/mocks/audioenginemock.h
     )
 

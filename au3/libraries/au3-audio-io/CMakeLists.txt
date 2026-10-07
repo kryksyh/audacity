@@ -18,6 +18,8 @@ set( SOURCES
    AudioIOListener.h
    AudioIOTrace.cpp
    AudioIOTrace.h
+   LoopbackLatency.cpp
+   LoopbackLatency.h
    PlaybackSchedule.cpp
    PlaybackSchedule.h
    ProjectAudioIO.cpp
