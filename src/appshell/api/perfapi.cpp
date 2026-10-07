@@ -116,6 +116,31 @@ QVariantMap PerfApi::audioEngineHealth() const
     };
 }
 
+void PerfApi::startLatencyMeasurement()
+{
+    m_latencyMeasurement.clear();
+    latencyMeasurementService()->measure(iocContext(), [this](const au::audio::LatencyMeasurement& m) {
+        m_latencyMeasurement = {
+            { "status", static_cast<int>(m.status) },
+            { "sampleRate", m.sampleRate },
+            { "roundTripFrames", static_cast<qlonglong>(m.roundTripFrames) },
+            { "roundTripMs", m.roundTripMs() },
+            { "reportedInputLatencyMs", m.reportedInputLatencyMs },
+            { "reportedOutputLatencyMs", m.reportedOutputLatencyMs },
+            { "signalsFound", static_cast<qulonglong>(m.signalsFound) },
+            { "signalsSent", static_cast<qulonglong>(m.signalsSent) },
+            { "spreadFrames", static_cast<qlonglong>(m.spreadFrames) },
+            { "inputPeak", m.inputPeak },
+            { "inverted", m.inverted },
+        };
+    });
+}
+
+QVariantMap PerfApi::latencyMeasurement() const
+{
+    return m_latencyMeasurement;
+}
+
 bool PerfApi::addRealtimeEffect(int trackIndex, const QString& effectId)
 {
     const auto project = globalContext()->currentTrackeditProject();
