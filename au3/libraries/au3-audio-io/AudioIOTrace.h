@@ -37,6 +37,11 @@ struct CallbackRecord {
     //! First output frame in this buffer that is not silent after a silence;
     //! -1 when there is none
     int32_t outputOnset = -1;
+    //! Set when a silence long enough to count as one is confirmed in this
+    //! buffer; it began this many ms after the first frame of the buffer
+    //! (negative: in an earlier buffer)
+    bool outputSilenceStarted = false;
+    double outputSilenceStartMs = 0.0;
 };
 
 struct Hooks {

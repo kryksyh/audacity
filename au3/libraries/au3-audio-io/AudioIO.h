@@ -358,6 +358,7 @@ public:
     unsigned long mTraceRingUnderrunFrames{ 0 };
     uint64_t mTraceStreamFrames{ 0 };
     size_t mTraceSilentFrames{ 0 };
+    uint64_t mTraceSilenceStartFrame{ 0 };
 
     struct DiagnosticCounters {
         std::atomic<uint64_t> callbacks{ 0 };

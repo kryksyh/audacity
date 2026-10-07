@@ -44,6 +44,9 @@ void drainCallbackRecords()
             if (r.outputPeak >= 0) {
                 tracer.recordLaneCounter(lane, "output peak", r.startNs, r.outputPeak);
             }
+            if (r.outputSilenceStarted) {
+                tracer.recordLaneCounter(lane, "output silence start ms", r.startNs, r.outputSilenceStartMs);
+            }
             if (r.outputOnset >= 0) {
                 tracer.recordLaneCounter(lane, "output onset frame", r.startNs, static_cast<double>(r.streamFrame + r.outputOnset));
             }

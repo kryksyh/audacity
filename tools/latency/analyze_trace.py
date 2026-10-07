@@ -122,6 +122,11 @@ def main():
             j = bisect.bisect_left(peak_ts, crossing + LOOKAHEAD_US)
             steps = [peaks[n][0] for n in range(i, j) if peaks[n - 1][1] >= LOUD and peaks[n][1] <= SILENT]
             silent = min(steps, key=lambda st: abs(st - crossing)) if steps else None
+            # Frame-exact when traced: where the silence begins inside a buffer
+            starts = [t + value * 1000.0 for t, value in counters.get("output silence start ms", [])
+                      if abs(t - crossing) <= LOOKAHEAD_US]
+            if starts:
+                silent = min(starts, key=lambda st: abs(st - crossing))
             if silent is None:
                 print("  playhead crossed %.1f s, but no tone-to-silence step found" % TONE_END_S)
                 continue

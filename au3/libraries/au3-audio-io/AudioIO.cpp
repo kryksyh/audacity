@@ -3720,7 +3720,14 @@ int AudioIoCallback::TracedAudioCallback(
                 framePeak = std::max(framePeak, std::fabs(outputBuffer[i * mNumPlaybackChannels + c]));
             }
             if (framePeak < onsetLevel) {
-                ++mTraceSilentFrames;
+                if (mTraceSilentFrames == 0) {
+                    mTraceSilenceStartFrame = mTraceStreamFrames + i;
+                }
+                if (++mTraceSilentFrames == minSilentFrames && mRate > 0) {
+                    record.outputSilenceStarted = true;
+                    record.outputSilenceStartMs
+                        =1000.0 * (static_cast<double>(mTraceSilenceStartFrame) - static_cast<double>(mTraceStreamFrames)) / mRate;
+                }
             } else {
                 if (record.outputOnset < 0 && mTraceSilentFrames >= minSilentFrames) {
                     record.outputOnset = static_cast<int32_t>(i);
