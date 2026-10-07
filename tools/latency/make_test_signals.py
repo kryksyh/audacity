@@ -7,7 +7,7 @@
 #   bursts.wav   the pa_rtl burst once per second. Record it through a loopback
 #                and run align_take.py to measure record alignment (L4).
 #
-# usage: make_test_signals.py <out dir>
+# usage: make_test_signals.py <out dir> [sample rate, default 48000]
 #
 import math, os, struct, sys
 
@@ -33,7 +33,10 @@ def burst(gain):
 
 
 def main():
+    global RATE
     out_dir = sys.argv[1] if len(sys.argv) > 1 else "."
+    if len(sys.argv) > 2:
+        RATE = int(sys.argv[2])
     os.makedirs(out_dir, exist_ok=True)
 
     tone = [0.5 * math.sin(2 * math.pi * 440 * n / RATE) for n in range(10 * RATE)]
