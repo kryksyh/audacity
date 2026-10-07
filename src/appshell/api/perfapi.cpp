@@ -9,6 +9,8 @@
 #include <QUrl>
 #include <QWheelEvent>
 
+#include <set>
+#include <string>
 #include <vector>
 
 #include "shared/perf/perftrace.h"
@@ -63,6 +65,88 @@ PerfApi::PerfApi(muse::api::IApiEngine* e)
 QString PerfApi::env(const QString& name) const
 {
     return qEnvironmentVariable(name.toUtf8().constData());
+}
+
+bool PerfApi::configureAudio(double bufferMs, const QString& outputDevice, const QString& inputDevice,
+                             int autoLatencyCompensation)
+{
+    au::audio::AudioConfigurationChange change;
+    if (bufferMs >= 0) {
+        change.bufferLength = bufferMs;
+    }
+    if (!outputDevice.isEmpty()) {
+        change.outputDevice = outputDevice.toStdString();
+    }
+    if (!inputDevice.isEmpty()) {
+        change.inputDevice = inputDevice.toStdString();
+    }
+    if (autoLatencyCompensation >= 0) {
+        change.automaticLatencyCompensation = autoLatencyCompensation > 0;
+    }
+    return audioDriverController()->apply(iocContext(), change).succeeded();
+}
+
+QString PerfApi::audioConfiguration() const
+{
+    const au::audio::AudioConfiguration c = audioDriverController()->configuration();
+    return QString("api=%1; output=%2; input=%3; bufferMs=%4; autoLatencyCompensation=%5; latencyCompensationMs=%6; rate=%7")
+           .arg(QString::fromStdString(c.api))
+           .arg(QString::fromStdString(c.outputDevice.value_or("<default>")))
+           .arg(QString::fromStdString(c.inputDevice.value_or("<default>")))
+           .arg(c.bufferLength)
+           .arg(c.automaticLatencyCompensation ? "true" : "false")
+           .arg(c.latencyCompensation)
+           .arg(c.defaultSampleRate);
+}
+
+bool PerfApi::addRealtimeEffect(int trackIndex, const QString& effectId)
+{
+    const auto project = globalContext()->currentTrackeditProject();
+    if (!project) {
+        return false;
+    }
+    const std::vector<au::trackedit::TrackId> tracks = project->trackIdList();
+    if (trackIndex < 0 || trackIndex >= static_cast<int>(tracks.size())) {
+        return false;
+    }
+    return realtimeEffectService()->addRealtimeEffect(tracks[trackIndex], muse::String::fromQString(effectId)) != nullptr;
+}
+
+bool PerfApi::exportTracks(const QString& directory)
+{
+    using au::importexport::IExporter;
+
+    std::string format;
+    for (const std::string& f : exporter()->formatsList()) {
+        if (QString::fromStdString(f).startsWith("WAV")) {
+            format = f;
+            break;
+        }
+    }
+    if (format.empty()) {
+        return false;
+    }
+
+    IExporter::Options options;
+    options[IExporter::OptionKey::Format] = muse::Val(format);
+    options[IExporter::OptionKey::ProcessType] = muse::Val(au::importexport::ExportProcessType::TRACKS_AS_SEPARATE_AUDIO_FILES);
+    options[IExporter::OptionKey::ExportSampleRate] = muse::Val(48000);
+    options[IExporter::OptionKey::FileNamePrefix] = muse::Val(std::string("track"));
+    options[IExporter::OptionKey::IncludeNumbers] = muse::Val(true);
+
+    if (!exporter()->prepareSeparateFiles(options)) {
+        return false;
+    }
+    return exporter()->exportSeparateFiles(muse::io::path_t(directory)).success();
+}
+
+void PerfApi::mark(const QString& name)
+{
+    // Trace events keep the name pointer, so names must live for the whole run
+    static std::set<std::string> names;
+    const char* interned = names.insert(name.toStdString()).first->c_str();
+    const int64_t now = au::perf::Tracer::nowNs();
+    au::perf::Tracer::instance().recordZone(interned, au::perf::Category::Backend, now, now);
 }
 
 void PerfApi::openProject(const QString& path)

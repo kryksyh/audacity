@@ -12,6 +12,11 @@
 #include "framework/actions/iactionsdispatcher.h"
 #include "framework/ui/imainwindow.h"
 
+#include "audio/driver/iaudiodrivercontroller.h"
+#include "importexport/export/iexporter.h"
+#include "context/iglobalcontext.h"
+#include "effects/effects_base/irealtimeeffectservice.h"
+
 #include "../internal/perftracecontroller.h"
 
 class QQuickWindow;
@@ -24,6 +29,10 @@ class PerfApi : public muse::api::ApiObject
 
     muse::ContextInject<muse::actions::IActionsDispatcher> dispatcher = { this };
     muse::ContextInject<muse::ui::IMainWindow> mainWindow = { this };
+    muse::GlobalInject<au::audio::IAudioDriverController> audioDriverController;
+    muse::ContextInject<au::importexport::IExporter> exporter = { this };
+    muse::ContextInject<au::context::IGlobalContext> globalContext = { this };
+    muse::ContextInject<au::effects::IRealtimeEffectService> realtimeEffectService = { this };
 
 public:
     explicit PerfApi(muse::api::IApiEngine* e);
@@ -31,7 +40,19 @@ public:
     Q_INVOKABLE QString env(const QString& name) const;
     Q_INVOKABLE void openProject(const QString& path);
 
+    //! Applied like the preferences page does. bufferMs < 0, empty device names and
+    //! autoLatencyCompensation < 0 keep the current values
+    Q_INVOKABLE bool configureAudio(double bufferMs, const QString& outputDevice, const QString& inputDevice,
+                                    int autoLatencyCompensation = -1);
+    Q_INVOKABLE QString audioConfiguration() const;
+    //! Appends a realtime effect to the track at `trackIndex` of the current project
+    Q_INVOKABLE bool addRealtimeEffect(int trackIndex, const QString& effectId);
+    //! Each track as a 48 kHz WAV file in `directory`
+    Q_INVOKABLE bool exportTracks(const QString& directory);
+
     Q_INVOKABLE void startTrace();
+    //! Zero-length zone named `name` on the calling thread
+    Q_INVOKABLE void mark(const QString& name);
     Q_INVOKABLE bool stopTrace(const QString& path);
 
     //! Plays a fixed sequence of trackpad pinch-zoom and scroll gestures over the tracks view
