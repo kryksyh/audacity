@@ -7,6 +7,7 @@
 
 #include "internal/au3audioengine.h"
 #include "internal/au3audiodrivercontroller.h"
+#include "internal/au3audioenginediagnostics.h"
 #include "internal/au3audiotrace.h"
 
 #if defined(Q_OS_MAC)
@@ -46,6 +47,7 @@ void Au3AudioModule::registerExports()
 
     globalIoc()->registerExport<audio::IAudioEngine>(mname, m_audioEngine);
     globalIoc()->registerExport<audio::IAudioDriverController>(mname, m_audioDriverController);
+    globalIoc()->registerExport<audio::IAudioEngineDiagnostics>(mname, std::make_shared<Au3AudioEngineDiagnostics>());
     globalIoc()->registerExport<ISystemAudioDevicesListener>(mname, m_systemAudioDevicesListener);
 }
 

@@ -25,6 +25,9 @@
 #include <thread>
 #include <utility>
 #include <array>
+#include <atomic>
+#include <chrono>
+#include <cstdint>
 #include <wx/atomic.h> // member variable
 #include <wx/thread.h>
 
@@ -99,6 +102,27 @@ int audacityAudioCallback(
 
 class AudioIOExt;
 
+//! Health of the audio stream. Counters never decrease
+struct AudioIOStreamHealth {
+    bool streamActive = false;
+    double sampleRate = 0.0;
+    size_t framesPerBuffer = 0;
+    double reportedInputLatencyMs = 0.0;
+    double reportedOutputLatencyMs = 0.0;
+    //! Share of the time budget of one callback; 1 is 100 %
+    float averageLoad = 0.0f;
+    //! Recent highest load, falling slowly after a spike
+    float peakLoad = 0.0f;
+    uint64_t callbacks = 0;
+    //! Callbacks with at least one of the problems below
+    uint64_t dropouts = 0;
+    uint64_t overBudgetCallbacks = 0;
+    uint64_t outputUnderflows = 0;
+    uint64_t inputOverflows = 0;
+    uint64_t playbackStarvations = 0;
+    uint64_t lostCaptureFrames = 0;
+};
+
 class AUDIO_IO_API AudioIoCallback /* not final */ : public AudioIOBase
 {
 public:
@@ -115,6 +139,10 @@ public:
     int TracedAudioCallback(
         constSamplePtr inputBuffer, float* outputBuffer, unsigned long framesPerBuffer, const PaStreamCallbackTimeInfo* timeInfo,
         const PaStreamCallbackFlags statusFlags, void* userData);
+
+    //! Called after each callback, on the callback thread
+    void UpdateDiagnostics(
+        std::chrono::steady_clock::time_point callbackStart, unsigned long framesPerBuffer, PaStreamCallbackFlags statusFlags);
 
     //! @name iteration over extensions, supporting range-for syntax
     //! @{
@@ -276,6 +304,24 @@ public:
     unsigned long mMaxFramesOutput;      // The actual number of frames output.
     //! Written and read by the audio callback only
     unsigned long mTraceRingUnderrunFrames{ 0 };
+
+    struct DiagnosticCounters {
+        std::atomic<uint64_t> callbacks{ 0 };
+        std::atomic<uint64_t> dropouts{ 0 };
+        std::atomic<uint64_t> overBudgetCallbacks{ 0 };
+        std::atomic<uint64_t> outputUnderflows{ 0 };
+        std::atomic<uint64_t> inputOverflows{ 0 };
+        std::atomic<uint64_t> playbackStarvations{ 0 };
+        std::atomic<uint64_t> lostCaptureFrames{ 0 };
+        std::atomic<float> averageLoad{ 0.0f };
+        std::atomic<float> peakLoad{ 0.0f };
+        std::atomic<unsigned long> framesPerBuffer{ 0 };
+    } mDiagnostics;
+    //! Written and read by the audio callback only
+    bool mPlaybackStarvedInCallback{ false };
+    //! Set by the producer once the playback policy pads with silence: an empty
+    //! playback buffer after that is the normal end of play, not a dropout
+    std::atomic<bool> mPlaybackExhausted{ false };
     /*! Read by a worker thread but unchanging during playback */
     bool mbMicroFades;
 
@@ -579,6 +625,8 @@ public:
      * t0 and t1
      */
     double GetStreamTime();
+
+    AudioIOStreamHealth GetStreamHealth();
 
     static void AudioThread(std::atomic<bool>& finish);
 

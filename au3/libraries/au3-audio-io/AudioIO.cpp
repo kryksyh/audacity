@@ -1169,6 +1169,8 @@ int AudioIO::StartStream(const TransportSequences& sequences,
     mPlaybackSchedule.mTimeQueue.Prime(mPlaybackSchedule.GetSequenceTime());
     // else recording only without overdub
 
+    mPlaybackExhausted.store(false, std::memory_order_relaxed);
+
     // We signal the audio thread to call SequenceBufferExchange, to prime the RingBuffers
     // so that they will have data in them when the stream starts.  Having the
     // audio thread call SequenceBufferExchange here makes the code more predictable, since
@@ -1917,6 +1919,29 @@ double AudioIO::GetBestRate(bool capturing, bool playing, double sampleRate)
     return supportedRate;
 }
 
+AudioIOStreamHealth AudioIO::GetStreamHealth()
+{
+    constexpr auto relaxed = std::memory_order_relaxed;
+    const auto& d = mDiagnostics;
+
+    AudioIOStreamHealth result;
+    result.streamActive = IsStreamActive();
+    result.sampleRate = mRate;
+    result.framesPerBuffer = d.framesPerBuffer.load(relaxed);
+    result.reportedInputLatencyMs = mHardwareCaptureLatencyMs;
+    result.reportedOutputLatencyMs = mHardwarePlaybackLatencyMs;
+    result.averageLoad = d.averageLoad.load(relaxed);
+    result.peakLoad = d.peakLoad.load(relaxed);
+    result.callbacks = d.callbacks.load(relaxed);
+    result.dropouts = d.dropouts.load(relaxed);
+    result.overBudgetCallbacks = d.overBudgetCallbacks.load(relaxed);
+    result.outputUnderflows = d.outputUnderflows.load(relaxed);
+    result.inputOverflows = d.inputOverflows.load(relaxed);
+    result.playbackStarvations = d.playbackStarvations.load(relaxed);
+    result.lostCaptureFrames = d.lostCaptureFrames.load(relaxed);
+    return result;
+}
+
 double AudioIO::GetStreamTime()
 {
     // Sequence time readout for the main thread
@@ -2166,6 +2191,9 @@ bool AudioIO::ProcessPlaybackSlices(
             =policy.GetPlaybackSlice(mPlaybackSchedule, available);
         const auto&[frames, toProduce] = slice;
         progress = progress || toProduce > 0;
+        if (toProduce < frames) {
+            mPlaybackExhausted.store(true, std::memory_order_relaxed);
+        }
 
         // Update the time queue.  This must be done before writing to the
         // ring buffers of samples, for proper synchronization with the
@@ -2767,17 +2795,19 @@ int audacityAudioCallback(const void* inputBuffer, void* outputBuffer,
                           const PaStreamCallbackTimeInfo* timeInfo,
                           const PaStreamCallbackFlags statusFlags, void* userData)
 {
+    const auto callbackStart = std::chrono::steady_clock::now();
     auto gAudioIO = AudioIO::Get();
-    if (AudioIOTrace::IsEnabled()) {
-        return gAudioIO->TracedAudioCallback(
-            static_cast<constSamplePtr>(inputBuffer),
-            static_cast<float*>(outputBuffer), framesPerBuffer,
-            timeInfo, statusFlags, userData);
-    }
-    return gAudioIO->AudioCallback(
+    const int result = AudioIOTrace::IsEnabled()
+                       ? gAudioIO->TracedAudioCallback(
+        static_cast<constSamplePtr>(inputBuffer),
+        static_cast<float*>(outputBuffer), framesPerBuffer,
+        timeInfo, statusFlags, userData)
+                       : gAudioIO->AudioCallback(
         static_cast<constSamplePtr>(inputBuffer),
         static_cast<float*>(outputBuffer), framesPerBuffer,
         timeInfo, statusFlags, userData);
+    gAudioIO->UpdateDiagnostics(callbackStart, framesPerBuffer, statusFlags);
+    return result;
 }
 
 // Stop recording if 'silence' is detected
@@ -2913,6 +2943,9 @@ bool AudioIoCallback::FillOutputBuffers(
                    (framesPerBuffer - numberOfRetrievedFrames) * sizeof(float));
             mTraceRingUnderrunFrames = std::max<unsigned long>(
                 mTraceRingUnderrunFrames, framesPerBuffer - numberOfRetrievedFrames);
+            if (!IsPaused() && !mPlaybackExhausted.load(std::memory_order_relaxed)) {
+                mPlaybackStarvedInCallback = true;
+            }
         }
 
         // PRL:  More recent rewrites of SequenceBufferExchange should guarantee a
@@ -3100,6 +3133,7 @@ unsigned long AudioIoCallback::DrainInputBuffers(
 
     if (len < framesPerBuffer) {
         mLostSamples += (framesPerBuffer - len);
+        mDiagnostics.lostCaptureFrames.fetch_add(framesPerBuffer - len, std::memory_order_relaxed);
         wxPrintf(wxT("lost %d samples\n"), (int)(framesPerBuffer - len));
     }
 
@@ -3389,6 +3423,48 @@ AudioIoCallback::~AudioIoCallback()
 {
 }
 
+void AudioIoCallback::UpdateDiagnostics(
+    std::chrono::steady_clock::time_point callbackStart, unsigned long framesPerBuffer, PaStreamCallbackFlags statusFlags)
+{
+    using namespace std::chrono;
+    constexpr auto relaxed = std::memory_order_relaxed;
+    auto& d = mDiagnostics;
+
+    const double budgetSecs = mRate > 0 ? framesPerBuffer / mRate : 0.0;
+    const float load = budgetSecs > 0
+                       ? static_cast<float>(duration<double>(steady_clock::now() - callbackStart).count() / budgetSecs)
+                       : 0.0f;
+
+    d.callbacks.fetch_add(1, relaxed);
+    d.framesPerBuffer.store(framesPerBuffer, relaxed);
+    // Smoothed over roughly the last hundred callbacks
+    d.averageLoad.store(d.averageLoad.load(relaxed) * 0.99f + load * 0.01f, relaxed);
+    // Peak hold that falls by 50 % of the budget per second, so any number of readers can sample it
+    const float decayedPeak = d.peakLoad.load(relaxed) - static_cast<float>(budgetSecs * 0.5);
+    d.peakLoad.store(std::max(load, decayedPeak), relaxed);
+
+    const bool overBudget = load > 1.0f;
+    const bool outputUnderflow = (statusFlags & paOutputUnderflow) != 0;
+    const bool inputOverflow = (statusFlags & paInputOverflow) != 0;
+    const bool starved = std::exchange(mPlaybackStarvedInCallback, false);
+
+    if (overBudget) {
+        d.overBudgetCallbacks.fetch_add(1, relaxed);
+    }
+    if (outputUnderflow) {
+        d.outputUnderflows.fetch_add(1, relaxed);
+    }
+    if (inputOverflow) {
+        d.inputOverflows.fetch_add(1, relaxed);
+    }
+    if (starved) {
+        d.playbackStarvations.fetch_add(1, relaxed);
+    }
+    if (overBudget || outputUnderflow || inputOverflow || starved) {
+        d.dropouts.fetch_add(1, relaxed);
+    }
+}
+
 int AudioIoCallback::TracedAudioCallback(
     constSamplePtr inputBuffer, float* outputBuffer,
     unsigned long framesPerBuffer,
@@ -3620,6 +3696,7 @@ int AudioIoCallback::CallbackDoSeek()
 
     mPlaybackSchedule.SetSequenceTime(time);
     mSeek = 0.0;
+    mPlaybackExhausted.store(false, std::memory_order_relaxed);
 
     // Reset mixer positions and flush buffers for all sequences
     for (auto& mixer : mPlaybackMixers) {
