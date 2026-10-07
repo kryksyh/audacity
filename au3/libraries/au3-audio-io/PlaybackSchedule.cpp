@@ -314,7 +314,7 @@ void PlaybackSchedule::TimeQueue::Producer(
     {
         auto newTail = (tail + 1) % static_cast<int>(node->records.size());
         if ((newTail > head && static_cast<size_t>(newTail - head) == node->records.size() - 1)
-            || (newTail < head && static_cast<size_t>(head - newTail) == node->records.size() - 1)) {
+            || (newTail < head && head - newTail == 1)) {
             try
             {
                 Node* next = nullptr;
