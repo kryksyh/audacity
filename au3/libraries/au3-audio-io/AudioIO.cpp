@@ -3810,8 +3810,10 @@ int AudioIoCallback::AudioCallback(
                                    : outputBuffer;
     // ----- END of MEMORY ALLOCATIONS ------------------------------------------
 
-    const auto levelDisplayTime = std::chrono::steady_clock::now()
-                                  + std::chrono::milliseconds(static_cast<int>(mHardwarePlaybackLatencyMs));
+    // Output is heard after the output latency; input is already late by the
+    // input latency when it gets here, so its levels show at once
+    const auto callbackTime = std::chrono::steady_clock::now();
+    const auto levelDisplayTime = callbackTime + std::chrono::milliseconds(static_cast<int>(mHardwarePlaybackLatencyMs));
 
     if (inputBuffer && numCaptureChannels) {
         float* inputSamples;
@@ -3833,7 +3835,7 @@ int AudioIoCallback::AudioCallback(
             inputSamples = tempFloats;
         }
 
-        SendVuInputMeterData(inputSamples, framesPerBuffer, levelDisplayTime);
+        SendVuInputMeterData(inputSamples, framesPerBuffer, callbackTime);
 
         // This function may queue up a pause or resume.
         // TODO this is a bit dodgy as it toggles the Pause, and
