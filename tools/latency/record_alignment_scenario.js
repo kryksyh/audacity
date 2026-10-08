@@ -67,6 +67,7 @@ var testCase = {
                 api.testflow.sleep(500)
                 api.dispatcher.dispatch("record-on-new-track")
                 api.testflow.sleep(8000)
+                api.log.info("latency", "audioEngineHealth " + JSON.stringify(Perf.audioEngineHealth()))
                 api.dispatcher.dispatch("action://record/stop")
                 api.testflow.sleep(2000)
                 Perf.stopTrace(Perf.env("AU_LAT_TRACE"))

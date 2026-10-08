@@ -42,7 +42,7 @@ if kill -0 $pid 2>/dev/null; then
     kill -0 $pid 2>/dev/null && { echo "app did not exit, killing"; kill -9 $pid; }
 fi
 
-grep -h "configureAudio\|latencyMeasurement\|calibrated\|addRealtimeEffect\|exportTracks" "$OUT/$label.log"
+grep -h "configureAudio\|latencyMeasurement\|calibrated\|addRealtimeEffect\|audioEngineHealth\|exportTracks" "$OUT/$label.log"
 ls "$OUT/$label"
 take=$(ls "$OUT/$label"/*.wav(N) | tail -1)
 [ -n "$take" ] && "$PA_RTL" --align "$OUT/bursts.wav" "$take"

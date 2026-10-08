@@ -158,6 +158,9 @@ QVariantMap PerfApi::audioEngineHealth() const
         { "inputOverflows", static_cast<qulonglong>(d.inputOverflows) },
         { "playbackStarvations", static_cast<qulonglong>(d.playbackStarvations) },
         { "lostCaptureFrames", static_cast<qulonglong>(d.lostCaptureFrames) },
+        { "streamRoundTripMs", d.streamRoundTripMs },
+        { "recordingCompensationMs", d.recordingCompensationMs },
+        { "recordingCompensationSource", static_cast<int>(d.recordingCompensationSource) },
     };
 }
 
