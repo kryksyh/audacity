@@ -10,6 +10,10 @@
 
 var Perf = require("Audacity.Perf")
 
+// Without the requested devices the app would play on the system default
+// output; the steps after "Configure audio" then do nothing
+var configured = false
+
 var ROUNDS = 5
 // Longer than the slowest change seen with 100 ms buffers, so steps never overlap
 var DWELL_MS = 1500
@@ -35,9 +39,12 @@ var testCase = {
         {
             name: "Configure audio", func: function () {
                 var bufferMs = Perf.env("AU_LAT_BUFFER_MS")
-                var ok = Perf.configureAudio(bufferMs ? parseFloat(bufferMs) : -1,
+                configured = Perf.configureAudio(bufferMs ? parseFloat(bufferMs) : -1,
                                              Perf.env("AU_LAT_OUTPUT"), Perf.env("AU_LAT_INPUT"))
-                api.log.info("latency", "configureAudio " + (ok ? "ok" : "FAILED") + ": " + Perf.audioConfiguration())
+                api.log.info("latency", "configureAudio " + (configured ? "ok" : "FAILED") + ": " + Perf.audioConfiguration())
+                if (!configured) {
+                    return
+                }
                 // Load for L10: AU_LAT_EFFECT_COUNT copies of AU_LAT_EFFECT on the track
                 var effectId = Perf.env("AU_LAT_EFFECT")
                 var count = effectId ? parseInt(Perf.env("AU_LAT_EFFECT_COUNT") || "1") : 0
@@ -53,6 +60,9 @@ var testCase = {
         },
         {
             name: "Scenario", func: function () {
+                if (!configured) {
+                    return
+                }
                 Perf.startTrace()
                 api.testflow.sleep(1000)
                 for (var i = 0; i < ROUNDS; ++i) {

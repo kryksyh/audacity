@@ -15,6 +15,9 @@ APP=${APP:-$ROOT/build/asan/src/app/audacity.app/Contents/MacOS/audacity}
 OUT=${OUT:-$ROOT/build/latency}
 label=$1; shift
 
+# Test signals must never reach the system default output (e.g. the laptop speakers)
+[[ " $* " == *" AU_LAT_OUTPUT="* ]] || { echo "AU_LAT_OUTPUT=<device> is required"; exit 2; }
+
 mkdir -p "$OUT"
 [ -f "$OUT/control.wav" ] || python3 "$SCRIPT_DIR/make_test_signals.py" "$OUT"
 
@@ -26,6 +29,8 @@ env AU_LAT_EFFECT="Effect_Audacity_Audacity_Compressor_Built-in Effect: Compress
 pid=$!
 for i in {1..600}; do
     kill -0 $pid 2>/dev/null || break
+    # The app would otherwise play on the system default output
+    grep -q "configureAudio FAILED" "$OUT/$label.log" && { echo "configureAudio failed, app stopped"; kill -9 $pid; break; }
     grep -q "effectChurn" "$OUT/$label.log" && { /bin/sleep 2; kill $pid 2>/dev/null; break; }
     /bin/sleep 1
 done

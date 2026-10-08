@@ -8,7 +8,8 @@
 # usage: run_record_alignment.sh <label> [ENV=VALUE ...]
 #   APP, OUT  as in run_latency_scenario.sh
 #   ENV=VALUE passed to the app: AU_LAT_BUFFER_MS, AU_LAT_OUTPUT, AU_LAT_INPUT,
-#             AU_LAT_AUTO_COMPENSATION=0|1, AU_LAT_EFFECT=<effect id> (added to the played track)
+#             AU_LAT_AUTO_COMPENSATION=0|1, AU_LAT_EFFECT=<effect id> (added to the played track),
+#             AU_LAT_CALIBRATE=1 (measure the round trip first and use it as the compensation)
 set -u
 SCRIPT_DIR=${0:A:h}
 ROOT=${SCRIPT_DIR:h:h}
@@ -16,6 +17,9 @@ APP=${APP:-$ROOT/build/audacity-release/src/app/audacity.app/Contents/MacOS/auda
 OUT=${OUT:-$ROOT/build/latency}
 PA_RTL=${PA_RTL:-$ROOT/build/pa_rtl/pa_rtl}
 label=$1; shift
+
+# Test signals must never reach the system default output (e.g. the laptop speakers)
+[[ " $* " == *" AU_LAT_OUTPUT="* ]] || { echo "AU_LAT_OUTPUT=<device> is required"; exit 2; }
 
 mkdir -p "$OUT"
 python3 "$SCRIPT_DIR/make_test_signals.py" "$OUT"
@@ -28,6 +32,8 @@ env "$@" AU_ALLOW_MULTIPLE_PROCESSES=1 AU_LAT_SIGNAL="$OUT/bursts.wav" AU_LAT_TR
 pid=$!
 for i in {1..120}; do
     kill -0 $pid 2>/dev/null || break
+    # The app would otherwise play on the system default output
+    grep -q "configureAudio FAILED" "$OUT/$label.log" && { echo "configureAudio failed, app stopped"; kill -9 $pid; break; }
     grep -q "exportTracks" "$OUT/$label.log" && { /bin/sleep 2; kill $pid 2>/dev/null; break; }
     /bin/sleep 1
 done
@@ -36,7 +42,7 @@ if kill -0 $pid 2>/dev/null; then
     kill -0 $pid 2>/dev/null && { echo "app did not exit, killing"; kill -9 $pid; }
 fi
 
-grep -h "configureAudio\|addRealtimeEffect\|exportTracks" "$OUT/$label.log"
+grep -h "configureAudio\|latencyMeasurement\|calibrated\|addRealtimeEffect\|exportTracks" "$OUT/$label.log"
 ls "$OUT/$label"
 take=$(ls "$OUT/$label"/*.wav(N) | tail -1)
 [ -n "$take" ] && "$PA_RTL" --align "$OUT/bursts.wav" "$take"

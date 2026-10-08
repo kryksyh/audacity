@@ -104,6 +104,14 @@ bool PerfApi::configureAudio(double bufferMs, const QString& outputDevice, const
     return audioDriverController()->apply(iocContext(), change).succeeded();
 }
 
+bool PerfApi::setLatencyCompensation(double ms)
+{
+    au::audio::AudioConfigurationChange change;
+    change.automaticLatencyCompensation = false;
+    change.latencyCompensation = ms;
+    return audioDriverController()->apply(iocContext(), change).succeeded();
+}
+
 QString PerfApi::audioConfiguration() const
 {
     const au::audio::AudioConfiguration c = audioDriverController()->configuration();

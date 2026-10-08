@@ -50,6 +50,8 @@ public:
     //! autoLatencyCompensation < 0 keep the current values
     Q_INVOKABLE bool configureAudio(double bufferMs, const QString& outputDevice, const QString& inputDevice,
                                     int autoLatencyCompensation = -1);
+    //! Manual recording latency compensation in ms, with automatic compensation off
+    Q_INVOKABLE bool setLatencyCompensation(double ms);
     Q_INVOKABLE QString audioConfiguration() const;
     Q_INVOKABLE QVariantMap audioEngineHealth() const;
     Q_INVOKABLE void startLatencyMeasurement();

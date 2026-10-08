@@ -91,8 +91,11 @@ tools/latency/run_stress.sh <label> [AU_LAT_BUFFER_MS=7] [AU_LAT_TRACKS=8] [AU_L
   callback size from it, and the health line shows the result (`framesPerBuffer`). The trace keeps only the first
   minute or so of a long run; the health counters cover all of it.
 
-Both scripts change the audio preferences of the development profile (buffer, devices, compensation). Write down the
-values first and set them back after the runs.
+The scripts change the audio preferences of the development profile (buffer, devices, compensation). Write down the
+values first and set them back after the runs. They need an explicit `AU_LAT_OUTPUT`, and they stop the app when the
+requested device does not exist, so that test signals never play on the system default output. Turn off software
+input monitoring (`record.inputMonitoring`) during runs: the app starts monitoring before a scenario configures the
+devices, and with a loopback cable that is a feedback loop.
 
 ## Procedure per platform
 

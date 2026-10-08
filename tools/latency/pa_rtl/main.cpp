@@ -60,6 +60,9 @@ struct State {
 
     // Written by the callback only, read after the stream has stopped
     std::vector<int64_t> callbackStartNs;
+    //! (outputBufferDacTime - inputBufferAdcTime) per callback, in seconds:
+    //! the round trip of this stream by its own clock
+    std::vector<double> timestampRoundTrip;
     size_t callbacks = 0;
     unsigned long minFrames = ULONG_MAX;
     unsigned long maxFrames = 0;
@@ -73,11 +76,14 @@ int64_t nowNs()
 }
 
 int callback(const void* input, void* output, unsigned long frames,
-             const PaStreamCallbackTimeInfo*, PaStreamCallbackFlags flags, void* userData)
+             const PaStreamCallbackTimeInfo* timeInfo, PaStreamCallbackFlags flags, void* userData)
 {
     State& s = *static_cast<State*>(userData);
     if (s.callbacks < s.callbackStartNs.size()) {
         s.callbackStartNs[s.callbacks] = nowNs();
+        if (timeInfo && timeInfo->inputBufferAdcTime > 0 && timeInfo->outputBufferDacTime > 0) {
+            s.timestampRoundTrip[s.callbacks] = timeInfo->outputBufferDacTime - timeInfo->inputBufferAdcTime;
+        }
     }
     ++s.callbacks;
     s.minFrames = std::min(s.minFrames, frames);
@@ -480,6 +486,7 @@ int main(int argc, char** argv)
     s.periodFrames = static_cast<size_t>(o.period * o.rate);
     s.capture.assign(static_cast<size_t>(o.seconds * o.rate), 0.0f);
     s.callbackStartNs.assign(kMaxCallbacks, 0);
+    s.timestampRoundTrip.assign(kMaxCallbacks, 0.0);
     s.burst = makeBurst(o.gain);
 
     PaStreamParameters in {};
@@ -626,5 +633,19 @@ int main(int argc, char** argv)
     std::printf("measured    %ld frames = %.3f ms (bursts %zu, spread %ld frames, min confidence %.1f)\n",
                 median, median * 1e3 / info->sampleRate, lags.size(), spread, minConfidence);
     std::printf("error       reported - measured = %+.1f frames\n", reportedFrames - median);
+
+    // The first callbacks run before both devices are in step
+    std::vector<double> stamps;
+    for (size_t i = s.callbacks / 10; i < std::min(s.callbacks, s.timestampRoundTrip.size()); ++i) {
+        if (s.timestampRoundTrip[i] > 0) {
+            stamps.push_back(s.timestampRoundTrip[i] * info->sampleRate);
+        }
+    }
+    if (!stamps.empty()) {
+        std::sort(stamps.begin(), stamps.end());
+        const double stampMedian = stamps[stamps.size() / 2];
+        std::printf("timestamps  output DAC - input ADC = %.1f frames (range %.1f..%.1f), minus measured = %+.1f frames\n",
+                    stampMedian, stamps.front(), stamps.back(), stampMedian - median);
+    }
     return 0;
 }

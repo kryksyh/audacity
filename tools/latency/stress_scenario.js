@@ -8,6 +8,10 @@
 
 var Perf = require("Audacity.Perf")
 
+// Without the requested devices the app would play on the system default
+// output; the steps after "Configure audio" then do nothing
+var configured = false
+
 // stress.wav is 120 s long
 var RESTART_MS = 110000
 
@@ -27,9 +31,12 @@ var testCase = {
         {
             name: "Configure audio", func: function () {
                 var bufferMs = Perf.env("AU_LAT_BUFFER_MS")
-                var ok = Perf.configureAudio(bufferMs ? parseFloat(bufferMs) : -1,
+                configured = Perf.configureAudio(bufferMs ? parseFloat(bufferMs) : -1,
                                              Perf.env("AU_LAT_OUTPUT"), Perf.env("AU_LAT_INPUT"))
-                api.log.info("latency", "configureAudio " + (ok ? "ok" : "FAILED") + ": " + Perf.audioConfiguration())
+                api.log.info("latency", "configureAudio " + (configured ? "ok" : "FAILED") + ": " + Perf.audioConfiguration())
+                if (!configured) {
+                    return
+                }
                 var tracks = parseInt(Perf.env("AU_LAT_TRACKS") || "8")
                 var effects = (Perf.env("AU_LAT_EFFECTS") || "").split(",").filter(function (e) { return e.length > 0 })
                 var added = 0
@@ -44,6 +51,9 @@ var testCase = {
         },
         {
             name: "Play", func: function () {
+                if (!configured) {
+                    return
+                }
                 var totalMs = 1000 * parseFloat(Perf.env("AU_LAT_SECONDS") || "120")
                 Perf.startTrace()
                 api.dispatcher.dispatch("action://playback/seek?seekTime=0&triggerPlay=false")

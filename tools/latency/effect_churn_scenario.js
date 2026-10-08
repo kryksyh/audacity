@@ -8,6 +8,10 @@
 
 var Perf = require("Audacity.Perf")
 
+// Without the requested devices the app would play on the system default
+// output; the steps after "Configure audio" then do nothing
+var configured = false
+
 var testCase = {
     name: "Perf: effect churn during playback",
     description: "Add, replace and remove realtime effects while playing",
@@ -21,13 +25,19 @@ var testCase = {
         {
             name: "Configure audio", func: function () {
                 var bufferMs = Perf.env("AU_LAT_BUFFER_MS")
-                Perf.configureAudio(bufferMs ? parseFloat(bufferMs) : -1, Perf.env("AU_LAT_OUTPUT"), Perf.env("AU_LAT_INPUT"))
-                api.log.info("latency", "configureAudio: " + Perf.audioConfiguration())
+                configured = Perf.configureAudio(bufferMs ? parseFloat(bufferMs) : -1, Perf.env("AU_LAT_OUTPUT"), Perf.env("AU_LAT_INPUT"))
+                api.log.info("latency", "configureAudio " + (configured ? "ok" : "FAILED") + ": " + Perf.audioConfiguration())
+                if (!configured) {
+                    return
+                }
                 api.testflow.sleep(1000)
             }
         },
         {
             name: "Churn", func: function () {
+                if (!configured) {
+                    return
+                }
                 var effectId = Perf.env("AU_LAT_EFFECT")
                 var rounds = parseInt(Perf.env("AU_LAT_ROUNDS") || "100")
                 api.dispatcher.dispatch("action://playback/seek?seekTime=0&triggerPlay=false")

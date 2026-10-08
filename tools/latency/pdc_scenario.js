@@ -9,6 +9,10 @@
 
 var Perf = require("Audacity.Perf")
 
+// Without the requested devices the app would play on the system default
+// output; the steps after "Configure audio" then do nothing
+var configured = false
+
 var ROUNDS = 3
 
 function play(from) {
@@ -36,15 +40,21 @@ var testCase = {
         {
             name: "Configure audio", func: function () {
                 var bufferMs = Perf.env("AU_LAT_BUFFER_MS")
-                var ok = Perf.configureAudio(bufferMs ? parseFloat(bufferMs) : -1,
+                configured = Perf.configureAudio(bufferMs ? parseFloat(bufferMs) : -1,
                                              Perf.env("AU_LAT_OUTPUT"), Perf.env("AU_LAT_INPUT"))
-                api.log.info("latency", "configureAudio " + (ok ? "ok" : "FAILED") + ": " + Perf.audioConfiguration())
+                api.log.info("latency", "configureAudio " + (configured ? "ok" : "FAILED") + ": " + Perf.audioConfiguration())
+                if (!configured) {
+                    return
+                }
                 api.log.info("latency", "addRealtimeEffect " + Perf.addRealtimeEffect(1, Perf.env("AU_LAT_EFFECT")))
                 api.testflow.sleep(1000)
             }
         },
         {
             name: "Scenario", func: function () {
+                if (!configured) {
+                    return
+                }
                 var effectId = Perf.env("AU_LAT_EFFECT")
                 Perf.startTrace()
                 api.testflow.sleep(1000)

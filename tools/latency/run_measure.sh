@@ -13,6 +13,9 @@ APP=${APP:-$ROOT/build/audacity-release/src/app/audacity.app/Contents/MacOS/auda
 OUT=${OUT:-$ROOT/build/latency}
 label=$1; shift
 
+# Test signals must never reach the system default output (e.g. the laptop speakers)
+[[ " $* " == *" AU_LAT_OUTPUT="* ]] || { echo "AU_LAT_OUTPUT=<device> is required"; exit 2; }
+
 mkdir -p "$OUT"
 # Never hand the run over to an Audacity that is already open
 env "$@" AU_ALLOW_MULTIPLE_PROCESSES=1 \
@@ -20,6 +23,8 @@ env "$@" AU_ALLOW_MULTIPLE_PROCESSES=1 \
 pid=$!
 for i in {1..60}; do
     kill -0 $pid 2>/dev/null || break
+    # The app would otherwise play on the system default output
+    grep -q "configureAudio FAILED" "$OUT/$label.log" && { echo "configureAudio failed, app stopped"; kill -9 $pid; break; }
     grep -q "latencyMeasurement" "$OUT/$label.log" && { /bin/sleep 1; kill $pid 2>/dev/null; break; }
     /bin/sleep 1
 done
