@@ -128,6 +128,13 @@ struct AudioIOLoopbackResult {
 };
 
 //! Health of the audio stream. Counters never decrease
+enum class AudioIOCompensationSource {
+    None,      //!< nothing recorded in this stream
+    Manual,
+    Reported,  //!< automatic, from the latencies the driver reported at open
+    Stream,    //!< automatic, from the stream's own timestamps
+};
+
 struct AudioIOStreamHealth {
     bool streamActive = false;
     double sampleRate = 0.0;
@@ -146,6 +153,11 @@ struct AudioIOStreamHealth {
     uint64_t inputOverflows = 0;
     uint64_t playbackStarvations = 0;
     uint64_t lostCaptureFrames = 0;
+    //! Output DAC time minus input ADC time of the last duplex callback; 0 without one
+    double streamRoundTripMs = 0.0;
+    //! Shift applied to the last recording, negative moves it earlier
+    double recordingCompensationMs = 0.0;
+    AudioIOCompensationSource recordingCompensationSource = AudioIOCompensationSource::None;
 };
 
 class AUDIO_IO_API AudioIoCallback /* not final */ : public AudioIOBase
@@ -507,6 +519,9 @@ protected:
     bool mCompensateFromStreamTimes { false };
     //! Output DAC time minus input ADC time of the last duplex callback, s
     std::atomic<double> mStreamRoundTrip { 0.0 };
+    //! Copies of the recording compensation for GetStreamHealth
+    std::atomic<double> mAppliedCompensation { 0.0 };
+    std::atomic<AudioIOCompensationSource> mAppliedCompensationSource { AudioIOCompensationSource::None };
 
     // For cacheing supported sample rates
     static double mCachedBestRateOut;

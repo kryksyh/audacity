@@ -1127,6 +1127,11 @@ int AudioIO::StartStream(const TransportSequences& sequences,
         successAudio
             =StartPortAudioStream(options, playbackChannels, numCaptureChannels);
     }
+    mAppliedCompensation.store(mRecordingSchedule.mLatencyCompensation, std::memory_order_relaxed);
+    mAppliedCompensationSource.store(mCaptureSequences.empty() ? AudioIOCompensationSource::None
+                                     : AudioIOAutomaticLatencyCompensation.Read() ? AudioIOCompensationSource::Reported
+                                     : AudioIOCompensationSource::Manual,
+                                     std::memory_order_relaxed);
 
     // Call this only after reassignment of mRate that might happen in the
     // previous call.
@@ -1984,6 +1989,9 @@ AudioIOStreamHealth AudioIO::GetStreamHealth()
     result.inputOverflows = d.inputOverflows.load(relaxed);
     result.playbackStarvations = d.playbackStarvations.load(relaxed);
     result.lostCaptureFrames = d.lostCaptureFrames.load(relaxed);
+    result.streamRoundTripMs = 1000.0 * mStreamRoundTrip.load(relaxed);
+    result.recordingCompensationMs = 1000.0 * mAppliedCompensation.load(relaxed);
+    result.recordingCompensationSource = mAppliedCompensationSource.load(relaxed);
     return result;
 }
 
@@ -2591,6 +2599,8 @@ void AudioIO::DrainRecordBuffers()
                 if (!mPlaybackSequences.empty() && roundTrip > 0.0 && roundTrip < 1.0
                     && !mRecordingSchedule.mLatencyCorrected) {
                     mRecordingSchedule.mLatencyCompensation = -roundTrip;
+                    mAppliedCompensation.store(-roundTrip, std::memory_order_relaxed);
+                    mAppliedCompensationSource.store(AudioIOCompensationSource::Stream, std::memory_order_relaxed);
                 }
             }
 

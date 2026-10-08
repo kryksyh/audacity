@@ -10,6 +10,13 @@
 
 namespace au::audio {
 //! Health of the audio stream. Counters count from the last reset.
+enum class RecordingCompensationSource {
+    None,
+    Manual,
+    Reported,  //!< automatic, from the latencies the driver reported at open
+    Stream,    //!< automatic, from the stream's own timestamps
+};
+
 struct AudioEngineDiagnostics {
     bool streamActive = false;
     double sampleRate = 0.0;
@@ -32,6 +39,12 @@ struct AudioEngineDiagnostics {
     //! Playback buffer ran dry before the end of the material
     uint64_t playbackStarvations = 0;
     uint64_t lostCaptureFrames = 0;
+
+    //! Round trip from the duplex callback's timestamps; 0 without one
+    double streamRoundTripMs = 0.0;
+    //! Shift applied to the last recording, negative moves it earlier
+    double recordingCompensationMs = 0.0;
+    RecordingCompensationSource recordingCompensationSource = RecordingCompensationSource::None;
 };
 
 class IAudioEngineDiagnostics : MODULE_GLOBAL_INTERFACE

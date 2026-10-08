@@ -27,6 +27,22 @@ au::audio::AudioEngineDiagnostics readEngine()
     result.inputOverflows = d.inputOverflows;
     result.playbackStarvations = d.playbackStarvations;
     result.lostCaptureFrames = d.lostCaptureFrames;
+    result.streamRoundTripMs = d.streamRoundTripMs;
+    result.recordingCompensationMs = d.recordingCompensationMs;
+    switch (d.recordingCompensationSource) {
+    case AudioIOCompensationSource::None:
+        result.recordingCompensationSource = au::audio::RecordingCompensationSource::None;
+        break;
+    case AudioIOCompensationSource::Manual:
+        result.recordingCompensationSource = au::audio::RecordingCompensationSource::Manual;
+        break;
+    case AudioIOCompensationSource::Reported:
+        result.recordingCompensationSource = au::audio::RecordingCompensationSource::Reported;
+        break;
+    case AudioIOCompensationSource::Stream:
+        result.recordingCompensationSource = au::audio::RecordingCompensationSource::Stream;
+        break;
+    }
     return result;
 }
 }
