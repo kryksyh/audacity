@@ -27,6 +27,22 @@ QString milliseconds(double ms)
     return muse::qtrc("playback", "%1 ms").arg(ms, 0, 'f', 1);
 }
 
+QString recordingCompensation(const au::audio::AudioEngineDiagnostics& c)
+{
+    using Source = au::audio::RecordingCompensationSource;
+    switch (c.recordingCompensationSource) {
+    case Source::None:
+        break;
+    case Source::Manual:
+        return muse::qtrc("playback", "%1 (manual)").arg(milliseconds(c.recordingCompensationMs));
+    case Source::Reported:
+        return muse::qtrc("playback", "%1 (automatic, reported by driver)").arg(milliseconds(c.recordingCompensationMs));
+    case Source::Stream:
+        return muse::qtrc("playback", "%1 (automatic, stream timestamps)").arg(milliseconds(c.recordingCompensationMs));
+    }
+    return muse::qtrc("playback", "none");
+}
+
 QVariantMap row(const QString& label, const QString& value)
 {
     return { { "label", label }, { "value", value } };
@@ -141,6 +157,12 @@ QVariantList AudioEngineStatusModel::details() const
                 muse::qtrc("playback", "%1 frames (%2)").arg(c.framesPerBuffer).arg(milliseconds(bufferMs)));
     rows << row(muse::qtrc("playback", "Input latency (reported by driver)"), milliseconds(c.reportedInputLatencyMs));
     rows << row(muse::qtrc("playback", "Output latency (reported by driver)"), milliseconds(c.reportedOutputLatencyMs));
+    rows << row(muse::qtrc("playback", "Round trip (stream timestamps)"),
+                c.streamRoundTripMs > 0
+                ? muse::qtrc("playback", "%1 (%2 frames)").arg(milliseconds(c.streamRoundTripMs))
+                .arg(c.streamRoundTripMs * c.sampleRate / 1000.0, 0, 'f', 0)
+                : muse::qtrc("playback", "none"));
+    rows << row(muse::qtrc("playback", "Last recording compensation"), recordingCompensation(c));
     rows << row(muse::qtrc("playback", "Callback load"),
                 muse::qtrc("playback", "%1 % average, %2 % peak").arg(loadPercent()).arg(peakLoadPercent()));
     rows << row(muse::qtrc("playback", "Callbacks"), QString::number(c.callbacks));
