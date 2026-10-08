@@ -9,10 +9,13 @@
 #include <QUrl>
 #include <QWheelEvent>
 
+#include <algorithm>
 #include <optional>
 #include <set>
 #include <string>
 #include <vector>
+
+#include "framework/global/log.h"
 
 #include "shared/perf/perftrace.h"
 
@@ -71,6 +74,20 @@ QString PerfApi::env(const QString& name) const
 bool PerfApi::configureAudio(double bufferMs, const QString& outputDevice, const QString& inputDevice,
                              int autoLatencyCompensation)
 {
+    // An unknown name would fall back to the system default device without an
+    // error, and the run would measure the wrong device
+    const auto known = [](const std::vector<std::string>& names, const QString& name) {
+        return std::find(names.begin(), names.end(), name.toStdString()) != names.end();
+    };
+    if (!outputDevice.isEmpty() && !known(audioDriverController()->outputDevices(), outputDevice)) {
+        LOGE() << "unknown output device \"" << outputDevice << "\"";
+        return false;
+    }
+    if (!inputDevice.isEmpty() && !known(audioDriverController()->inputDevices(), inputDevice)) {
+        LOGE() << "unknown input device \"" << inputDevice << "\"";
+        return false;
+    }
+
     au::audio::AudioConfigurationChange change;
     if (bufferMs >= 0) {
         change.bufferLength = bufferMs;
