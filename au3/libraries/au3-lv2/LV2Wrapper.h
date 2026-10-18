@@ -29,7 +29,7 @@
 #include <thread>
 #include <wx/msgqueue.h>
 
-struct EffectOutputs;
+class EffectOutputs;
 struct LV2EffectSettings;
 class LV2Ports;
 class LV2PortStates;
@@ -105,6 +105,7 @@ private:
     wxMessageQueue<LV2Work> mRequests;
     wxMessageQueue<LV2Work> mResponses;
     float mLatency{ 0.0 };
+    const float* mLatencyValue{ &mLatency };
 
     //! If true, do not spawn extra worker threads
     bool mFreeWheeling{ false };

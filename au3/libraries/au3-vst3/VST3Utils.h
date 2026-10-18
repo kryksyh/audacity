@@ -14,6 +14,7 @@
 
 #include <pluginterfaces/vst/ivstaudioprocessor.h>
 #include <string>
+#include <set>
 #include <public.sdk/source/vst/hosting/module.h>
 #include <public.sdk/source/vst/vstpresetfile.h>
 
@@ -54,6 +55,11 @@ public:
     //Get the unit string for a VST3 parameter as std::string
     //Returns empty string if units cannot be determined or if conversion fails
     static std::string GetParameterUnitStdString(Steinberg::Vst::IEditController* controller, const Steinberg::Vst::ParameterInfo& info);
+
+    // Non-automatable parameters used to carry MIDI controller events. Their
+    // initial values are not persistent synth controls: replaying them sends
+    // unsolicited CC messages and can overwrite the restored native preset.
+    static std::set<Steinberg::Vst::ParamID> MidiEventParameters(Steinberg::Vst::IEditController* controller);
 
     //Builds a string key suitable to use as an Audacity macro param
     //key, which is guaranteed to be unique, and most likely be in

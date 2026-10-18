@@ -1,0 +1,1278 @@
+diff --git a/framework/dockwindow/qml/Muse/Dock/dockpanelview.cpp b/framework/dockwindow/qml/Muse/Dock/dockpanelview.cpp
+index ecdbaef97..c74fb4243 100644
+--- a/framework/dockwindow/qml/Muse/Dock/dockpanelview.cpp
++++ b/framework/dockwindow/qml/Muse/Dock/dockpanelview.cpp
+@@ -310,3 +310,9 @@ void DockPanelView::setCurrentTabIndex(int index)
+         frame->setCurrentTabIndex(index);
+     }
+ }
++
++void DockPanelView::activate()
++{
++    open();
++    if (auto* dock = dockWidget()) dock->setAsCurrentTab();
++}
+diff --git a/framework/dockwindow/qml/Muse/Dock/dockpanelview.h b/framework/dockwindow/qml/Muse/Dock/dockpanelview.h
+index 0acfc4923..e10fb555e 100644
+--- a/framework/dockwindow/qml/Muse/Dock/dockpanelview.h
++++ b/framework/dockwindow/qml/Muse/Dock/dockpanelview.h
+@@ -58,6 +58,7 @@ public:
+     bool isTabAllowed(const DockPanelView* tab) const;
+     void addPanelAsTab(DockPanelView* tab);
+     void setCurrentTabIndex(int index);
++    Q_INVOKABLE void activate();
+ 
+ public slots:
+     void setGroupName(const QString& name);
+diff --git a/framework/dockwindow_v2/qml/Muse/Dock/dockpanelview.cpp b/framework/dockwindow_v2/qml/Muse/Dock/dockpanelview.cpp
+index ef5c17eb1..1a7f89103 100644
+--- a/framework/dockwindow_v2/qml/Muse/Dock/dockpanelview.cpp
++++ b/framework/dockwindow_v2/qml/Muse/Dock/dockpanelview.cpp
+@@ -320,3 +320,9 @@ void DockPanelView::setCurrentTabIndex(int index)
+         group->setCurrentTabIndex(index);
+     }
+ }
++
++void DockPanelView::activate()
++{
++    open();
++    if (auto* dock = dockWidget()) dock->setAsCurrentTab();
++}
+diff --git a/framework/dockwindow_v2/qml/Muse/Dock/dockpanelview.h b/framework/dockwindow_v2/qml/Muse/Dock/dockpanelview.h
+index 0acfc4923..e10fb555e 100644
+--- a/framework/dockwindow_v2/qml/Muse/Dock/dockpanelview.h
++++ b/framework/dockwindow_v2/qml/Muse/Dock/dockpanelview.h
+@@ -58,6 +58,7 @@ public:
+     bool isTabAllowed(const DockPanelView* tab) const;
+     void addPanelAsTab(DockPanelView* tab);
+     void setCurrentTabIndex(int index);
++    Q_INVOKABLE void activate();
+ 
+ public slots:
+     void setGroupName(const QString& name);
+diff --git a/framework/interactive/internal/interactive.cpp b/framework/interactive/internal/interactive.cpp
+index 23745bdf8..aa1fc0294 100644
+--- a/framework/interactive/internal/interactive.cpp
++++ b/framework/interactive/internal/interactive.cpp
+@@ -897,7 +897,12 @@ std::vector<Interactive::ObjectInfo> Interactive::openDialogs() const
+ 
+ Promise<Ret> Interactive::closeObjects(const std::vector<ObjectInfo>& objs)
+ {
+-    return async::make_promise<Ret>([this, objs](auto resolve, auto) {
++    return async::make_promise<Ret>(closeFunc(objs));
++}
++
++Promise<Ret>::BodyResolveReject Interactive::closeFunc(const std::vector<ObjectInfo>& objs)
++{
++    return [this, objs](auto resolve, auto) {
+         if (objs.empty()) {
+             return resolve(make_ok());
+         }
+@@ -951,7 +956,7 @@ Promise<Ret> Interactive::closeObjects(const std::vector<ObjectInfo>& objs)
+         }
+ 
+         return Promise<Ret>::dummy_result();
+-    });
++    };
+ }
+ 
+ Ret Interactive::closeObjectsSync(const std::vector<ObjectInfo>& objs)
+@@ -962,13 +967,28 @@ Ret Interactive::closeObjectsSync(const std::vector<ObjectInfo>& objs)
+ 
+     QEventLoop loop;
+     Ret ret = make_ok();
++    bool finished = false;
++    Promise<Ret>::Resolve resolve;
++    auto promise = async::make_promise<Ret>([&resolve](auto res, auto) {
++        resolve = res;
++        return Promise<Ret>::dummy_result();
++    }, PromiseType::AsyncByBody);
+ 
+-    closeObjects(objs).onResolve(this, [&loop, &ret](const Ret& closeRet) {
++    promise.onResolve(this, [&loop, &ret, &finished](const Ret& closeRet) {
+         ret = closeRet;
++        finished = true;
+         loop.quit();
+     });
+ 
+-    loop.exec();
++    // A command may already be draining the async queue. Start closing directly
++    // like openSync(), rather than queuing work that cannot run until we return.
++    closeFunc(objs)(resolve, {});
++
++    // A close may resolve before the local wait begins. Like openSync(), do
++    // not enter a new event loop after that completion: an earlier quit is lost.
++    if (!finished) {
++        loop.exec();
++    }
+ 
+     return ret;
+ }
+@@ -1326,12 +1346,14 @@ void Interactive::onClose(const QString& objectId, const QVariant& jsrv)
+         notifyAboutCurrentUriChanged();
+     }
+ 
+-    Async::call(this, [this, objectId, rv]() {
++    // Defer until the window has finished closing, using the Qt loop that also
++    // drives a synchronous close invoked from inside an async command handler.
++    QMetaObject::invokeMethod(this, [this, objectId, rv]() {
+         auto onClosedIt = m_onClosedFuncs.find(objectId);
+         if (onClosedIt != m_onClosedFuncs.end()) {
+             onClosedIt->second(rv.ret);
+         }
+-    });
++    }, Qt::QueuedConnection);
+ }
+ 
+ std::vector<Interactive::ObjectInfo> Interactive::allOpenObjects() const
+diff --git a/framework/interactive/internal/interactive.h b/framework/interactive/internal/interactive.h
+index 6bf0ac53f..a77a3af2a 100644
+--- a/framework/interactive/internal/interactive.h
++++ b/framework/interactive/internal/interactive.h
+@@ -175,6 +175,7 @@ private:
+     RetVal<OpenData> openQml(const Uri& uri, const QVariantMap& params);
+ 
+     async::Promise<Ret> closeObjects(const std::vector<ObjectInfo>& objs);
++    async::Promise<Ret>::BodyResolveReject closeFunc(const std::vector<ObjectInfo>& objs);
+     Ret closeObjectsSync(const std::vector<ObjectInfo>& objs);
+ 
+     void closeQml(const QVariant& objectId);
+diff --git a/framework/interactive/tests/CMakeLists.txt b/framework/interactive/tests/CMakeLists.txt
+index 30b8492c2..7ac541770 100644
+--- a/framework/interactive/tests/CMakeLists.txt
++++ b/framework/interactive/tests/CMakeLists.txt
+@@ -22,6 +22,7 @@ set(MODULE_TEST muse_interactive_tests)
+ 
+ set(MODULE_TEST_SRC
+     ${CMAKE_CURRENT_LIST_DIR}/filedialogfilters_tests.cpp
++    ${CMAKE_CURRENT_LIST_DIR}/interactiveclose_tests.cpp
+     ${CMAKE_CURRENT_LIST_DIR}/mocks/interactivemock.h
+ )
+ 
+@@ -29,4 +30,8 @@ set(MODULE_TEST_LINK
+     muse_interactive
+ )
+ 
++set(MODULE_TEST_INCLUDE
++    ${CMAKE_CURRENT_LIST_DIR}/..
++)
++
+ include(SetupGTest)
+diff --git a/framework/interactive/tests/interactiveclose_tests.cpp b/framework/interactive/tests/interactiveclose_tests.cpp
+new file mode 100644
+index 000000000..482bdb33e
+--- /dev/null
++++ b/framework/interactive/tests/interactiveclose_tests.cpp
+@@ -0,0 +1,139 @@
++/* SPDX-License-Identifier: GPL-3.0-only */
++#include <gtest/gtest.h>
++
++#include <QEventLoop>
++#include <QWindow>
++
++#include "async/async.h"
++#include "async/processevents.h"
++#include "interactive/internal/interactive.h"
++#include "interactive/internal/interactiveuriregister.h"
++
++using namespace muse;
++using namespace muse::interactive;
++
++class Interactive_CloseTests : public ::testing::Test
++{
++protected:
++    void SetUp() override
++    {
++        registry = std::make_shared<InteractiveUriRegister>();
++        modularity::globalIoc()->registerExport<IInteractiveUriRegister>("close-tests", registry);
++        interactive = std::make_unique<Interactive>(nullptr);
++        interactive->openRequested().onReceive(&receiver, [this](QmlLaunchData* data) {
++            const QString id = QString::number(++nextId);
++            data->setValue("objectId", id);
++            data->setValue("ret", QVariantMap { { "errcode", 0 } });
++            interactive->onOpen(ContainerMeta::QmlDialog, id, &window);
++        });
++        interactive->closeRequested().onReceive(&receiver, [this](const QVariant& id) {
++            ++closeRequests;
++            interactive->onClose(id.toString(), QVariantMap { { "errcode", 0 } });
++        });
++    }
++
++    void TearDown() override
++    {
++        // Drain open notifications while their provider and receiver still live.
++        async::processMessages();
++        interactive.reset();
++        modularity::globalIoc()->unregister<IInteractiveUriRegister>("close-tests");
++    }
++
++    UriQuery openDialog(const std::string& path)
++    {
++        Uri uri("muse://close-tests/" + path);
++        registry->registerQmlUri(uri, "UnusedTestDialog.qml");
++        UriQuery query(uri);
++        auto opened = interactive->open(query);
++        opened.onResolve(&receiver, [](const Val&) {});
++        opened.onReject(&receiver, [](int, const std::string&) { ADD_FAILURE() << "Fake dialog did not open"; });
++        EXPECT_TRUE(interactive->isOpened(query).val);
++        return query;
++    }
++
++    // Commands are delivered from this queue in the app. A synchronous dialog
++    // close must finish without recursively draining the queue already in use.
++    template<typename F> void fromCommandQueue(F action)
++    {
++        bool completed = false;
++        QEventLoop loop;
++        async::Async::call(&receiver, [&] {
++            action();
++            completed = true;
++            loop.quit();
++        });
++        // Let the real single-shot ticker deliver the queued command, just as
++        // in the app. Manually draining it while that timer is active would
++        // introduce a second, artificial recursive queue drain during a wait.
++        loop.exec();
++        EXPECT_TRUE(completed);
++    }
++
++    std::shared_ptr<InteractiveUriRegister> registry;
++    std::unique_ptr<Interactive> interactive;
++    async::Asyncable receiver;
++    QWindow window;
++    int nextId = 0;
++    int closeRequests = 0;
++};
++
++TEST_F(Interactive_CloseTests, CloseAllFromCommandQueueWaitsForEveryDialog)
++{
++    auto first = openDialog("first");
++    auto second = openDialog("second");
++    fromCommandQueue([&] {
++        EXPECT_TRUE(interactive->closeAllDialogsSync());
++        EXPECT_EQ(closeRequests, 2);
++        EXPECT_FALSE(interactive->isOpened(first).val);
++        EXPECT_FALSE(interactive->isOpened(second).val);
++    });
++}
++
++TEST_F(Interactive_CloseTests, CloseOneFromCommandQueueKeepsOtherDialog)
++{
++    auto first = openDialog("first");
++    auto second = openDialog("second");
++    fromCommandQueue([&] {
++        EXPECT_TRUE(interactive->closeSync(first));
++        EXPECT_EQ(closeRequests, 1);
++        EXPECT_FALSE(interactive->isOpened(first).val);
++        EXPECT_TRUE(interactive->isOpened(second).val);
++        EXPECT_TRUE(interactive->closeAllDialogsSync());
++    });
++}
++
++TEST_F(Interactive_CloseTests, ImmediateCloseFailureReturnsWithoutEnteringWait)
++{
++    auto query = openDialog("missing-widget");
++    // Simulate a registered QWidget dialog whose native window disappeared.
++    registry->unregisterUri(query.uri());
++    registry->registerUri(query.uri(), ContainerMeta(ContainerMeta::QWidgetDialog));
++    fromCommandQueue([&] {
++        EXPECT_FALSE(interactive->closeSync(query));
++        EXPECT_TRUE(interactive->isOpened(query).val);
++    });
++    registry->unregisterUri(query.uri());
++    registry->registerQmlUri(query.uri(), "UnusedTestDialog.qml");
++    fromCommandQueue([&] { EXPECT_TRUE(interactive->closeAllDialogsSync()); });
++}
++
++TEST_F(Interactive_CloseTests, AsyncCloseStillNotifiesAfterAllDialogsClose)
++{
++    auto first = openDialog("first");
++    auto second = openDialog("second");
++    QEventLoop loop;
++    bool completed = false;
++    auto closing = interactive->closeAllDialogs();
++    closing.onResolve(&receiver, [&](const Ret& ret) {
++        EXPECT_TRUE(ret);
++        EXPECT_EQ(closeRequests, 2);
++        EXPECT_FALSE(interactive->isOpened(first).val);
++        EXPECT_FALSE(interactive->isOpened(second).val);
++        completed = true;
++        loop.quit();
++    });
++    EXPECT_FALSE(completed);
++    loop.exec();
++    EXPECT_TRUE(completed);
++}
+diff --git a/framework/midi/imidiinport.h b/framework/midi/imidiinport.h
+index 4282f6a76..d0bb94c57 100644
+--- a/framework/midi/imidiinport.h
++++ b/framework/midi/imidiinport.h
+@@ -22,6 +22,10 @@
+ #ifndef MUSE_MIDI_IMIDIINPORT_H
+ #define MUSE_MIDI_IMIDIINPORT_H
+ 
++#include <chrono>
++#include <optional>
++#include <memory>
++
+ #include "modularity/imoduleinterface.h"
+ 
+ #include "types/ret.h"
+@@ -47,6 +51,25 @@ public:
+     virtual async::Notification deviceChanged() const = 0;
+ 
+     virtual async::Channel<tick_t, Event> eventReceived() const = 0;
++    // Optional high-resolution input time, in the steady clock's epoch. Drivers
++    // capture/convert this before asynchronous delivery to the UI. Legacy tick
++    // units differ by platform and must not be interpreted as this clock.
++    using InputTime = std::chrono::steady_clock::time_point;
++    virtual std::optional<async::Channel<InputTime, Event>> timestampedEventReceived() const { return std::nullopt; }
++
++    // Optional driver-thread delivery. Implementations serialize receive/lost
++    // calls and finish any in-flight call before clearRealtimeReceiver returns.
++    // Receivers must only publish bounded data, without touching UI or plugins.
++    // lost() also runs on replacement, disconnect, and endpoint removal.
++    class RealtimeReceiver {
++    public:
++        virtual ~RealtimeReceiver() = default;
++        virtual void receive(InputTime, const Event&) noexcept = 0;
++        virtual void lost(InputTime) noexcept = 0;
++    };
++    virtual bool setRealtimeReceiver(const std::shared_ptr<RealtimeReceiver>&) { return false; }
++    // Identity-checked: an old session cannot detach a newer session's receiver.
++    virtual void clearRealtimeReceiver(const std::shared_ptr<RealtimeReceiver>&) {}
+ };
+ }
+ 
+diff --git a/framework/midi/internal/platform/osx/coremidiinport.cpp b/framework/midi/internal/platform/osx/coremidiinport.cpp
+index d1f0d366a..6533697c8 100644
+--- a/framework/midi/internal/platform/osx/coremidiinport.cpp
++++ b/framework/midi/internal/platform/osx/coremidiinport.cpp
+@@ -28,6 +28,7 @@
+ #include "translation.h"
+ #include "midierrors.h"
+ #include "defer.h"
++#include <utility>
+ #include "log.h"
+ 
+ using namespace muse;
+@@ -42,6 +43,22 @@ using namespace muse::midi;
+ #define LOG_MIDI_W LOGN
+ #endif
+ 
++namespace {
++IMidiInPort::InputTime inputTime(MIDITimeStamp timestamp)
++{
++    using Clock = std::chrono::steady_clock;
++    const auto now = Clock::now();
++    if (timestamp == 0) return now;
++    const auto hostNow = AudioGetCurrentHostTime();
++    const bool past = timestamp < hostNow;
++    const auto nanos = AudioConvertHostTimeToNanos(past ? hostNow - timestamp : timestamp - hostNow);
++    const auto delta = std::chrono::duration<long double>(nanos * 1e-9L);
++    const auto target = std::chrono::duration<long double>(now.time_since_epoch()) + (past ? -delta : delta);
++    if (target < Clock::time_point::min().time_since_epoch() || target > Clock::time_point::max().time_since_epoch()) return now;
++    return Clock::time_point(std::chrono::duration_cast<Clock::duration>(target));
++}
++}
++
+ struct muse::midi::CoreMidiInPort::Core {
+     MIDIClientRef client = 0;
+     MIDIPortRef inputPort = 0;
+@@ -194,9 +211,10 @@ void CoreMidiInPort::initCore()
+ 
+     CFStringRef portName = CFSTR("MuseScore MIDI input port");
+     if (__builtin_available(macOS 11.0, *)) {
+-        MIDIReceiveBlock receiveBlock = ^ (const MIDIEventList* eventList, void* /*srcConnRefCon*/) {
++        MIDIReceiveBlock receiveBlock = ^ (const MIDIEventList* eventList, void* srcConnRefCon) {
+             const MIDIEventPacket* packet = eventList->packet;
+             for (UInt32 index = 0; index < eventList->numPackets; index++) {
++                const auto time = inputTime(packet->timeStamp);
+                 LOG_MIDI_D() << "Receiving MIDIEventPacket with " << packet->wordCount << " words";
+                 // Handle packet
+                 uint32_t pos = 0;
+@@ -205,10 +223,11 @@ void CoreMidiInPort::initCore()
+                     size_t messageWordCount = Event::wordCountForMessageType(static_cast<Event::MessageType>(messageType));
+ 
+                     LOG_MIDI_D() << "Receiving midi message with " << messageWordCount << " words";
++                    if (!messageWordCount || messageWordCount > packet->wordCount - pos) return;
+                     Event e = Event::fromMidi20Words(&packet->words[pos], messageWordCount);
+                     if (e) {
+                         LOG_MIDI_D() << "Received midi message: " << e.to_string();
+-                        m_eventReceived.send((tick_t)packet->timeStamp, e);
++                        deliver(srcConnRefCon, time, (tick_t)packet->timeStamp, e);
+                     }
+                     pos += messageWordCount;
+                 }
+@@ -219,10 +238,11 @@ void CoreMidiInPort::initCore()
+         result
+             = MIDIInputPortCreateWithProtocol(m_core->client, portName, kMIDIProtocol_2_0, &m_core->inputPort, receiveBlock);
+     } else {
+-        MIDIReadBlock readBlock = ^ (const MIDIPacketList* packetList, void* /*srcConnRefCon*/)
++        MIDIReadBlock readBlock = ^ (const MIDIPacketList* packetList, void* srcConnRefCon)
+         {
+             const MIDIPacket* packet = packetList->packet;
+             for (UInt32 index = 0; index < packetList->numPackets; index++) {
++                const auto time = inputTime(packet->timeStamp);
+                 auto len = packet->length;
+                 int pos = 0;
+                 const Byte* pointer = static_cast<const Byte*>(&(packet->data[0]));
+@@ -243,7 +263,7 @@ void CoreMidiInPort::initCore()
+                     e = e.toMIDI20();
+                     if (e) {
+                         LOG_MIDI_D() << "Converted to midi 2.0 midi message: " << e.to_string();
+-                        m_eventReceived.send((tick_t)packet->timeStamp, e);
++                        deliver(srcConnRefCon, time, (tick_t)packet->timeStamp, e);
+                     }
+                     pos += msgLen;
+                 }
+@@ -316,6 +336,7 @@ void CoreMidiInPort::disconnect()
+ 
+     m_core->sourceId = 0;
+     m_deviceID.clear();
++    m_deviceChanged.notify();
+ }
+ 
+ bool CoreMidiInPort::isConnected() const
+@@ -338,13 +359,25 @@ async::Channel<tick_t, Event> CoreMidiInPort::eventReceived() const
+     return m_eventReceived;
+ }
+ 
++std::optional<async::Channel<IMidiInPort::InputTime, Event>> CoreMidiInPort::timestampedEventReceived() const
++{
++    return m_timestampedEventReceived;
++}
++
+ Ret CoreMidiInPort::run()
+ {
+     if (!isConnected()) {
+         return make_ret(Err::MidiNotConnected);
+     }
+ 
+-    OSStatus result = MIDIPortConnectSource(m_core->inputPort, m_core->sourceId, nullptr /*connRefCon*/);
++    uintptr_t generation;
++    {
++        std::lock_guard lock(m_receiverMutex);
++        generation = ++m_connectionGeneration;
++    }
++    // An opaque value, never dereferenced. CoreMIDI returns the connection's
++    // value even if packets from a retired connection arrive after reconnect.
++    OSStatus result = MIDIPortConnectSource(m_core->inputPort, m_core->sourceId, reinterpret_cast<void*>(generation));
+     if (result == noErr) {
+         m_running = true;
+         return Ret(true);
+@@ -355,6 +388,13 @@ Ret CoreMidiInPort::run()
+ 
+ void CoreMidiInPort::stop()
+ {
++    std::shared_ptr<RealtimeReceiver> retired;
++    {
++        std::lock_guard lock(m_receiverMutex);
++        ++m_connectionGeneration;
++        retired = std::move(m_receiver);
++        if (retired) retired->lost(std::chrono::steady_clock::now());
++    }
+     if (!isConnected()) {
+         LOGE() << "midi port is not connected";
+         return;
+@@ -371,3 +411,37 @@ void CoreMidiInPort::stop()
+     }
+     m_running = false;
+ }
++
++void CoreMidiInPort::deliver(void* connection, InputTime time, tick_t tick, const Event& event)
++{
++    {
++        std::lock_guard lock(m_receiverMutex);
++        if (reinterpret_cast<uintptr_t>(connection) != m_connectionGeneration) return;
++        if (m_receiver) m_receiver->receive(time, event);
++    }
++    m_timestampedEventReceived.send(time, event);
++    m_eventReceived.send(tick, event);
++}
++
++bool CoreMidiInPort::setRealtimeReceiver(const std::shared_ptr<RealtimeReceiver>& receiver)
++{
++    std::shared_ptr<RealtimeReceiver> retired;
++    {
++        std::lock_guard lock(m_receiverMutex);
++        if (receiver == m_receiver) return true;
++        retired = std::exchange(m_receiver, receiver);
++        if (retired) retired->lost(std::chrono::steady_clock::now());
++    }
++    return true;
++}
++
++void CoreMidiInPort::clearRealtimeReceiver(const std::shared_ptr<RealtimeReceiver>& receiver)
++{
++    std::shared_ptr<RealtimeReceiver> retired;
++    {
++        std::lock_guard lock(m_receiverMutex);
++        if (!receiver || receiver != m_receiver) return;
++        retired = std::move(m_receiver);
++        retired->lost(std::chrono::steady_clock::now());
++    }
++}
+diff --git a/framework/midi/internal/platform/osx/coremidiinport.h b/framework/midi/internal/platform/osx/coremidiinport.h
+index 3bc9caecd..cc18e6107 100644
+--- a/framework/midi/internal/platform/osx/coremidiinport.h
++++ b/framework/midi/internal/platform/osx/coremidiinport.h
+@@ -23,6 +23,8 @@
+ #define MUSE_MIDI_COREMIDIINPORT_H
+ 
+ #include <memory>
++#include <mutex>
++#include <cstdint>
+ 
+ #include "imidiinport.h"
+ 
+@@ -46,12 +48,21 @@ public:
+     async::Notification deviceChanged() const override;
+ 
+     async::Channel<tick_t, Event> eventReceived() const override;
++    std::optional<async::Channel<InputTime, Event>> timestampedEventReceived() const override;
++    bool setRealtimeReceiver(const std::shared_ptr<RealtimeReceiver>&) override;
++    void clearRealtimeReceiver(const std::shared_ptr<RealtimeReceiver>&) override;
+ 
+ private:
+     Ret run();
+     void stop();
+ 
+     void initCore();
++    void deliver(void* connection, InputTime, tick_t, const Event&);
++    // Only driver/control threads take this mutex. The audio thread consumes
++    // its receiver's queues independently and never calls into this port.
++    std::mutex m_receiverMutex;
++    std::shared_ptr<RealtimeReceiver> m_receiver;
++    uintptr_t m_connectionGeneration = 0;
+ 
+     struct Core;
+     std::unique_ptr<Core> m_core;
+@@ -62,6 +73,7 @@ private:
+     bool m_running = false;
+ 
+     async::Channel<tick_t, Event > m_eventReceived;
++    async::Channel<InputTime, Event> m_timestampedEventReceived;
+ };
+ }
+ 
+diff --git a/framework/testflow/CMakeLists.txt b/framework/testflow/CMakeLists.txt
+index 20efea0a3..5425bed99 100644
+--- a/framework/testflow/CMakeLists.txt
++++ b/framework/testflow/CMakeLists.txt
+@@ -80,7 +80,8 @@ qt_add_resources(muse_testflow muse_testflow_resources
+         examples/steps/NewScore.js
+ )
+ 
+-target_link_libraries(muse_testflow PRIVATE muse::draw Qt::Quick)
++find_package(Qt6 REQUIRED COMPONENTS Test Widgets)
++target_link_libraries(muse_testflow PRIVATE muse::draw Qt::Quick Qt::Test Qt::Widgets)
+ 
+ if (MUSE_MODULE_TESTFLOW_QML)
+     add_subdirectory(qml/Muse/Testflow)
+diff --git a/framework/testflow/internal/api/testflowapi.cpp b/framework/testflow/internal/api/testflowapi.cpp
+index dad98b439..c2553df86 100644
+--- a/framework/testflow/internal/api/testflowapi.cpp
++++ b/framework/testflow/internal/api/testflowapi.cpp
+@@ -20,12 +20,26 @@
+  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
+  */
+ #include "testflowapi.h"
++#include <QUuid>
+ 
+ #include <QTimer>
+ #include <QEventLoop>
+ #include <QFileInfo>
+ #include <QDir>
+ #include <QDateTime>
++#include <QQuickItem>
++#include <QQuickWindow>
++#include <QGuiApplication>
++#include <QImage>
++#include <QApplication>
++#include <QWidget>
++#include <QAbstractButton>
++#include <QPixmap>
++#include <QLineEdit>
++#include <QKeyEvent>
++#include <QtTest/qtestmouse.h>
++#include <QtTest/qtestkeyboard.h>
++#include <cmath>
+ 
+ #include "async/async.h"
+ #include "io/fileinfo.h"
+@@ -36,6 +50,40 @@ using namespace muse::actions;
+ using namespace muse::testflow::api;
+ using namespace muse::testflow;
+ 
++namespace {
++void findVisibleItems(QQuickItem* item, const QString& name, QList<QQuickItem*>& found)
++{
++    if (!item || !item->isVisible() || !item->isEnabled()) return;
++    if (item->objectName() == name) found.push_back(item);
++    for (auto* child : item->childItems()) findVisibleItems(child, name, found);
++}
++
++QQuickItem* namedWindowItem(const QString& name)
++{
++    QList<QQuickItem*> found;
++    if (name.isEmpty()) return nullptr;
++    for (auto* window : QGuiApplication::topLevelWindows()) {
++        if (auto* quick = qobject_cast<QQuickWindow*>(window); quick && quick->isVisible()) {
++            findVisibleItems(quick->contentItem(), name, found);
++        }
++    }
++    return found.size() == 1 ? found.front() : nullptr;
++}
++
++QWidget* namedWidget(const QString& name)
++{
++    if (name.isEmpty() || !qobject_cast<QApplication*>(QCoreApplication::instance())) return nullptr;
++    QWidget* result = nullptr;
++    for (auto* widget : QApplication::allWidgets()) {
++        if (widget->objectName() != name || !widget->isVisible() || !widget->isEnabled()) continue;
++        if (result) return nullptr;
++        result = widget;
++    }
++    return result;
++}
++
++}
++
+ TestflowApi::TestflowApi(muse::api::IApiEngine* e)
+     : ApiObject(e)
+ {
+@@ -178,6 +226,19 @@ void TestflowApi::async(const QJSValue& func, const QJSValueList& args)
+     });
+ }
+ 
++void TestflowApi::after(int msec, const QJSValue& func, const QJSValueList& args)
++{
++    if (msec < 0 || !func.isCallable()) {
++        fatal(QStringLiteral("after requires a nonnegative delay and a callable function"));
++        return;
++    }
++    QTimer::singleShot(msec, this, [this, func, args]() mutable {
++        if (testflow()->status() != ITestflow::Status::Running) return;
++        const auto result = func.call(args);
++        if (result.isError()) fatal(result.toString());
++    });
++}
++
+ int TestflowApi::randomInt(int min, int max) const
+ {
+     int val = rand() % (max - min + 1) + min;
+@@ -198,7 +259,328 @@ QString TestflowApi::selectedFilePath() const
+     return testflow()->testflowInteractive()->selectedFilePath().toQString();
+ }
+ 
++QString TestflowApi::prepareSavingFile(const QString& fileName)
++{
++    if (fileName.isEmpty() || fileName == "." || fileName == ".." || QFileInfo(fileName).fileName() != fileName) {
++        fatal("A save fixture requires a file name without a directory.");
++        return {};
++    }
++    const auto directory = testflowConfiguration()->savingFilesPath().toQString() + "/"
++                           + QUuid::createUuid().toString(QUuid::WithoutBraces);
++    if (!QDir().mkpath(directory)) {
++        fatal("Could not create a fresh save fixture directory.");
++        return {};
++    }
++    const auto path = directory + "/" + fileName;
++    testflow()->testflowInteractive()->setNextSavingFilePath(io::path_t(path));
++    return path;
++}
++
+ void TestflowApi::showMainWindowOnFront()
+ {
+     mainWindow()->requestShowOnFront();
+ }
++
++void TestflowApi::useWidgetFileDialogs(bool enabled)
++{
++    testflow()->testflowInteractive()->useWidgetFileDialogs(enabled);
++}
++
++QString TestflowApi::captureMainWindow(const QString& fileName)
++{
++    if (fileName.isEmpty() || QFileInfo(fileName).fileName() != fileName || !fileName.endsWith(".png")) {
++        return {};
++    }
++    auto* window = qobject_cast<QQuickWindow*>(mainWindow()->qWindow());
++    if (!window || !window->isVisible()) return {};
++    const auto image = window->grabWindow();
++    if (image.isNull()) return {};
++    const auto directory = testflowConfiguration()->reportsPath().toQString() + "/"
++                           + QUuid::createUuid().toString(QUuid::WithoutBraces);
++    if (!QDir().mkpath(directory)) return {};
++    const auto path = directory + "/" + fileName;
++    return image.save(path, "PNG") ? path : QString();
++}
++
++QJSValue TestflowApi::itemRect(const QString& objectName) const
++{
++    auto* item = namedWindowItem(objectName);
++    if (!item) return QJSValue(QJSValue::NullValue);
++    const auto rect = item->mapRectToScene(item->boundingRect());
++    auto result = engine()->newObject();
++    result.setProperty("x", rect.x());
++    result.setProperty("y", rect.y());
++    result.setProperty("width", rect.width());
++    result.setProperty("height", rect.height());
++    return result;
++}
++
++QString TestflowApi::captureItemWindow(const QString& objectName, const QString& fileName)
++{
++    if (fileName.isEmpty() || QFileInfo(fileName).fileName() != fileName || !fileName.endsWith(".png")) return {};
++    const auto* item = namedWindowItem(objectName);
++    auto* window = item ? item->window() : nullptr;
++    if (!window) return {};
++    const auto image = window->grabWindow();
++    if (image.isNull()) return {};
++    const auto directory = testflowConfiguration()->reportsPath().toQString() + "/"
++                           + QUuid::createUuid().toString(QUuid::WithoutBraces);
++    if (!QDir().mkpath(directory)) return {};
++    const auto path = directory + "/" + fileName;
++    return image.save(path, "PNG") ? path : QString();
++}
++
++QString TestflowApi::captureWidgetWindow(const QString& objectName, const QString& fileName)
++{
++    if (fileName.isEmpty() || QFileInfo(fileName).fileName() != fileName || !fileName.endsWith(".png")) return {};
++    auto* widget = namedWidget(objectName);
++    if (!widget) return {};
++    const auto image = widget->window()->grab();
++    if (image.isNull()) return {};
++    const auto directory = testflowConfiguration()->reportsPath().toQString() + "/"
++                           + QUuid::createUuid().toString(QUuid::WithoutBraces);
++    if (!QDir().mkpath(directory)) return {};
++    const auto path = directory + "/" + fileName;
++    return image.save(path, "PNG") ? path : QString();
++}
++
++QJSValue TestflowApi::itemWindowInfo(const QString& objectName) const
++{
++    const auto* item = namedWindowItem(objectName);
++    if (!item || !item->window()) return QJSValue(QJSValue::NullValue);
++    const auto* window = item->window();
++    auto result = engine()->newObject();
++    result.setProperty("title", window->title());
++    result.setProperty("mainWindow", window == mainWindow()->qWindow());
++    result.setProperty("parentIsMain", window->transientParent() == mainWindow()->qWindow());
++    result.setProperty("modal", window->modality() != Qt::NonModal);
++    result.setProperty("width", window->width());
++    result.setProperty("height", window->height());
++    result.setProperty("activeFocus", item->hasActiveFocus());
++    result.setProperty("windowActive", window->isActive());
++    result.setProperty("focusWindow", QGuiApplication::focusWindow() == window);
++    const auto* focusItem = window->activeFocusItem();
++    result.setProperty("focusItem", focusItem ? focusItem->objectName() : QString());
++    const auto value = item->property("currentValue");
++    if (value.isValid()) result.setProperty("currentValue", value.toDouble());
++    const auto text = item->property("currentText");
++    if (text.isValid()) result.setProperty("currentText", text.toString());
++    const auto label = item->property("text");
++    if (label.isValid()) result.setProperty("text", label.toString());
++    for (const auto* property : { "contentX", "contentY", "contentWidth", "contentHeight" }) {
++        const auto metric = item->property(property);
++        if (metric.isValid()) result.setProperty(property, metric.toDouble());
++    }
++    const auto available = item->property("available");
++    if (available.isValid()) result.setProperty("available", available.toBool());
++    return result;
++}
++
++bool TestflowApi::closeItemWindow(const QString& objectName)
++{
++    const auto* item = namedWindowItem(objectName);
++    auto* window = item ? item->window() : nullptr;
++    return window && window != mainWindow()->qWindow() && window->close();
++}
++
++QJSValue TestflowApi::widgetInfo(const QString& objectName) const
++{
++    const auto* widget = namedWidget(objectName);
++    if (!widget) return QJSValue(QJSValue::NullValue);
++    auto result = engine()->newObject();
++    result.setProperty("width", widget->width());
++    result.setProperty("height", widget->height());
++    result.setProperty("focus", widget->hasFocus());
++    result.setProperty("className", widget->metaObject()->className());
++    result.setProperty("windowTitle", widget->window()->windowTitle());
++    if (const auto text = widget->property("text"); text.isValid()) result.setProperty("text", text.toString());
++    for (const auto* property : { "value", "minimum", "maximum" }) {
++        const auto value = widget->property(property);
++        if (value.isValid()) result.setProperty(property, value.toInt());
++    }
++    return result;
++}
++
++QJSValue TestflowApi::widgetButtons() const
++{
++    auto result = engine()->newArray();
++    quint32 index = 0;
++    if (!qobject_cast<QApplication*>(QCoreApplication::instance())) return result;
++    for (const auto* widget : QApplication::allWidgets()) {
++        const auto* button = qobject_cast<const QAbstractButton*>(widget);
++        if (!button || !button->isVisible()) continue;
++        auto entry = engine()->newObject();
++        entry.setProperty("text", button->text().remove('&'));
++        entry.setProperty("enabled", button->isEnabled());
++        entry.setProperty("windowTitle", button->window()->windowTitle());
++        result.setProperty(index++, entry);
++    }
++    return result;
++}
++
++bool TestflowApi::mouseClickWidgetButton(const QString& text)
++{
++    if (text.isEmpty() || !qobject_cast<QApplication*>(QCoreApplication::instance())) return false;
++    QAbstractButton* found = nullptr;
++    for (auto* widget : QApplication::allWidgets()) {
++        auto* button = qobject_cast<QAbstractButton*>(widget);
++        if (!button || !button->isVisible() || !button->isEnabled() || button->text().remove('&') != text) continue;
++        if (found) return false;
++        found = button;
++    }
++    if (!found) return false;
++    QTest::mouseClick(found, Qt::LeftButton, Qt::NoModifier, found->rect().center());
++    return true;
++}
++
++bool TestflowApi::typeWidgetText(const QString& objectName, const QString& text)
++{
++    QPointer<QLineEdit> editor(qobject_cast<QLineEdit*>(namedWidget(objectName)));
++    if (!editor || editor->isReadOnly()) return false;
++    editor->window()->activateWindow();
++    QApplication::setActiveWindow(editor->window());
++    editor->setFocus(Qt::OtherFocusReason);
++    // Target the actual widget, as with the mouse helpers. A synthetic QWidget
++    // click does not activate its OS window, so focusWindow() may still point
++    // at the main Quick window. Send input events rather than setting text.
++    QTest::keySequence(editor.data(), QKeySequence(QKeySequence::SelectAll));
++    for (const QChar ch : text) {
++        if (!editor) return false;
++        QKeyEvent press(QEvent::KeyPress, Qt::Key_unknown, Qt::NoModifier, QString(ch));
++        QCoreApplication::sendEvent(editor.data(), &press);
++        if (!editor) return false;
++        QKeyEvent release(QEvent::KeyRelease, Qt::Key_unknown, Qt::NoModifier, QString(ch));
++        QCoreApplication::sendEvent(editor.data(), &release);
++    }
++    return !editor.isNull();
++}
++
++bool TestflowApi::mouseClickWidget(const QString& objectName, double x, double y)
++{
++    if (!std::isfinite(x) || !std::isfinite(y) || x < 0.0 || x > 1.0 || y < 0.0 || y > 1.0) return false;
++    auto* widget = namedWidget(objectName);
++    if (!widget || widget->width() <= 0 || widget->height() <= 0) return false;
++    const QPoint point(qRound(x * (widget->width() - 1)), qRound(y * (widget->height() - 1)));
++    QTest::mouseClick(widget, Qt::LeftButton, Qt::NoModifier, point);
++    return true;
++}
++
++bool TestflowApi::mouseDragWidget(const QString& objectName, double fromX, double fromY, double toX, double toY)
++{
++    if (!std::isfinite(fromX) || !std::isfinite(fromY) || !std::isfinite(toX) || !std::isfinite(toY)) return false;
++    auto* widget = namedWidget(objectName);
++    if (!widget || widget->width() <= 0 || widget->height() <= 0) return false;
++    const auto point = [widget](double x, double y) {
++        return QPointF(x * (widget->width() - 1), y * (widget->height() - 1));
++    };
++    const auto from = point(fromX, fromY);
++    const auto to = point(toX, toY);
++    QPointer<QWidget> guard(widget);
++    QTest::mouseMove(widget, from.toPoint());
++    QTest::mousePress(widget, Qt::LeftButton, Qt::NoModifier, from.toPoint());
++    for (int i = 1; i <= 12; ++i) {
++        if (!guard) return false;
++        QTest::mouseMove(widget, (from + (to - from) * (i / 12.0)).toPoint(), 10);
++        sleep(10);
++    }
++    if (!guard) return false;
++    QTest::mouseRelease(widget, Qt::LeftButton, Qt::NoModifier, to.toPoint());
++    return true;
++}
++
++bool TestflowApi::mouseClickItem(const QString& objectName, double x, double y, const QString& button, bool doubleClick)
++{
++    if (!std::isfinite(x) || !std::isfinite(y) || x < 0.0 || x > 1.0 || y < 0.0 || y > 1.0) return false;
++    auto* item = namedWindowItem(objectName);
++    if (!item || item->width() <= 0.0 || item->height() <= 0.0) return false;
++    auto* window = item->window();
++    if (!window) return false;
++    const auto mouseButton = button == "left" ? Qt::LeftButton : button == "right" ? Qt::RightButton
++        : button == "middle" ? Qt::MiddleButton : Qt::NoButton;
++    if (mouseButton == Qt::NoButton) return false;
++    const auto point = item->mapToScene({ x * item->width(), y * item->height() });
++    QTest::mouseMove(window, point.toPoint());
++    if (doubleClick) {
++        QTest::mouseDClick(window, mouseButton, Qt::NoModifier, point.toPoint(), 10);
++    } else QTest::mouseClick(window, mouseButton, Qt::NoModifier, point.toPoint());
++    return true;
++}
++
++bool TestflowApi::typeItemText(const QString& objectName, const QString& text, bool accept)
++{
++    QPointer<QQuickItem> item(namedWindowItem(objectName));
++    QPointer<QQuickWindow> window(item ? item->window() : nullptr);
++    if (!item || !window || !mouseClickItem(objectName)) return false;
++    const auto* focus = window->activeFocusItem();
++    // Refuse to send text unless the requested editor owns keyboard focus.
++    // Otherwise letters such as I and R would invoke timeline shortcuts.
++    if (!focus || (focus != item && !item->isAncestorOf(focus))) return false;
++    QTest::keySequence(window.data(), QKeySequence(QKeySequence::SelectAll));
++    for (const QChar ch : text) {
++        if (!item || !window) return false;
++        QKeyEvent press(QEvent::KeyPress, Qt::Key_unknown, Qt::NoModifier, QString(ch));
++        QCoreApplication::sendEvent(window.data(), &press);
++        if (!item || !window) return false;
++        QKeyEvent release(QEvent::KeyRelease, Qt::Key_unknown, Qt::NoModifier, QString(ch));
++        QCoreApplication::sendEvent(window.data(), &release);
++    }
++    if (!item || !window) return false;
++    if (accept) QTest::keyClick(window.data(), Qt::Key_Return);
++    return true;
++}
++
++bool TestflowApi::mouseDragItem(const QString& objectName, double fromX, double fromY, double toX, double toY)
++{
++    if (!std::isfinite(fromX) || !std::isfinite(fromY) || !std::isfinite(toX) || !std::isfinite(toY)) return false;
++    auto* item = namedWindowItem(objectName);
++    if (!item || item->width() <= 0.0 || item->height() <= 0.0) return false;
++    auto* window = item->window();
++    if (!window) return false;
++    const auto from = item->mapToScene({ fromX * item->width(), fromY * item->height() });
++    const auto to = item->mapToScene({ toX * item->width(), toY * item->height() });
++    QPointer<QQuickWindow> guard(window);
++    QTest::mouseMove(window, from.toPoint());
++    QTest::mousePress(window, Qt::LeftButton, Qt::NoModifier, from.toPoint());
++    for (int i = 1; i <= 12; ++i) {
++        if (!guard) return false;
++        QTest::mouseMove(window, (from + (to - from) * (i / 12.0)).toPoint(), 10);
++        sleep(10);
++    }
++    if (!guard) return false;
++    QTest::mouseRelease(window, Qt::LeftButton, Qt::NoModifier, to.toPoint());
++    return true;
++}
++
++bool TestflowApi::mouseClickControl(const QString& section, const QString& panel, const QString& name)
++{
++    const auto* control = navigation()->findControl(section.toStdString(), panel.toStdString(), name.toStdString());
++    auto* item = control && control->enabled() ? control->visualItem() : nullptr;
++    auto* window = item ? item->window() : nullptr;
++    if (!window || !item->isVisible() || !item->isEnabled() || item->width() <= 0.0 || item->height() <= 0.0) return false;
++    const auto point = item->mapToScene(item->boundingRect().center()).toPoint();
++    QTest::mouseClick(window, Qt::LeftButton, Qt::NoModifier, point);
++    return true;
++}
++
++bool TestflowApi::typeControlText(const QString& section, const QString& panel, const QString& name, const QString& text)
++{
++    const auto* control = navigation()->findControl(section.toStdString(), panel.toStdString(), name.toStdString());
++    QPointer<QQuickItem> item(control && control->enabled() ? control->visualItem() : nullptr);
++    QPointer<QQuickWindow> window(item ? item->window() : nullptr);
++    if (!item || !window || !item->isVisible() || !item->isEnabled()) return false;
++    if (!mouseClickControl(section, panel, name) || !item || !window) return false;
++    const auto* focus = window->activeFocusItem();
++    if (!focus || (focus != item && !item->isAncestorOf(focus))) return false;
++    // Target the clicked field's window, as in typeWidgetText. OS focus can
++    // remain elsewhere when a test sends a synthetic click to a popup.
++    QTest::keySequence(window.data(), QKeySequence(QKeySequence::SelectAll));
++    for (const QChar ch : text) {
++        if (!item || !window) return false;
++        QKeyEvent press(QEvent::KeyPress, Qt::Key_unknown, Qt::NoModifier, QString(ch));
++        QCoreApplication::sendEvent(window.data(), &press);
++        if (!item || !window) return false;
++        QKeyEvent release(QEvent::KeyRelease, Qt::Key_unknown, Qt::NoModifier, QString(ch));
++        QCoreApplication::sendEvent(window.data(), &release);
++    }
++    return item && window;
++}
+diff --git a/framework/testflow/internal/api/testflowapi.h b/framework/testflow/internal/api/testflowapi.h
+index 5e7563703..5aaed9c23 100644
+--- a/framework/testflow/internal/api/testflowapi.h
++++ b/framework/testflow/internal/api/testflowapi.h
+@@ -34,6 +34,7 @@
+ #include "interactive/iinteractive.h"
+ #include "io/ifilesystem.h"
+ #include "ui/imainwindow.h"
++#include "ui/inavigationcontroller.h"
+ 
+ namespace muse::testflow::api {
+ class TestflowApi : public muse::api::ApiObject, public async::Asyncable
+@@ -46,6 +47,7 @@ class TestflowApi : public muse::api::ApiObject, public async::Asyncable
+     ContextInject<actions::IActionsDispatcher> dispatcher = { this };
+     ContextInject<IInteractive> interactive = { this };
+     ContextInject<muse::ui::IMainWindow> mainWindow = { this };
++    ContextInject<muse::ui::INavigationController> navigation = { this };
+ 
+ public:
+     explicit TestflowApi(muse::api::IApiEngine* e);
+@@ -66,14 +68,48 @@ public:
+     Q_INVOKABLE void waitPopup();
+     Q_INVOKABLE void seeChanges(int msec = -1);
+     Q_INVOKABLE void async(const QJSValue& func, const QJSValueList& args = QJSValueList());
++    // A Qt timer can drive real input while a command runs a modal event loop.
++    Q_INVOKABLE void after(int msec, const QJSValue& func, const QJSValueList& args = QJSValueList());
+     Q_INVOKABLE int randomInt(int min, int max) const;
+     Q_INVOKABLE int fileSize(const QString& path) const;
+ 
+     // Interactive
+     Q_INVOKABLE QString selectedFilePath() const;
++    // Reserve a new destination for the next normal Save/Save As file picker.
++    Q_INVOKABLE QString prepareSavingFile(const QString& fileName);
++    // Delegate saving to Interactive's actual QFileDialog instead of the auto-
++    // closing test placeholder. Restore the prior Qt dialog mode when disabled.
++    Q_INVOKABLE void useWidgetFileDialogs(bool enabled);
+ 
+     // Window
+     Q_INVOKABLE void showMainWindowOnFront();
++    // Capture the actual Quick scene of this test's main window to its report
++    // directory. Native child plugin views are not included in the Quick scene.
++    Q_INVOKABLE QString captureMainWindow(const QString& fileName);
++    Q_INVOKABLE QString captureItemWindow(const QString& objectName, const QString& fileName);
++    Q_INVOKABLE QString captureWidgetWindow(const QString& objectName, const QString& fileName);
++    // Observe a named item in any visible window of this test process. This
++    // also distinguishes a floating native editor from the main Quick scene.
++    Q_INVOKABLE QJSValue itemWindowInfo(const QString& objectName) const;
++    Q_INVOKABLE bool closeItemWindow(const QString& objectName);
++    // Native Qt plugin editors contain Widgets rather than Quick items. These
++    // helpers observe their real controls and send ordinary mouse events.
++    Q_INVOKABLE QJSValue widgetInfo(const QString& objectName) const;
++    Q_INVOKABLE QJSValue widgetButtons() const;
++    Q_INVOKABLE bool mouseClickWidgetButton(const QString& text);
++    Q_INVOKABLE bool typeWidgetText(const QString& objectName, const QString& text);
++    Q_INVOKABLE bool mouseClickWidget(const QString& objectName, double x = 0.5, double y = 0.5);
++    Q_INVOKABLE bool mouseDragWidget(const QString& objectName, double fromX, double fromY, double toX, double toY);
++    // Coordinates are fractions of a uniquely named visible Quick item in any
++    // window belonging to this test process.
++    // Drags may end outside those bounds, like a captured mouse gesture.
++    Q_INVOKABLE QJSValue itemRect(const QString& objectName) const;
++    Q_INVOKABLE bool mouseClickItem(const QString& objectName, double x = 0.5, double y = 0.5,
++                                   const QString& button = QStringLiteral("left"), bool doubleClick = false);
++    Q_INVOKABLE bool typeItemText(const QString& objectName, const QString& text, bool accept = false);
++    Q_INVOKABLE bool mouseDragItem(const QString& objectName, double fromX, double fromY, double toX, double toY);
++    Q_INVOKABLE bool mouseClickControl(const QString& section, const QString& panel, const QString& name);
++    Q_INVOKABLE bool typeControlText(const QString& section, const QString& panel, const QString& name, const QString& text);
+ };
+ }
+ 
+diff --git a/framework/testflow/internal/testflowinteractive.cpp b/framework/testflow/internal/testflowinteractive.cpp
+index d75266eb6..3bc181097 100644
+--- a/framework/testflow/internal/testflowinteractive.cpp
++++ b/framework/testflow/internal/testflowinteractive.cpp
+@@ -20,12 +20,30 @@
+  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
+  */
+ #include "testflowinteractive.h"
++#include <QCoreApplication>
+ 
+ #include "log.h"
+ 
+ using namespace muse;
+ using namespace muse::testflow;
+ 
++TestflowInteractive::~TestflowInteractive()
++{
++    useWidgetFileDialogs(false);
++}
++
++void TestflowInteractive::useWidgetFileDialogs(bool enabled)
++{
++    if (m_widgetFileDialogs == enabled) return;
++    if (enabled) {
++        m_previousDontUseNativeDialogs = QCoreApplication::testAttribute(Qt::AA_DontUseNativeDialogs);
++        QCoreApplication::setAttribute(Qt::AA_DontUseNativeDialogs, true);
++    } else {
++        QCoreApplication::setAttribute(Qt::AA_DontUseNativeDialogs, m_previousDontUseNativeDialogs);
++    }
++    m_widgetFileDialogs = enabled;
++}
++
+ void TestflowInteractive::setRealInteractive(std::shared_ptr<IInteractive> real)
+ {
+     m_real = real;
+@@ -136,9 +154,15 @@ io::path_t TestflowInteractive::selectSavingFileSync(const std::string& title, c
+         filterList << QString::fromStdString(fileFilter);
+     }
+ 
+-    LOGD() << title << " dir:" << dir << ", filter: " << filterList << ", confirmOverwrite: " << confirmOverwrite;
+-    m_real->openSync("muse://testflow/selectfile?filePath=" + dir.toStdString());
+-    m_selectedFilePath = dir;
++    const auto path = m_nextSavingFilePath.empty() ? dir : m_nextSavingFilePath;
++    m_nextSavingFilePath = io::path_t();
++    LOGD() << title << " dir:" << path << ", filter: " << filterList << ", confirmOverwrite: " << confirmOverwrite;
++    if (m_widgetFileDialogs) {
++        m_selectedFilePath = m_real->selectSavingFileSync(title, path, filter, confirmOverwrite);
++        return m_selectedFilePath;
++    }
++    m_real->openSync("muse://testflow/selectfile?filePath=" + path.toStdString());
++    m_selectedFilePath = path;
+     return m_selectedFilePath;
+ }
+ 
+diff --git a/framework/testflow/internal/testflowinteractive.h b/framework/testflow/internal/testflowinteractive.h
+index a62079330..7707d6271 100644
+--- a/framework/testflow/internal/testflowinteractive.h
++++ b/framework/testflow/internal/testflowinteractive.h
+@@ -31,6 +31,7 @@ class TestflowInteractive : public IInteractive
+ {
+ public:
+     TestflowInteractive() = default;
++    ~TestflowInteractive() override;
+ 
+     void setRealInteractive(std::shared_ptr<IInteractive> real);
+     std::shared_ptr<IInteractive> realInteractive() const;
+@@ -118,11 +119,16 @@ public:
+ 
+     // TestflowInteractive
+     io::path_t selectedFilePath() const; // last selected file path
++    void setNextSavingFilePath(const io::path_t& path) { m_nextSavingFilePath = path; }
++    void useWidgetFileDialogs(bool enabled);
+ 
+ private:
+     std::shared_ptr<IInteractive> m_real = nullptr;
+ 
+     io::path_t m_selectedFilePath;
++    io::path_t m_nextSavingFilePath;
++    bool m_widgetFileDialogs = false;
++    bool m_previousDontUseNativeDialogs = false;
+ };
+ 
+ using TestflowInteractivePtr = std::shared_ptr<TestflowInteractive>;
+diff --git a/framework/ui/api/navigationapi.cpp b/framework/ui/api/navigationapi.cpp
+index 95be6ae20..01ae9cfc5 100644
+--- a/framework/ui/api/navigationapi.cpp
++++ b/framework/ui/api/navigationapi.cpp
+@@ -20,6 +20,8 @@
+  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
+  */
+ #include "navigationapi.h"
++#include <QQuickItem>
++#include <QWindow>
+ 
+ #include "navigationcommands.h"
+ 
+@@ -28,6 +30,16 @@
+ using namespace muse::api;
+ using namespace muse::ui;
+ 
++static QString accessibleLabel(const INavigation* navigation)
++{
++    if (const auto* object = dynamic_cast<const QObject*>(navigation)) {
++        if (const auto* accessible = object->property("accessible").value<QObject*>()) {
++            return accessible->property("name").toString();
++        }
++    }
++    return {};
++}
++
+ NavigationApi::NavigationApi(api::IApiEngine* e)
+     : api::ApiObject(e)
+ {
+@@ -109,6 +121,29 @@ bool NavigationApi::triggerControl(const QString& section, const QString& panel,
+     return ok;
+ }
+ 
++bool NavigationApi::triggerAccessibleControl(const QString& name, bool activePanelOnly)
++{
++    if (name.isEmpty()) return false;
++    INavigationControl* found = nullptr;
++    for (auto* section : navigation()->sections()) {
++        if (!section->enabled()) continue;
++        for (auto* panel : section->panels()) {
++            if (activePanelOnly && panel != navigation()->activePanel()) continue;
++            if (!panel->enabled()) continue;
++            for (auto* control : panel->controls()) {
++                if (!control->enabled() || !control->window() || !control->window()->isVisible()
++                    || !control->visualItem() || !control->visualItem()->isVisible() || accessibleLabel(control) != name) continue;
++                if (found) return false;
++                found = control;
++            }
++        }
++    }
++    if (!found) return false;
++    found->requestActive();
++    trigger();
++    return true;
++}
++
+ QString NavigationApi::activeSection() const
+ {
+     INavigationSection* sec = navigation()->activeSection();
+@@ -131,6 +166,9 @@ static QJSValue toQJSValue(const INavigation* n, IApiEngine* e)
+ {
+     QJSValue o = e->newObject();
+     o.setProperty("name", n->name());
++    // Grouped menus may have no internal command id. Expose their existing
++    // accessible label so UI scripts can choose the visible item by its index.
++    o.setProperty("accessibleName", accessibleLabel(n));
+ 
+     QJSValue io = e->newObject();
+     io.setProperty("column", n->index().column);
+@@ -159,6 +197,7 @@ QJSValue NavigationApi::sections() const
+ QJSValue NavigationApi::panels(const QString& sectionName) const
+ {
+     const INavigationSection* s = navigation()->findSection(sectionName.toStdString());
++    if (!s) return engine()->newArray(0);
+     QJSValue arr = engine()->newArray(s->panels().size());
+     quint32 i = 0;
+     for (const INavigationPanel* p : s->panels()) {
+@@ -172,6 +211,7 @@ QJSValue NavigationApi::panels(const QString& sectionName) const
+ QJSValue NavigationApi::controls(const QString& sectionName, const QString& panelName) const
+ {
+     const INavigationPanel* p = navigation()->findPanel(sectionName.toStdString(), panelName.toStdString());
++    if (!p) return engine()->newArray(0);
+     QJSValue arr = engine()->newArray(p->controls().size());
+     quint32 i = 0;
+     for (const INavigationControl* c : p->controls()) {
+@@ -182,6 +222,24 @@ QJSValue NavigationApi::controls(const QString& sectionName, const QString& pane
+     return arr;
+ }
+ 
++QJSValue NavigationApi::accessibleControls() const
++{
++    auto result = engine()->newArray();
++    quint32 index = 0;
++    for (const auto* section : navigation()->sections()) {
++        for (const auto* panel : section->panels()) {
++            for (const auto* control : panel->controls()) {
++                auto entry = toQJSValue(control, engine());
++                entry.setProperty("section", section->name());
++                entry.setProperty("panel", panel->name());
++                entry.setProperty("enabled", section->enabled() && panel->enabled() && control->enabled());
++                result.setProperty(index++, entry);
++            }
++        }
++    }
++    return result;
++}
++
+ void NavigationApi::dump() const
+ {
+     navigation()->dump();
+diff --git a/framework/ui/api/navigationapi.h b/framework/ui/api/navigationapi.h
+index dc1f820e1..fbce0dce9 100644
+--- a/framework/ui/api/navigationapi.h
++++ b/framework/ui/api/navigationapi.h
+@@ -52,6 +52,9 @@ public:
+     Q_INVOKABLE bool goToControl(const QString& section, const QString& panel, const QJSValue& controlNameOrIndex);
+     Q_INVOKABLE void trigger();
+     Q_INVOKABLE bool triggerControl(const QString& section, const QString& panel, const QJSValue& controlNameOrIndex);
++    // Require one enabled visible label, optionally within the active panel
++    // when nested menus contain identical publisher/group names.
++    Q_INVOKABLE bool triggerAccessibleControl(const QString& name, bool activePanelOnly = false);
+ 
+     Q_INVOKABLE QString activeSection() const;
+     Q_INVOKABLE QString activePanel() const;
+@@ -60,6 +63,7 @@ public:
+     Q_INVOKABLE QJSValue sections() const;                          // array of sections
+     Q_INVOKABLE QJSValue panels(const QString& sectionName) const;  // array of panels
+     Q_INVOKABLE QJSValue controls(const QString& sectionName, const QString& panelName) const;  // array of controls
++    Q_INVOKABLE QJSValue accessibleControls() const; // flat inventory, including nested popup sections
+ 
+     Q_INVOKABLE void dump() const;
+ };

@@ -415,7 +415,7 @@ class CLExportProcessor : public ExportProcessor
         unsigned channels;
         wxString cmd;
         bool showOutput;
-        std::unique_ptr<Mixer> mixer;
+        std::unique_ptr<AudioRenderSource> mixer;
         wxString output;
         std::unique_ptr<ExportCLProcess> process;
     } context;

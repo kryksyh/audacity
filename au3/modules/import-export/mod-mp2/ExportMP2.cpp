@@ -162,7 +162,7 @@ class MP2ExportProcessor final : public ExportProcessor
         double t0;
         double t1;
         wxFileNameWrapper fName;
-        std::unique_ptr<Mixer> mixer;
+        std::unique_ptr<AudioRenderSource> mixer;
         ArrayOf<char> id3buffer;
         int id3len;
         twolame_options* encodeOptions{};

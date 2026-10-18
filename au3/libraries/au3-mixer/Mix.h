@@ -148,6 +148,7 @@ private:
     bool mNeedsDither;
     bool mHasMixerSpec{ false };
 
+    const BoundedEnvelope* const mEnvelope;
     const std::shared_ptr<TimesAndSpeed> mTimesAndSpeed;
 
     // BUFFERS

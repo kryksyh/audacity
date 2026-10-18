@@ -33,13 +33,6 @@ set( SOURCES
       ${zix_SOURCE_DIR}/src/ring.c
       ${zix_SOURCE_DIR}/src/string_view.c
       ${zix_SOURCE_DIR}/src/system.h
-      # We only target Linux for now, but the darwin and win32 source files are
-      # available if needed.
-      ${zix_SOURCE_DIR}/src/posix/environment_posix.c
-      ${zix_SOURCE_DIR}/src/posix/filesystem_posix.c
-      ${zix_SOURCE_DIR}/src/posix/sem_posix.c
-      ${zix_SOURCE_DIR}/src/posix/system_posix.c
-      ${zix_SOURCE_DIR}/src/posix/thread_posix.c
 
       # lilv
 
@@ -108,6 +101,29 @@ set( SOURCES
       ${suil_SOURCE_DIR}/src/suil_internal.h
 )
 
+if (OS_IS_WIN)
+    list(APPEND SOURCES
+        ${zix_SOURCE_DIR}/src/win32/environment_win32.c
+        ${zix_SOURCE_DIR}/src/win32/filesystem_win32.c
+        ${zix_SOURCE_DIR}/src/win32/sem_win32.c
+        ${zix_SOURCE_DIR}/src/win32/system_win32.c
+        ${zix_SOURCE_DIR}/src/win32/thread_win32.c
+        ${zix_SOURCE_DIR}/src/win32/win32_util.c
+    )
+else()
+    list(APPEND SOURCES
+        ${zix_SOURCE_DIR}/src/posix/environment_posix.c
+        ${zix_SOURCE_DIR}/src/posix/filesystem_posix.c
+        ${zix_SOURCE_DIR}/src/posix/system_posix.c
+        ${zix_SOURCE_DIR}/src/posix/thread_posix.c
+    )
+    if (OS_IS_MAC)
+        list(APPEND SOURCES ${zix_SOURCE_DIR}/src/darwin/sem_darwin.c)
+    else()
+        list(APPEND SOURCES ${zix_SOURCE_DIR}/src/posix/sem_posix.c)
+    endif()
+endif()
+
 set( INCLUDES
    PRIVATE
       ${lilv_SOURCE_DIR}/src
@@ -139,6 +155,18 @@ set(MODULE_USE_PCH OFF)
 set(MODULE_USE_UNITY OFF)
 
 setup_module()
+
+# The SDK is linked into the host as a static library. Its public headers must
+# use the same linkage in both the SDK sources and consumers on Windows.
+if(OS_IS_WIN)
+    target_compile_definitions(${MODULE} PUBLIC
+        ZIX_STATIC LILV_STATIC SERD_STATIC SORD_STATIC SRATOM_STATIC SUIL_STATIC
+    )
+endif()
+
+include(CheckSymbolExists)
+check_symbol_exists(posix_fadvise "fcntl.h" LV2SDK_HAVE_POSIX_FADVISE)
+target_compile_definitions(${MODULE} PRIVATE HAVE_POSIX_FADVISE=$<BOOL:${LV2SDK_HAVE_POSIX_FADVISE}>)
 
 if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
     target_compile_definitions(${MODULE} PRIVATE _GNU_SOURCE)

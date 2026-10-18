@@ -17,6 +17,27 @@ VST3Instance::VST3Instance(const PerTrackEffect& effect, VST3::Hosting::Module& 
 
 VST3Instance::~VST3Instance() = default;
 
+bool VST3Instance::RealtimeLatencyUpdatePending() const noexcept
+{
+    if (!mUseLatency) return false;
+    if (mWrapper->LatencyUpdatePending()) return true;
+    return std::any_of(mProcessors.begin(), mProcessors.end(), [](const auto& processor) { return processor->mWrapper->LatencyUpdatePending(); });
+}
+
+bool VST3Instance::RefreshRealtimeLatency()
+{
+    bool changed = mWrapper->RefreshLatency();
+    for (const auto& processor : mProcessors) changed |= processor->mWrapper->RefreshLatency();
+    if (changed && mUseLatency) mLatencyRevision.fetch_add(1, std::memory_order_release);
+    return changed && mUseLatency;
+}
+
+void VST3Instance::SetRealtimeProcessingContext(size_t group, const EffectProcessingContext& context)
+{
+    if (group == 0) mWrapper->SetProcessingContext(context);
+    else if (group - 1 < mProcessors.size()) mProcessors[group - 1]->mWrapper->SetProcessingContext(context);
+}
+
 size_t VST3Instance::GetTailSize() const
 {
     return Instance::GetTailSize();
@@ -58,7 +79,6 @@ bool VST3Instance::RealtimeFinalize(EffectSettings& settings) noexcept
 bool VST3Instance::RealtimeInitialize(EffectSettings& settings, double sampleRate, size_t audioThreadBufferSize)
 {
     if (mWrapper->Initialize(settings, sampleRate, Steinberg::Vst::kRealtime, mProcessingBlockSize)) {
-        mInitialDelay = mWrapper->GetLatencySamples();
         m_audioThreadBufferSize = audioThreadBufferSize;
         return true;
     }
@@ -117,9 +137,14 @@ auto VST3Instance::GetLatency(const EffectSettings& settings, double sampleRate)
 const -> SampleCount
 {
     if (mUseLatency) {
-        return mInitialDelay.as_long_long();
+        return mWrapper->CachedLatencySamples();
     }
     return 0;
+}
+
+auto VST3Instance::GetReportedLatency(const EffectSettings&, double) const -> SampleCount
+{
+    return mUseLatency ? static_cast<SampleCount>(std::max<Steinberg::int32>(0, mWrapper->GetLatencySamples())) : 0;
 }
 
 bool VST3Instance::ProcessFinalize() noexcept
@@ -134,7 +159,6 @@ bool VST3Instance::ProcessFinalize() noexcept
 bool VST3Instance::ProcessInitialize(EffectSettings& settings, double sampleRate, ChannelNames chanMap)
 {
     if (mWrapper->Initialize(settings, sampleRate, Steinberg::Vst::kOffline, mProcessingBlockSize)) {
-        mInitialDelay = mWrapper->GetLatencySamples();
         return true;
     }
     return false;
@@ -161,6 +185,12 @@ size_t VST3Instance::ProcessBlock(EffectSettings& settings, const float* const* 
 VST3Wrapper& VST3Instance::GetWrapper()
 {
     return *mWrapper;
+}
+
+void VST3Instance::QueueRealtimeParameterChange(Steinberg::uint32 id, double value)
+{
+    mWrapper->QueueParameterChange(id, value);
+    for (const auto& processor : mProcessors) processor->mWrapper->QueueParameterChange(id, value);
 }
 
 unsigned VST3Instance::GetAudioInCount() const

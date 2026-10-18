@@ -19,6 +19,7 @@
 
 #include <cmath>
 #include "EffectStage.h"
+#include "Envelope.h"
 #include "au3-math/Dither.h"
 #include "au3-math/float_cast.h"
 #include "WideSampleSequence.h"
@@ -100,6 +101,7 @@ Mixer::Mixer(
     , mFormat{outFormat}
     , mOutRate{outRate}
     , mInterleaved{outInterleaved}
+    , mEnvelope{warpOptions.envelope}
     , mTimesAndSpeed{std::make_shared<TimesAndSpeed>(TimesAndSpeed {
         startTime, stopTime, warpOptions.initialSpeed, startTime })}
 
@@ -298,7 +300,7 @@ size_t Mixer::Process(const size_t maxToProcess)
     //if (mT >= mT1)
     //   return 0;
 
-    auto&[mT0, mT1, _, mTime] = *mTimesAndSpeed;
+    auto&[mT0, mT1, speed, mTime] = *mTimesAndSpeed;
     auto oldTime = mTime;
     // backwards (as possibly in scrubbing)
     const auto backwards = (mT0 > mT1);
@@ -315,7 +317,10 @@ size_t Mixer::Process(const size_t maxToProcess)
     }
 
     if (mOutRate > 0.0) {
-        mTime += static_cast<double>(*maxOut) / mOutRate;
+        // mTime is a project position. Output duration must pass through the
+        // same speed/time warp as the resampler, in either direction.
+        const auto duration = static_cast<double>(*maxOut) / mOutRate * speed * (backwards ? -1 : 1);
+        mTime = mEnvelope ? mEnvelope->SolveIntegralOfInverse(mTime, duration) : mTime + duration;
     }
 
     if (backwards) {

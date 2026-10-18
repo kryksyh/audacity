@@ -158,6 +158,13 @@ void AudioIOBase::HandleDeviceChange()
         return;
     }
 
+#if defined(__WXMAC__)
+    mInputMixerWorks = false;
+    mPortMixer = Px_OpenMixer(nullptr, recDeviceNum, playDeviceNum, 0);
+    if (!mPortMixer) {
+        return;
+    }
+#else
     // Looking for highest supported sample rate for a given
     // play/rec device pair
     long highestSampleRate = GetClosestSupportedSampleRate(playDeviceNum, recDeviceNum, INT_MAX);
@@ -258,6 +265,7 @@ void AudioIOBase::HandleDeviceChange()
     if (error) {
         return;
     }
+#endif
 
     // Set input source
 #if USE_PORTMIXER
@@ -289,7 +297,9 @@ void AudioIOBase::HandleDeviceChange()
     }
     Px_SetInputVolume(mPortMixer, inputVol);
 
+#if !defined(__WXMAC__)
     Pa_CloseStream(stream);
+#endif
 
    #if 0
     wxPrintf("PortMixer: Recording: %s\n"
@@ -695,10 +705,16 @@ std::vector<long> AudioIOBase::GetSupportedSampleRates(int playDevice, int recDe
  * the real rates. */
 int AudioIOBase::GetOptimalSupportedSampleRate()
 {
-    // for ASIO use the last known device rate
+    // Device metadata is enough to choose a default. CoreAudio format probing
+    // opens capture I/O, so it must not run while initializing preferences.
     const int playDevice = getPlayDevIndex();
-    if (DeviceManager::IsAsioDevice(playDevice)) {
-        const PaDeviceInfo* info = Pa_GetDeviceInfo(playDevice);
+    const PaDeviceInfo* info = Pa_GetDeviceInfo(playDevice);
+    bool useDeviceRate = DeviceManager::IsAsioDevice(playDevice);
+#if defined(__WXMAC__)
+    const auto* host = info ? Pa_GetHostApiInfo(info->hostApi) : nullptr;
+    useDeviceRate = useDeviceRate || (host && host->type == paCoreAudio);
+#endif
+    if (useDeviceRate) {
         if (info && info->defaultSampleRate > 0) {
             return static_cast<int>(info->defaultSampleRate);
         }

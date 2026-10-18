@@ -73,7 +73,7 @@ class PCMExportProcessor final : public ExportProcessor
         int subformat;
         double t0;
         double t1;
-        std::unique_ptr<Mixer> mixer;
+        std::unique_ptr<AudioRenderSource> mixer;
         TranslatableString status;
         SF_INFO info;
         sampleFormat format;
@@ -693,7 +693,7 @@ ExportResult PCMExportProcessor::Process(ExportProcessorDelegate& delegate)
     {
         std::vector<char> dither;
         if ((context.info.format & SF_FORMAT_SUBMASK) == SF_FORMAT_PCM_24) {
-            dither.reserve(maxBlockLen * context.info.channels * SAMPLE_SIZE(int24Sample));
+            dither.resize(maxBlockLen * context.info.channels * SAMPLE_SIZE(int24Sample));
         }
 
         while (exportResult == ExportResult::Success) {

@@ -1,4 +1,5 @@
 #pragma once
+#include <atomic>
 
 #include <pluginterfaces/base/smartpointer.h>
 #include <pluginterfaces/vst/ivstaudioprocessor.h>
@@ -21,6 +22,7 @@ class IComponentHandler;
 class IConnectionPoint;
 class IEditController;
 class IParameterChanges;
+class IEventList;
 }
 }
 
@@ -55,6 +57,8 @@ class VST3_API VST3Wrapper
     const VST3::Hosting::ClassInfo& mEffectClassInfo;
 public:
 
+    enum class Role { Effect, Instrument };
+
     struct FactoryPresetDesc
     {
         wxString id;
@@ -72,7 +76,7 @@ public:
     //! Counter to track when FetchSettings was last called, used to skip redundant calls
     uint64_t lastFetchedSettingsCounter{ 0 };
 
-    VST3Wrapper(VST3::Hosting::Module& module, const VST3::Hosting::ClassInfo& effectClassInfo);
+    VST3Wrapper(VST3::Hosting::Module& module, const VST3::Hosting::ClassInfo& effectClassInfo, Role role = Role::Effect);
     ~VST3Wrapper();
 
     VST3Wrapper(const VST3Wrapper&) = delete;
@@ -96,9 +100,10 @@ public:
     void LoadPreset(const wxString& presetId);
     void SavePresetToFile(const wxString& filepath) const;
 
-    //!Initializes effect for processing using settings.
+    //!Initializes processing. Instruments with state already restored may
+    //!preserve that state instead of applying and recapturing a saved preset.
     bool Initialize(EffectSettings& settings, Steinberg::Vst::SampleRate sampleRate, Steinberg::int32 processMode,
-                    Steinberg::int32 maxSamplesPerBlock);
+                    Steinberg::int32 maxSamplesPerBlock, bool applySettings = true);
     //!Frees up resources allocated for processing, should be called
     //!after processing is complete. Optionally settings object may
     //!be passed to update runtime data with current internal state.
@@ -106,6 +111,9 @@ public:
 
     //!Prepares effect to process next block with changes written to the settings object
     void ProcessBlockStart(const EffectSettings& settings);
+    //! Processing-thread update, without calling the main-thread controller.
+    void QueueParameterChange(Steinberg::Vst::ParamID id, double value);
+    void SetProcessingContext(const EffectProcessingContext& context);
 
     //Used to send EffectSettings changes to the IAudioProcessor, while effect is inactive(!)
 
@@ -114,7 +122,10 @@ public:
     void FlushParameters(EffectSettings& settings, bool* hasChanges = nullptr);
 
     //Intialize first, before calling to Process. It's safe to it use from another thread
-    size_t Process(const float* const* inBlock, float* const* outBlock, size_t blockLen);
+    size_t Process(const float* const* inBlock, float* const* outBlock, size_t blockLen,
+                   Steinberg::Vst::IEventList* events = nullptr,
+                   const Steinberg::Vst::ProcessContext* context = nullptr,
+                   Steinberg::Vst::IParameterChanges* parameters = nullptr);
 
     void SuspendProcessing();
     void ResumeProcessing();
@@ -127,6 +138,12 @@ public:
     std::vector<FactoryPresetDesc> FindFactoryPresets() const;
 
     Steinberg::int32 GetLatencySamples() const;
+    Steinberg::int32 CachedLatencySamples() const { return mCachedLatency.load(std::memory_order_acquire); }
+    void RequestRestart(Steinberg::int32 flags);
+    bool LatencyUpdatePending() const;
+    bool RefreshLatency(bool measureWithoutNotification = false);
+    // Quiescent processing-thread parameter restoration, without advancing audio.
+    bool FlushProcessingParameters(Steinberg::Vst::IParameterChanges&, const Steinberg::Vst::ProcessContext&);
 
     static EffectSettings MakeSettings();
 
@@ -142,6 +159,8 @@ public:
 
 private:
 
+    Role mRole;
+
     bool LoadPresetFromStream(Steinberg::IBStream* fileStream);
     bool SavePresetToStream(Steinberg::IBStream* fileStream) const;
 
@@ -154,6 +173,9 @@ private:
     void ProcessSilentBlock();
 
     bool mActive { false };
+    bool mProcessing { false };
+    std::atomic<Steinberg::int32> mRestartFlags { 0 };
+    std::atomic<Steinberg::int32> mCachedLatency { 0 };
 
     std::vector<std::pair<Steinberg::Vst::ParamID, Steinberg::Vst::ParamValue> > mParameters;
     //A preallocated array of Steinberg::Vst::IParameterValueQueue

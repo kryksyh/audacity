@@ -16,11 +16,12 @@
 
 #include "ExportPlugin.h"
 #include "ExportTypes.h"
+#include "au3-mixer/AudioRenderSource.h"
 #include "au3-math/SampleFormat.h"
+#include "au3-utility/GlobalVariable.h"
 
 class TrackList;
 class WaveTrack;
-class Mixer;
 
 namespace MixerOptions {
 class Downmix;
@@ -30,13 +31,13 @@ class Downmix;
 class IMPORT_EXPORT_API ExportPluginHelpers final
 {
 public:
-    static std::unique_ptr<Mixer> CreateMixer(
+    static std::unique_ptr<AudioRenderSource> CreateMixer(
         const AudacityProject& project, bool selectionOnly, double startTime, double stopTime, unsigned numOutChannels,
         size_t outBufferSize, bool outInterleaved, double outRate, sampleFormat outFormat, MixerOptions::Downmix* mixerSpec);
 
     ///\brief Sends progress update to delegate and retrieves state update from it.
     ///Typically used inside each export iteration.
-    static ExportResult UpdateProgress(ExportProcessorDelegate& delegate, Mixer& mixer, double t0, double t1);
+    static ExportResult UpdateProgress(ExportProcessorDelegate& delegate, AudioRenderSource& mixer, double t0, double t1);
 
     template<typename T>
     static T GetParameterValue(const ExportProcessor::Parameters& parameters, int id, T defaultValue = T())

@@ -58,7 +58,7 @@ class OGGExportProcessor final : public ExportProcessor
         double t0;
         double t1;
         unsigned numChannels;
-        std::unique_ptr<Mixer> mixer;
+        std::unique_ptr<AudioRenderSource> mixer;
         std::unique_ptr<FileIO> outFile;
         wxFileNameWrapper fName;
 
@@ -332,7 +332,7 @@ ExportResult OGGExportProcessor::Process(ExportProcessorDelegate& delegate)
             } else {
                 for (size_t i = 0; i < context.numChannels; i++) {
                     float* temp = (float*)context.mixer->GetBuffer(i);
-                    memcpy(vorbis_buffer[i], temp, sizeof(float) * SAMPLES_PER_RUN);
+                    memcpy(vorbis_buffer[i], temp, sizeof(float) * samplesThisRun);
                 }
 
                 // tell the encoder how many samples we have

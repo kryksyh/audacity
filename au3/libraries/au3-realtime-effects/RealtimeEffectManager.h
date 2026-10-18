@@ -23,6 +23,7 @@
 #include "au3-utility/Observer.h"
 #include "au3-components/PluginProvider.h" // for PluginID
 #include "RealtimeEffectList.h"
+#include "RealtimeProcessingTime.h"
 
 class ChannelGroup;
 class EffectInstance;
@@ -107,6 +108,10 @@ public:
     bool GetSuspended() const
     { return mSuspended.load(std::memory_order_relaxed); }
 
+    bool LatencyUpdatePending();
+    // Caller has detached the live callback and stopped the disk worker.
+    bool RefreshRealtimeLatencies();
+
     //! To be called only from main thread
     /*!
      Each time a processing scope starts in the audio thread, suspension state
@@ -139,7 +144,7 @@ private:
 
     /*! @copydoc ProcessScope::Process */
     size_t Process(bool suspended, const ChannelGroup* group, float* const* buffers, float* const* scratch, float* dummy, unsigned nBuffers,
-                   size_t numSamples);
+                   size_t numSamples, const RealtimeEffects::ProcessingTime* time = nullptr, bool rawLatency = false, bool probe = false);
     void ProcessEnd(bool suspended) noexcept;
 
     RealtimeEffectManager(const RealtimeEffectManager&) = delete;
@@ -154,12 +159,9 @@ private:
     template<typename StateVisitor>
     void VisitGroup(ChannelGroup* group, const StateVisitor& func)
     {
-        if (group == nullptr) {
-            RealtimeEffectList::Get(mProject).Visit(func);
-        } else {
-            // Call the function for each effect on the group list
-            RealtimeEffectList::Get(*group).Visit(func);
-        }
+        auto& list = group ? RealtimeEffectList::Get(*group) : RealtimeEffectList::Get(mProject);
+        const std::lock_guard guard(list.GetLock());
+        list.Visit(func);
     }
 
     template<typename StateVisitor>
@@ -174,11 +176,11 @@ private:
     void VisitAll(const StateVisitor& func)
     {
         // Call the function for each effect on the master list
-        RealtimeEffectList::Get(mProject).Visit(func);
+        VisitGroup(MasterGroup, func);
 
         // And all group lists
         for (auto group : mGroups) {
-            RealtimeEffectList::Get(*group).Visit(func);
+            VisitGroup(group, func);
         }
     }
 
@@ -194,6 +196,7 @@ private:
     std::vector<const ChannelGroup*> mGroups; //!< all are non-null
 
     std::unordered_map<const ChannelGroup*, double> mRates;
+    std::unordered_map<const ChannelGroup*, unsigned> mChannels;
 };
 
 namespace RealtimeEffects {
@@ -280,6 +283,27 @@ public:
                             nBuffers, numSamples);
         }
         return 0; // consider them trivially processed
+    }
+
+    //! Preserve insert delay for a routing graph that compensates whole paths.
+    size_t ProcessRaw(const ChannelGroup* group, float* const* buffers, float* const* scratch,
+                      float* dummy, unsigned nBuffers, size_t numSamples, const ProcessingTime* time = nullptr)
+    {
+        if (const auto project = mwProject.lock()) {
+            return RealtimeEffectManager::Get(*project).Process(mSuspended, group, buffers, scratch, dummy,
+                                                               nBuffers, numSamples, time, true);
+        }
+        return 0;
+    }
+
+    //! Discover late-reported insert latencies using silence before routing.
+    void ProbeRaw(const ChannelGroup* group, float* const* buffers, float* const* scratch,
+                  float* dummy, unsigned nBuffers, size_t numSamples)
+    {
+        if (const auto project = mwProject.lock()) {
+            RealtimeEffectManager::Get(*project).Process(mSuspended, group, buffers, scratch, dummy,
+                                                       nBuffers, numSamples, nullptr, true, true);
+        }
     }
 
 private:

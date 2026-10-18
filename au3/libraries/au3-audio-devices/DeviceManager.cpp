@@ -288,6 +288,15 @@ static void AddSources(int deviceIndex, int rate, std::vector<DeviceSourceMap>* 
     DeviceSourceMap map;
     const PaDeviceInfo* info = Pa_GetDeviceInfo(deviceIndex);
 
+#if defined(__WXMAC__)
+    // CoreAudio exposes source names as device properties. Opening capture I/O
+    // just to enumerate them can block startup on an unavailable input path.
+    if (isInput) {
+        AddSourcesFromStream(deviceIndex, info, maps, nullptr);
+        return;
+    }
+#endif
+
     // This tries to open the device with the samplerate worked out above, which
     // will be the highest available for play and record on the device, or
     // 44.1kHz if the info cannot be fetched.
@@ -437,8 +446,9 @@ void DeviceManager::Rescan()
     if (m_inited) {
         // check to see if there is a stream open - can happen if monitoring,
         // but otherwise Rescan() should not be available to the user.
-        auto gAudioIO = AudioIOBase::Get();
-        gAudioIO->StopMonitoring(); // TODO Inject and use IAudioEngine instead
+        if (auto gAudioIO = AudioIOBase::Get()) {
+            gAudioIO->StopMonitoring(); // TODO Inject and use IAudioEngine instead
+        }
 
         // restart portaudio - this updates the device list
         // FIXME: TRAP_ERR restarting PortAudio

@@ -206,7 +206,11 @@ size_t MixerSource::MixVariableRates(
         out += results.second;
         t += (input_used / sequenceRate) * (backwards ? -1 : 1);
 
-        if (last) {
+        // Marking the final input packet does not imply it was all consumed.
+        // A small output request may first need several input passes to fill
+        // the resampler's filter. Drain until output is ready or no progress
+        // remains, rather than publishing silence between those passes.
+        if (input_used == 0 && results.second == 0) {
             break;
         }
     }
@@ -340,13 +344,19 @@ std::optional<size_t> MixerSource::Acquire(Buffers& data, size_t bound)
     assert(bound <= data.BlockSize());
     assert(data.BlockSize() <= data.Remaining());
 
-    auto&[mT0, mT1, _, mTime] = *mTimesAndSpeed;
+    auto&[mT0, mT1, speed, mTime] = *mTimesAndSpeed;
     bool hasEndTime = mT1 < std::numeric_limits<decltype(mT1)>::max();
 
-    const sampleCount requested = sampleCount { bound };
-    const sampleCount available = hasEndTime ? sampleCount { (mT1 - mTime) * mRate } : sampleCount::max();
-
-    const auto target = std::min(requested, available).as_size_t();
+    // Remaining project time becomes output frames through the same warp and
+    // speed as MixVariableRates. Truncating the unscaled duration ends slow
+    // playback early; a reversed interval must also have a positive length.
+    auto target = bound;
+    if (hasEndTime && speed > 0.0) {
+        const auto remaining = mEnvelope ? mEnvelope->IntegralOfInverse(mTime, mT1) : mT1 - mTime;
+        const auto duration = std::abs(remaining) / speed;
+        // Clamp before conversion, including for a very distant scrub end.
+        target = static_cast<size_t>(std::min<double>(bound, duration * mRate + 0.5));
+    }
 
     // TODO: more-than-two-channels
     const auto maxChannels = mMaxChannels = data.Channels();

@@ -50,6 +50,22 @@ bool RealtimeEffectManager::IsActive() const noexcept
     return mActive;
 }
 
+bool RealtimeEffectManager::LatencyUpdatePending()
+{
+    if (!mActive) return false;
+    bool pending = false;
+    VisitAll([&](RealtimeEffectState& state, bool) { pending |= state.LatencyUpdatePending(); });
+    return pending;
+}
+
+bool RealtimeEffectManager::RefreshRealtimeLatencies()
+{
+    if (!mActive) return false;
+    bool changed = false;
+    VisitAll([&](RealtimeEffectState& state, bool) { changed |= state.RefreshRealtimeLatency(); });
+    return changed;
+}
+
 void RealtimeEffectManager::Initialize(
     RealtimeEffects::InitializationScope& scope,
     unsigned numPlaybackChannels,
@@ -57,6 +73,7 @@ void RealtimeEffectManager::Initialize(
 {
     // (Re)Set processor parameters
     mRates.clear();
+    mChannels.clear();
     mGroups.clear();
 
     // RealtimeAdd/RemoveEffect() needs to know when we're active so it can
@@ -82,6 +99,7 @@ void RealtimeEffectManager::AddGroup(
 {
     mGroups.push_back(&group);
     mRates.insert({ &group, rate });
+    mChannels.insert({ &group, chans });
 
     VisitGroup(&group,
                [&](RealtimeEffectState& state, bool) {
@@ -100,6 +118,7 @@ void RealtimeEffectManager::Finalize() noexcept
     // Reset processor parameters
     mGroups.clear();
     mRates.clear();
+    mChannels.clear();
 
     // No longer active
     mActive = false;
@@ -122,7 +141,7 @@ void RealtimeEffectManager::ProcessStart(bool suspended)
 size_t RealtimeEffectManager::Process(bool suspended,
                                       const ChannelGroup* group,
                                       float* const* buffers, float* const* scratch, float* const dummy,
-                                      unsigned nBuffers, size_t numSamples)
+                                      unsigned nBuffers, size_t numSamples, const RealtimeEffects::ProcessingTime* time, bool rawLatency, bool probe)
 {
     // Can be suspended because of the audio stream being paused or because
     // effects have been suspended, so allow the samples to pass as-is.
@@ -148,10 +167,26 @@ size_t RealtimeEffectManager::Process(bool suspended,
     // Tracks how many processors were called
     size_t called = 0;
     size_t totalDiscardable = 0;
+    int64_t precedingLatency = 0;
     VisitGroup(group,
                [&](RealtimeEffectState& state, bool)
     {
-        const size_t discardable = std::min(state.Process(group, nBuffers, ibuf, obuf, dummy, numSamples), numSamples);
+        struct OffsetTime final : RealtimeEffects::ProcessingTime {
+            const RealtimeEffects::ProcessingTime* source;
+            int64_t delay;
+            OffsetTime(const RealtimeEffects::ProcessingTime* source, int64_t delay) : source(source), delay(delay) {}
+            double TimeAt(int64_t offset) const override { return source->TimeAt(offset - delay); }
+            EffectProcessingContext ContextAt(int64_t offset) const override { return source->ContextAt(offset - delay); }
+        } offsetTime(time, precedingLatency);
+        const size_t processedDiscard = state.Process(group, nBuffers, ibuf, obuf, dummy, numSamples,
+                                                      time ? &offsetTime : nullptr, rawLatency, probe);
+        const size_t discardable = rawLatency ? 0 : std::min(processedDiscard, numSamples);
+        if (rawLatency) {
+            precedingLatency += state.ProcessingLatency(group);
+            // A failed/short processor has already zeroed its missing output.
+            // Keep timeline positions intact and report failure to the caller.
+            totalDiscardable = std::max(totalDiscardable, processedDiscard);
+        }
         for (unsigned int i = 0; i < nBuffers; i++) {
             ibuf[i] += discardable;
             obuf[i] += discardable;
@@ -202,7 +237,9 @@ RealtimeEffectManager::MakeNewState(
     }
     auto pNewState = RealtimeEffectState::make_shared(id);
     auto& state = *pNewState;
-    if (pScope && mActive) {
+    if (pScope && mActive && (pGroup == MasterGroup || std::find(mGroups.begin(), mGroups.end(), pGroup) != mGroups.end())) {
+        // Only initialize groups participating in this stream. An insert on
+        // another track has no processors to run or finalize in this scope.
         // Adding a state while playback is in-flight
         auto pInstance = state.Initialize(pScope->mSampleRate, pScope->mAudioThreadBufferSize);
         pScope->mInstances.push_back(pInstance);
@@ -218,7 +255,7 @@ RealtimeEffectManager::MakeNewState(
                     continue;
                 }
                 auto pInstance2
-                    =state.AddGroup(group, pScope->mNumPlaybackChannels, mRates[group], pScope->mAudioThreadBufferSize);
+                    =state.AddGroup(group, mChannels[group], mRates[group], pScope->mAudioThreadBufferSize);
                 if (pInstance2 != pInstance) {
                     pScope->mInstances.push_back(pInstance2);
                 }

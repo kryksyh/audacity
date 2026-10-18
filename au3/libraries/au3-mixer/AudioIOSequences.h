@@ -22,6 +22,10 @@ class ChannelGroup;
 struct MIXER_API PlayableSequence : WideSampleSequence {
     ~PlayableSequence() override;
 
+    // Worker-thread transport snapshot, supplied before fetching a playback
+    // slice. Offline renderers leave cycling disabled.
+    virtual void SetPlaybackLoop(bool, double, double) const {}
+
     //! Find associated ChannelGroup if any
     virtual const ChannelGroup* FindChannelGroup() const = 0;
 

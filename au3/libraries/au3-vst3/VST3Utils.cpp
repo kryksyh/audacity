@@ -18,6 +18,7 @@
 
 #include <pluginterfaces/vst/ivsteditcontroller.h>
 #include <pluginterfaces/vst/ivstparameterchanges.h>
+#include <pluginterfaces/vst/ivstmidicontrollers.h>
 #include <pluginterfaces/vst/ivstunits.h>
 #include <wx/regex.h>
 
@@ -92,6 +93,31 @@ wxString VST3Utils::ToWxString(const Steinberg::Vst::TChar* str)
 {
     static const wxCSConv csConv { wxFONTENCODING_UTF16 };
     return { reinterpret_cast<const char*>(str), csConv };
+}
+
+std::set<Steinberg::Vst::ParamID> VST3Utils::MidiEventParameters(Steinberg::Vst::IEditController* controller)
+{
+    using namespace Steinberg;
+    std::set<Vst::ParamID> mapped;
+    FUnknownPtr<Vst::IMidiMapping> mapping(controller);
+    if (!mapping) return mapped;
+    for (int16 channel = 0; channel < 16; ++channel) {
+        for (int16 control = 0; control < Vst::kCountCtrlNumber; ++control) {
+            Vst::ParamID id = Vst::kNoParamId;
+            if (mapping->getMidiControllerAssignment(0, channel, control, id) == kResultTrue && id != Vst::kNoParamId) {
+                mapped.insert(id);
+            }
+        }
+    }
+    std::set<Vst::ParamID> events;
+    for (int32 index = 0; index < controller->getParameterCount(); ++index) {
+        Vst::ParameterInfo info {};
+        if (controller->getParameterInfo(index, info) == kResultOk && mapped.contains(info.id)
+            && !(info.flags & Vst::ParameterInfo::kCanAutomate)) {
+            events.insert(info.id);
+        }
+    }
+    return events;
 }
 
 std::string VST3Utils::UTF16ToStdString(const Steinberg::Vst::TChar* str)

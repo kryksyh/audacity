@@ -83,8 +83,11 @@ int OpenMixer_Mac_CoreAudio(px_mixer *Px, int index)
 
    info = (PxInfo *) Px->info;
 
-   info->input = PaMacCore_GetStreamInputDevice(Px->pa_stream);;
-   info->output = PaMacCore_GetStreamOutputDevice(Px->pa_stream);
+   /* Mixer properties belong to devices, not to an active audio stream. */
+   info->input = Px->pa_stream ? PaMacCore_GetStreamInputDevice(Px->pa_stream)
+                              : PaMacCore_GetDeviceID(Px->input_device_index);
+   info->output = Px->pa_stream ? PaMacCore_GetStreamOutputDevice(Px->pa_stream)
+                               : PaMacCore_GetDeviceID(Px->output_device_index);
 
    if (info->input == kAudioDeviceUnknown) {
       /* This probably means it was an output-only stream;

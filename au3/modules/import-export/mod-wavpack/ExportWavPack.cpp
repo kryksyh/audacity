@@ -149,7 +149,7 @@ class WavPackExportProcessor final : public ExportProcessor
         sampleFormat format;
         WriteId outWvFile, outWvcFile;
         WavpackContext* wpc{};
-        std::unique_ptr<Mixer> mixer;
+        std::unique_ptr<AudioRenderSource> mixer;
         std::unique_ptr<Tags> metadata;
     } context;
 public:

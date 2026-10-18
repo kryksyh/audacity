@@ -15,6 +15,9 @@
 
 #include <AudioToolbox/AudioUnitUtilities.h>
 #include <dispatch/dispatch.h>
+#include <cmath>
+#include <limits>
+#include <stdexcept>
 #include "au3-basic-ui/BasicUI.h"
 #include "au3-exceptions/AudacityException.h"
 #include <wx/log.h>
@@ -69,6 +72,8 @@ AudioUnitInstance::AudioUnitInstance(const PerTrackEffect& effect,
     mAudioIns = audioIns;
     mAudioOuts = audioOuts;
     CreateAudioUnit();
+    if (mUnit) mLatencyListenerInstalled = AudioUnitAddPropertyListener(mUnit.get(), kAudioUnitProperty_Latency,
+        &LatencyPropertyChanged, mLatencyListener.get()) == noErr;
 }
 
 AudioUnitInstance::~AudioUnitInstance()
@@ -82,11 +87,15 @@ AudioUnitInstance::~AudioUnitInstance()
     // ~AudioUnitWrapper does not dispose a second time.
     const bool wasInitialized = mInitialization.release() != nullptr;
     AudioUnit unit = mUnit.release();
+    const auto listener = std::move(mLatencyListener);
+    const bool listenerInstalled = mLatencyListenerInstalled;
     if (!unit) {
         return;
     }
 
     dispatch_async(dispatch_get_main_queue(), ^ {
+        if (listenerInstalled) AudioUnitRemovePropertyListenerWithUserData(unit, kAudioUnitProperty_Latency,
+            &LatencyPropertyChanged, listener.get());
         if (wasInitialized) {
             AudioUnitUninitialize(unit);
         }
@@ -131,14 +140,52 @@ unsigned AudioUnitInstance::GetAudioOutCount() const
 auto AudioUnitInstance::GetLatency(
     const EffectSettings&, double sampleRate) const -> SampleCount
 {
-    // Retrieve the latency (can be updated via an event)
     if (mUseLatency) {
-        Float64 latency = 0.0;
-        if (!GetFixedSizeProperty(kAudioUnitProperty_Latency, latency)) {
-            return latency * sampleRate;
-        }
+        const auto samples = mCachedLatencySeconds.load(std::memory_order_acquire) * sampleRate;
+        return samples >= 0.0 && samples < static_cast<double>(std::numeric_limits<int64_t>::max()) ? static_cast<SampleCount>(samples) : 0;
     }
     return 0;
+}
+
+void AudioUnitInstance::LatencyPropertyChanged(void* data, AudioUnit, AudioUnitPropertyID, AudioUnitScope, AudioUnitElement)
+{
+    static_cast<LatencyListenerState*>(data)->pending.store(true, std::memory_order_release);
+}
+
+bool AudioUnitInstance::RealtimeLatencyUpdatePending() const noexcept
+{
+    if (!mUseLatency) return false;
+    if (mLatencyListener->pending.load(std::memory_order_acquire)) return true;
+    return std::any_of(mSlaves.begin(), mSlaves.end(), [](const auto& slave) {
+        return slave->mLatencyListener->pending.load(std::memory_order_acquire);
+    });
+}
+
+bool AudioUnitInstance::UpdateCachedLatency()
+{
+    mLatencyListener->pending.store(false, std::memory_order_release);
+    Float64 latency = 0.0;
+    if (GetFixedSizeProperty(kAudioUnitProperty_Latency, latency) != noErr || !std::isfinite(latency) || latency < 0.0) latency = 0.0;
+    return mCachedLatencySeconds.exchange(latency, std::memory_order_acq_rel) != latency;
+}
+
+auto AudioUnitInstance::GetReportedLatency(const EffectSettings&, double sampleRate) const -> SampleCount
+{
+    if (!mUseLatency) return 0;
+    Float64 latency = 0.0;
+    if (GetFixedSizeProperty(kAudioUnitProperty_Latency, latency) != noErr || !std::isfinite(latency) || latency < 0) return 0;
+    const auto samples = latency * sampleRate;
+    if (samples >= static_cast<double>(std::numeric_limits<int64_t>::max())) throw std::runtime_error("The effect's processing delay is out of range.");
+    return static_cast<SampleCount>(samples);
+}
+
+bool AudioUnitInstance::RefreshRealtimeLatency()
+{
+    if (!RealtimeLatencyUpdatePending()) return false;
+    bool changed = UpdateCachedLatency();
+    for (const auto& slave : mSlaves) changed |= slave->UpdateCachedLatency();
+    if (changed) mLatencyRevision.fetch_add(1, std::memory_order_release);
+    return changed;
 }
 
 #if 0
@@ -171,10 +218,64 @@ bool AudioUnitInstance::Initialize()
     return true;
 }
 
+void AudioUnitInstance::SetRealtimeProcessingContext(size_t group, const EffectProcessingContext& context)
+{
+    auto* target = group == 0 ? this : group - 1 < mSlaves.size() ? mSlaves[group - 1].get() : nullptr;
+    if (!target) return;
+    target->mTransportChanged = !target->mHaveTransport || target->mTransport.playing != context.playing
+        || target->mTransport.cycling != context.cycling || target->mTransport.cycleStart != context.cycleStart
+        || target->mTransport.cycleEnd != context.cycleEnd
+        || std::abs(context.time - target->mNextTransportTime) > 0.5 / context.sampleRate;
+    target->mTransport = context;
+    target->mHaveTransport = true;
+}
+
+OSStatus AudioUnitInstance::BeatAndTempo(void* data, Float64* beat, Float64* tempo)
+{
+    const auto& context = static_cast<AudioUnitInstance*>(data)->mTransport;
+    if (beat) *beat = context.time * context.tempo / 60.0;
+    if (tempo) *tempo = context.tempo;
+    return noErr;
+}
+
+OSStatus AudioUnitInstance::MusicalTime(void* data, UInt32* nextBeat, Float32* numerator, UInt32* denominator, Float64* downbeat)
+{
+    const auto& context = static_cast<AudioUnitInstance*>(data)->mTransport;
+    const double beat = context.time * context.tempo / 60.0;
+    const double bar = context.numerator * 4.0 / context.denominator;
+    if (nextBeat) *nextBeat = static_cast<UInt32>((std::ceil(beat) - beat) * 60.0 / context.tempo * context.sampleRate);
+    if (numerator) *numerator = context.numerator;
+    if (denominator) *denominator = context.denominator;
+    if (downbeat) *downbeat = std::floor(beat / bar) * bar;
+    return noErr;
+}
+
+OSStatus AudioUnitInstance::TransportState(void* data, Boolean* playing, Boolean* changed, Float64* sample,
+                                         Boolean* cycling, Float64* cycleStart, Float64* cycleEnd)
+{
+    const auto& self = *static_cast<AudioUnitInstance*>(data);
+    if (playing) *playing = self.mTransport.playing;
+    if (changed) *changed = self.mTransportChanged;
+    if (sample) *sample = self.mTransport.time * self.mTransport.sampleRate;
+    if (cycling) *cycling = self.mTransport.cycling;
+    if (cycleStart) *cycleStart = self.mTransport.cycleStart * self.mTransport.tempo / 60.0;
+    if (cycleEnd) *cycleEnd = self.mTransport.cycleEnd * self.mTransport.tempo / 60.0;
+    return noErr;
+}
+
 bool AudioUnitInstance::ProcessInitialize(EffectSettings& settings,
                                           double sampleRate, ChannelNames chanMap)
 {
     mLastError.clear();
+    mHaveTransport = false;
+    mTransport = {};
+    mTransport.sampleRate = sampleRate;
+    HostCallbackInfo callbacks {};
+    callbacks.hostUserData = this;
+    callbacks.beatAndTempoProc = &BeatAndTempo;
+    callbacks.musicalTimeLocationProc = &MusicalTime;
+    callbacks.transportStateProc = &TransportState;
+    SetProperty(kAudioUnitProperty_HostCallbacks, callbacks);
 
     mInputList
         =PackedArray::AllocateCount<AudioBufferList>(mAudioIns)(mAudioIns);
@@ -253,6 +354,7 @@ bool AudioUnitInstance::ProcessInitialize(EffectSettings& settings,
         // Ignore bad return value.  Some (like Xfer OTT) give a bad status.
     }
 
+    UpdateCachedLatency();
     return true;
 }
 
@@ -321,6 +423,7 @@ size_t AudioUnitInstance::ProcessBlock(EffectSettings&,
     }
 
     mTimeStamp.mSampleTime += blockLen;
+    mNextTransportTime = mTransport.time + (mTransport.playing ? blockLen / mTransport.sampleRate * mTransport.speed : 0.0);
     return blockLen;
 }
 
@@ -400,6 +503,12 @@ bool AudioUnitInstance::RealtimeResume()
     return true;
 }
 
+void AudioUnitInstance::SetRealtimeParameter(AudioUnitParameterID id, AudioUnitParameterValue value)
+{
+    AudioUnitSetParameter(mUnit.get(), id, kAudioUnitScope_Global, 0, value, 0);
+    for (const auto& slave : mSlaves) AudioUnitSetParameter(slave->mUnit.get(), id, kAudioUnitScope_Global, 0, value, 0);
+}
+
 auto AudioUnitInstance::MakeMessage() const -> std::unique_ptr<Message>
 {
     // Like AudioUnitEffect::MakeSettings, except it only allocates map entries
@@ -434,7 +543,7 @@ bool AudioUnitInstance::RealtimeProcessStart(MessagePackage& package)
         for (auto&[ID, oPair] : values) {
             if (oPair.has_value()) {
                 auto value = oPair->second;
-                if (AudioUnitSetParameter(mUnit.get(), ID,
+                if (AudioUnitSetParameter(instance.mUnit.get(), ID,
                                           kAudioUnitScope_Global, 0, value, 0)) {
                     // Probably failed because of an invalid parameter when
                     // a plug-in is in a certain mode that doesn't contain
@@ -530,7 +639,7 @@ void AudioUnitInstance::EventListener(const AudioUnitEvent* inEvent,
         // Handle latency changes
         if (inEvent->mArgument.mProperty.mPropertyID
             == kAudioUnitProperty_Latency) {
-            // Do what?
+            mLatencyListener->pending.store(true, std::memory_order_release);
         }
         return;
     }

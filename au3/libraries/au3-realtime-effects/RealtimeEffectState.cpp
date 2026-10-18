@@ -202,6 +202,9 @@ public:
     MessageBuffer<FromMainSlot> mChannelFromMain;
     Response::Counter mCounter;
     SettingsAndCounter mLastSettings;
+    // A main-thread cache generation, independent of the small inter-thread
+    // acknowledgement counter and its resets during processor initialization.
+    uint64_t mModificationCounter{ 0 };
 
     MessageBuffer<ToMainSlot> mChannelToMain;
 
@@ -248,6 +251,7 @@ struct RealtimeEffectState::Access final : EffectSettingsAccess {
     {
         if (auto pState = mwState.lock()) {
             if (auto pAccessState = pState->GetAccessState()) {
+                ++pAccessState->mModificationCounter;
                 if (pMessage && !pAccessState->mState.mInitialized) {
                     // Other thread isn't processing.
                     // Let the instance consume the message directly.
@@ -279,6 +283,7 @@ struct RealtimeEffectState::Access final : EffectSettingsAccess {
     {
         if (auto pState = mwState.lock()) {
             if (auto pAccessState = pState->GetAccessState()) {
+                ++pAccessState->mModificationCounter;
                 if (pMessage && !pAccessState->mState.mInitialized) {
                     // Other thread isn't processing.
                     // Let the instance consume the message directly.
@@ -343,7 +348,7 @@ struct RealtimeEffectState::Access final : EffectSettingsAccess {
     {
         if (auto pState = mwState.lock()) {
             if (auto pAccessState = pState->GetAccessState()) {
-                return pAccessState->mLastSettings.counter;
+                return pAccessState->mModificationCounter;
             }
         }
         return 0;
@@ -361,17 +366,25 @@ RealtimeEffectState::RealtimeEffectState(const PluginID& id)
 
 RealtimeEffectState& RealtimeEffectState::operator=(const RealtimeEffectState& other)
 {
-    assert(other.mID == mID);
-    SetActive(other.IsActive());
-    if (!mPlugin || !other.mPlugin) {
+    if (this == &other) {
         return *this;
     }
-    CommandParameters params;
-    if (other.mPlugin->SaveSettings(mMainSettings.settings, params)) {
-        mPlugin->LoadSettings(params, mMainSettings.settings);
+    assert(other.mID == mID);
+    mAutomation = other.mAutomation;
+    mParameters = other.SnapshotParameters();
+    auto settings = mPlugin ? mPlugin->MakeSettings() : EffectSettings {};
+    settings.extra = other.SnapshotSettings().extra;
+    if (mPlugin) {
+        if (LoadParameters(settings)) {
+            mParameters.clear();
+        }
+        auto access = GetAccess();
+        access->Set(std::move(settings), nullptr);
+        access->Flush();
     } else {
-        assert(false);
+        mMainSettings.settings = std::move(settings);
     }
+    Publish(IsEnabled() ? RealtimeEffectStateChange::EffectOn : RealtimeEffectStateChange::EffectOff);
     return *this;
 }
 
@@ -382,6 +395,8 @@ RealtimeEffectState::~RealtimeEffectState()
 std::shared_ptr<RealtimeEffectState> RealtimeEffectState::Clone() const
 {
     auto pNewState{ RealtimeEffectState::make_shared(PluginID {}) };
+    pNewState->mAutomation = mAutomation;
+    pNewState->mParameters = mParameters;
     pNewState->mID = mID;
     pNewState->mPlugin = mPlugin;
     if (mPlugin) {
@@ -389,7 +404,45 @@ std::shared_ptr<RealtimeEffectState> RealtimeEffectState::Clone() const
         pNewState->mMovedOutputs = mPlugin->MakeOutputs();
     }
     pNewState->mMainSettings.Set(mMainSettings);
+    pNewState->mMainSettings.settings = SnapshotSettings();
     return pNewState;
+}
+
+const EffectSettings& RealtimeEffectState::SnapshotSettings() const
+{
+    const auto access = GetAccessState();
+    return access ? access->mLastSettings.settings : mMainSettings.settings;
+}
+
+RealtimeEffectState::Parameters RealtimeEffectState::SnapshotParameters() const
+{
+    if (!mParameters.empty()) {
+        return mParameters;
+    }
+    Parameters result;
+    CommandParameters parameters;
+    if (mPlugin && mPlugin->SaveSettings(SnapshotSettings(), parameters)) {
+        wxString name;
+        long index;
+        for (bool more = parameters.GetFirstEntry(name, index); more; more = parameters.GetNextEntry(name, index)) {
+            result.emplace_back(name, parameters.Read(name, ""));
+        }
+    }
+    return result;
+}
+
+bool RealtimeEffectState::LoadParameters(EffectSettings& settings) const
+{
+    if (!mPlugin) {
+        return false;
+    }
+    CommandParameters parameters;
+    for (const auto& [name, value] : mParameters) {
+        if (!parameters.Write(name, value)) {
+            return false;
+        }
+    }
+    return mPlugin->LoadSettings(parameters, settings);
 }
 
 void RealtimeEffectState::SetID(const PluginID& id)
@@ -419,6 +472,9 @@ const EffectInstanceFactory* RealtimeEffectState::GetEffect()
             mMainSettings.counter = 0;
             mMainSettings.settings = mPlugin->MakeSettings();
             mMainSettings.settings.extra.SetActive(wasActive);
+            if (!mParameters.empty() && LoadParameters(mMainSettings.settings)) {
+                mParameters.clear();
+            }
             mOutputs = mPlugin->MakeOutputs();
             mMovedOutputs = mPlugin->MakeOutputs();
         }
@@ -428,6 +484,9 @@ const EffectInstanceFactory* RealtimeEffectState::GetEffect()
 
 std::shared_ptr<EffectInstance> RealtimeEffectState::MakeInstance()
 {
+    if (const auto access = GetAccessState()) {
+        mMainSettings.Set(access->mLastSettings);
+    }
     mMovedMessage.reset();
     mMessage.reset();
     auto result = mPlugin->MakeInstance();
@@ -453,6 +512,9 @@ RealtimeEffectState::EnsureInstance(double sampleRate, size_t audioThreadBufferS
 
     auto pInstance = mwInstance.lock();
     if (!mInitialized) {
+        if (const auto access = GetAccessState()) {
+            mMainSettings.Set(access->mLastSettings);
+        }
         //! copying settings in the main thread while worker isn't yet running
         mWorkerSettings = mMainSettings;
         mLastActive = IsActive();
@@ -473,6 +535,8 @@ RealtimeEffectState::EnsureInstance(double sampleRate, size_t audioThreadBufferS
             return {};
         }
         mInitialized = true;
+        mProcessingRate = sampleRate;
+        RefreshProcessingAutomation();
         return pInstance;
     }
     return pInstance;
@@ -497,6 +561,7 @@ RealtimeEffectState::Initialize(double sampleRate, size_t audioThreadBufferSize)
 
     mCurrentProcessor = 0;
     mGroups.clear();
+    mRawDelays.clear();
     mLatency = {};
     return EnsureInstance(sampleRate, audioThreadBufferSize);
 }
@@ -560,6 +625,7 @@ RealtimeEffectState::AddGroup(
         // Remember the sampleRate of the group, so latency can be computed
         // later
         mGroups[group] = { first, sampleRate };
+        mRawDelays.try_emplace(group);
         return pInstance;
     }
     return {};
@@ -577,6 +643,10 @@ bool RealtimeEffectState::ProcessStart(bool running)
 
     // Detect transitions of activity state
     auto pInstance = mwInstance.lock();
+    if (!mInitialized) {
+        mLastActive = false;
+        return false;
+    }
     bool active = IsActive() && running;
     if (active != mLastActive) {
         if (pInstance) {
@@ -616,10 +686,48 @@ bool RealtimeEffectState::ProcessStart(bool running)
 size_t RealtimeEffectState::Process(
     const ChannelGroup* group, unsigned chans,
     const float* const* inbuf, float* const* outbuf, float* const dummybuf,
-    size_t numSamples)
+    size_t numSamples, const RealtimeEffects::ProcessingTime* time, bool rawLatency, bool probe)
 {
     const auto pInstance = mwInstance.lock();
-    const auto& pair = mGroups[group];
+    const auto found = mGroups.find(group);
+    if (!mInitialized || found == mGroups.end()) {
+        // A native plug-in can refuse the current format while its editor is
+        // still open. Leave the samples dry; never process that UI instance.
+        for (size_t channel = 0; channel < chans; ++channel) std::copy_n(inbuf[channel], numSamples, outbuf[channel]);
+        return 0;
+    }
+    struct RestoreProbe {
+        EffectInstance* instance;
+        bool active;
+        ~RestoreProbe() { if (instance) { instance->RealtimeSuspend(); if (active) instance->RealtimeResume(); } }
+    } restore { probe ? pInstance.get() : nullptr, mLastActive };
+    if (probe && pInstance) {
+        pInstance->RealtimeResume();
+        EffectInstance::MessagePackage package { mWorkerSettings.settings, nullptr };
+        pInstance->RealtimeProcessStart(package);
+    }
+    const auto automation = time ? std::atomic_load_explicit(&mProcessingAutomation, std::memory_order_acquire) : nullptr;
+    const auto& pair = found->second;
+    RawDelay* delay = rawLatency ? &mRawDelays[group] : nullptr;
+    // Probes run on the disk worker or on main with monitoring detached. A
+    // device callback only requests this rebuild; it never resizes histories.
+    if (probe && delay && pInstance && delay->revision != pInstance->RealtimeLatencyRevision()) delay->ready = false;
+    const bool delayReady = delay && delay->ready;
+    const auto dry = [&](bool produce) {
+        if (!delay || !delay->latency) {
+            if (produce) for (size_t channel = 0; channel < chans; ++channel) std::copy_n(inbuf[channel], numSamples, outbuf[channel]);
+            return;
+        }
+        for (size_t frame = 0; frame < numSamples; ++frame) {
+            for (size_t channel = 0; channel < chans; ++channel) {
+                const auto source = inbuf[channel][frame];
+                if (produce) outbuf[channel][frame] = delay->history[channel][delay->position];
+                delay->history[channel][delay->position] = source;
+            }
+            if (++delay->position == delay->latency) delay->position = 0;
+        }
+    };
+    if (delayReady && (mLastActive || probe)) dry(false);
     const float** const clientIn
         =pInstance ? stackAllocate(const float*, pInstance->GetAudioInCount())
           : nullptr;
@@ -639,11 +747,9 @@ size_t RealtimeEffectState::Process(
         }
     };
 
-    if (!mPlugin || !pInstance || !mLastActive) {
+    if (!mPlugin || !pInstance || (!mLastActive && !probe)) {
         // Process trivially
-        for (size_t ii = 0; ii < chans; ++ii) {
-            memcpy(outbuf[ii], inbuf[ii], numSamples * sizeof(float));
-        }
+        dry(true);
         if (pInstance) {
             auto processor = pair.first;
             const auto numAudioIn = pInstance->GetAudioInCount();
@@ -674,6 +780,7 @@ size_t RealtimeEffectState::Process(
     const auto numAudioOut = pInstance->GetAudioOutCount();
     const auto clientOut = stackAllocate(float*, numAudioOut);
     size_t len = 0;
+    size_t rawMissing = 0;
     auto processor = pair.first;
     // Outer loop over processors
     AllocateChannelsToProcessors(
@@ -689,17 +796,56 @@ size_t RealtimeEffectState::Process(
         }
 
         // Inner loop over blocks
+        size_t processorMissing = 0;
         const auto blockSize = pInstance->GetBlockSize();
         for (size_t block = 0; block < numSamples; block += blockSize) {
             auto cnt = std::min(numSamples - block, blockSize);
+            if (time) {
+                auto context = time->ContextAt(static_cast<int64_t>(block));
+                context.sampleRate = pair.second;
+                pInstance->SetRealtimeProcessingContext(processor, context);
+            }
+            if (automation) {
+                const auto position = time->TimeAt(static_cast<int64_t>(block));
+                automation->BeforeProcessStart(position);
+                // The outer processing scope already consumed GUI messages.
+                // Refresh cached coefficients without consuming a message twice.
+                EffectInstance::MessagePackage package { mWorkerSettings.settings, nullptr };
+                pInstance->RealtimeProcessStart(package);
+                automation->AfterProcessStart(position);
+            }
             // Assuming we are in a processing scope, use the worker settings
             auto processed = pInstance->RealtimeProcess(
                 processor, mWorkerSettings.settings, clientIn, clientOut, cnt);
+            if (probe) {
+                // A fixed-block adapter may need several small device slices
+                // before the plug-in runs and publishes its latency port. Warm
+                // a complete block before reading it, then RestoreProbe resets
+                // the processor. Reuse these bounded silent buffers.
+                for (size_t warmed = cnt; warmed < blockSize; warmed += cnt) {
+                    pInstance->RealtimeProcess(processor, mWorkerSettings.settings, clientIn, clientOut,
+                                               std::min(cnt, blockSize - warmed));
+                }
+            }
+            if (rawLatency) {
+                processed = std::min(processed, cnt);
+                processorMissing += cnt - processed;
+                for (size_t channel = 0; channel < numAudioOut; ++channel) {
+                    std::fill(clientOut[channel] + processed, clientOut[channel] + cnt, 0.0f);
+                }
+            }
             if (!mLatency) {
                 // Find latency once only per initialization scope,
                 // after processing one block
                 mLatency.emplace(
                     pInstance->GetLatency(mWorkerSettings.settings, pair.second));
+            }
+            if (delay && !delay->ready) {
+                delay->latency = static_cast<size_t>(pInstance->GetLatency(mWorkerSettings.settings, pair.second));
+                delay->history.assign(chans, std::vector<float>(delay->latency));
+                delay->position = 0;
+                delay->revision = pInstance->RealtimeLatencyRevision();
+                delay->ready = true;
             }
             for (size_t i = 0; i < numAudioIn; i++) {
                 if (clientIn[i]) {
@@ -714,24 +860,26 @@ size_t RealtimeEffectState::Process(
             if (ondx == 0) {
                 // For the first processor only
                 len += processed;
-                auto discard = limitSampleBufferSize(len, *mLatency);
+                auto discard = rawLatency ? 0 : limitSampleBufferSize(len, *mLatency);
                 len -= discard;
                 *mLatency -= discard;
             }
         }
+        rawMissing = std::max(rawMissing, processorMissing);
         ++processor;
         return true;
     });
+    if (delay && !delayReady) dry(false);
     // Report the number discardable during the processing scope
     // We are assuming len as calculated above is the same in case of multiple
     // processors
-    return numSamples - len;
+    return rawLatency ? rawMissing : numSamples - len;
 }
 
 bool RealtimeEffectState::ProcessEnd()
 {
     auto pInstance = mwInstance.lock();
-    bool result = pInstance
+    bool result = mInitialized && pInstance
                   &&// Assuming we are in a processing scope, use the worker settings
                   pInstance->RealtimeProcessEnd(mWorkerSettings.settings)
                   && IsActive() && mLastActive;
@@ -748,6 +896,46 @@ bool RealtimeEffectState::ProcessEnd()
     return result;
 }
 
+void RealtimeEffectState::RefreshProcessingAutomation()
+{
+    std::erase_if(mRetiredAutomation, [](const auto& item) { return item.use_count() == 1; });
+    std::shared_ptr<ProcessingAutomation> next;
+    if (const auto instance = mwInstance.lock(); mInitialized && mPlugin && instance) {
+        next = AutomationFactory::Call(*mPlugin, *instance, mWorkerSettings.settings, mAutomation, mProcessingRate);
+    }
+    if (auto previous = std::atomic_exchange_explicit(&mProcessingAutomation, std::move(next), std::memory_order_acq_rel)) {
+        mRetiredAutomation.push_back(std::move(previous));
+    }
+}
+
+uint64_t RealtimeEffectState::ProcessingLatencyRevision() const
+{
+    const auto instance = mwInstance.lock();
+    return instance ? instance->RealtimeLatencyRevision() : 0;
+}
+
+bool RealtimeEffectState::LatencyUpdatePending() const
+{
+    const auto instance = mwInstance.lock();
+    return mInitialized && instance && instance->RealtimeLatencyUpdatePending();
+}
+
+bool RealtimeEffectState::RefreshRealtimeLatency()
+{
+    const auto instance = mwInstance.lock();
+    return mInitialized && instance && instance->RefreshRealtimeLatency();
+}
+
+size_t RealtimeEffectState::ProcessingLatency(const ChannelGroup* group) const
+{
+    const auto delay = mRawDelays.find(group);
+    if (delay != mRawDelays.end() && delay->second.ready) return delay->second.latency;
+    const auto instance = mwInstance.lock();
+    const auto found = mGroups.find(group);
+    return instance && found != mGroups.end()
+        ? static_cast<size_t>(instance->GetLatency(mWorkerSettings.settings, found->second.second)) : 0;
+}
+
 bool RealtimeEffectState::IsEnabled() const noexcept
 {
     return mMainSettings.settings.extra.GetActive();
@@ -760,12 +948,18 @@ bool RealtimeEffectState::IsActive() const noexcept
 
 void RealtimeEffectState::SetActive(bool active)
 {
-    auto access = GetAccess();
-    access->ModifySettings([&](EffectSettings& settings) {
-        settings.extra.SetActive(active);
-        return nullptr;
-    });
-    access->Flush();
+    if (!mPlugin) {
+        // There is no processing thread or functional settings access for a
+        // missing plugin. Bypass still belongs to the document.
+        mMainSettings.settings.extra.SetActive(active);
+    } else {
+        auto access = GetAccess();
+        access->ModifySettings([&](EffectSettings& settings) {
+            settings.extra.SetActive(active);
+            return nullptr;
+        });
+        access->Flush();
+    }
 
     Publish(active
             ? RealtimeEffectStateChange::EffectOn
@@ -774,6 +968,9 @@ void RealtimeEffectState::SetActive(bool active)
 
 bool RealtimeEffectState::Finalize() noexcept
 {
+    std::atomic_store_explicit(&mProcessingAutomation, std::shared_ptr<ProcessingAutomation> {}, std::memory_order_release);
+    mRetiredAutomation.clear();
+    mRawDelays.clear();
     mGroups.clear();
     mCurrentProcessor = 0;
 
@@ -855,6 +1052,7 @@ bool RealtimeEffectState::HandleXMLTag(
     const std::string_view& tag, const AttributesList& attrs)
 {
     if (tag == XMLTag()) {
+        mAutomation.Clear();
         mParameters.clear();
         mPlugin = nullptr;
         mID.clear();
@@ -883,7 +1081,7 @@ bool RealtimeEffectState::HandleXMLTag(
                 v = value.ToWString();
             }
         }
-        mParameters += wxString::Format(wxT("\"%s=%s\" "), n, v);
+        mParameters.emplace_back(std::move(n), std::move(v));
         return true;
     } else {
         return false;
@@ -893,16 +1091,17 @@ bool RealtimeEffectState::HandleXMLTag(
 void RealtimeEffectState::HandleXMLEndTag(const std::string_view& tag)
 {
     if (tag == XMLTag()) {
-        if (mPlugin && !mParameters.empty()) {
-            CommandParameters parms(mParameters);
-            mPlugin->LoadSettings(parms, mMainSettings.settings);
+        if (!mParameters.empty() && LoadParameters(mMainSettings.settings)) {
+            mParameters.clear();
         }
-        mParameters.clear();
     }
 }
 
 XMLTagHandler* RealtimeEffectState::HandleXMLChild(const std::string_view& tag)
 {
+    if (tag == AutomationData::XMLTag) {
+        return &mAutomation;
+    }
     // Tag may be for the state, or the list of parameters, or for one parameter.
     // See the writing method below.  All are handled by this
     return this;
@@ -911,33 +1110,23 @@ XMLTagHandler* RealtimeEffectState::HandleXMLChild(const std::string_view& tag)
 void RealtimeEffectState::WriteXML(XMLWriter& xmlFile)
 {
     xmlFile.StartTag(XMLTag());
-    const auto active = mMainSettings.settings.extra.GetActive();
+    const auto active = SnapshotSettings().extra.GetActive();
     xmlFile.WriteAttr(activeAttribute, active);
     xmlFile.WriteAttr(idAttribute, mID);
 
-    CommandParameters cmdParms;
-    if (mPlugin && mPlugin->SaveSettings(mMainSettings.settings, cmdParms)) {
+    const auto parameters = SnapshotParameters();
+    if (!parameters.empty()) {
         xmlFile.StartTag(parametersAttribute);
-
-        wxString entryName;
-        long entryIndex;
-        bool entryKeepGoing;
-
-        entryKeepGoing = cmdParms.GetFirstEntry(entryName, entryIndex);
-        while (entryKeepGoing) {
-            wxString entryValue = cmdParms.Read(entryName, "");
-
+        for (const auto& [name, value] : parameters) {
             xmlFile.StartTag(parameterAttribute);
-            xmlFile.WriteAttr(nameAttribute, entryName);
-            xmlFile.WriteAttr(valueAttribute, entryValue);
+            xmlFile.WriteAttr(nameAttribute, name);
+            xmlFile.WriteAttr(valueAttribute, value);
             xmlFile.EndTag(parameterAttribute);
-
-            entryKeepGoing = cmdParms.GetNextEntry(entryName, entryIndex);
         }
-
         xmlFile.EndTag(parametersAttribute);
     }
 
+    mAutomation.WriteXML(xmlFile);
     xmlFile.EndTag(XMLTag());
 }
 

@@ -10,6 +10,8 @@ set(_self_dir "${CMAKE_CURRENT_LIST_DIR}")
 get_filename_component(_root "${_self_dir}/../.." ABSOLUTE)
 set(EXTDEPS_DIR "${_root}/muse_deps")
 
+include("${_self_dir}/ApplyNativeMidiPatches.cmake")
+
 include("${EXTDEPS_DIR}/buildtools/build_dependency.cmake")
 
 if (EXTDEPS_CACHE)

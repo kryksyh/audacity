@@ -124,6 +124,11 @@ TranslatableString AudioUnitEffectBase::GetDescription() const
 
 EffectType AudioUnitEffectBase::GetType() const
 {
+    AudioComponentDescription description {};
+    if (AudioComponentGetDescription(GetComponent(), &description) == noErr
+        && description.componentType == kAudioUnitType_MusicDevice) {
+        return EffectTypeInstrument;
+    }
     if (mAudioIns == 0 && mAudioOuts == 0) {
         return EffectTypeNone;
     }
@@ -566,6 +571,13 @@ TranslatableString AudioUnitEffectBase::Import(
 
 void AudioUnitEffectBase::GetChannelCounts()
 {
+    AudioComponentDescription description {};
+    if (AudioComponentGetDescription(GetComponent(), &description) == noErr
+        && description.componentType == kAudioUnitType_MusicDevice) {
+        mAudioIns = 0;
+        mAudioOuts = 2;
+        return;
+    }
     // Does AU have channel info
     PackedArray::Ptr<AUChannelInfo> info;
     if (GetVariableSizeProperty(kAudioUnitProperty_SupportedNumChannels, info)) {

@@ -104,6 +104,7 @@ struct LV2_API LV2AtomPortState final {
      In addition, reset the output Atom ports.
     */
     void SendToInstance(LV2_Atom_Forge& forge, int64_t frameTime, float speed);
+    void UpdatePosition(LV2_Atom_Forge& forge, const EffectProcessingContext& context);
     void ResetForInstanceOutput();
 
     //! Take responses from the instance and send cross-thread for the dialog

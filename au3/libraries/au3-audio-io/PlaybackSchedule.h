@@ -17,6 +17,7 @@
 #include "au3-utility/Observer.h"
 #include <atomic>
 #include <chrono>
+#include <span>
 #include <vector>
 
 class AudacityProject;
@@ -150,12 +151,15 @@ public:
     //! @section To be removed
 
     virtual bool Looping(const PlaybackSchedule& schedule) const;
+    // Effective worker-thread loop region, in project seconds.
+    virtual std::pair<double, double> LoopBounds(const PlaybackSchedule& schedule) const;
 
 protected:
     double mRate = 0;
 };
 
 struct AUDIO_IO_API PlaybackSchedule {
+    std::atomic<bool> mInteractiveInput { false };
     /// Playback starts at offset of mT0, which is measured in seconds.
     double mT0;
     /// Playback ends at offset of mT1, which is measured in seconds.  Note that mT1 may be less than mT0 during scrubbing.
@@ -218,7 +222,15 @@ struct AUDIO_IO_API PlaybackSchedule {
         //! @section Called by the AudioIO::SequenceBufferExchange thread
 
         //! Enqueue track time value advanced by the slice according to `schedule`'s PlaybackPolicy
-        void Producer(PlaybackSchedule& schedule, PlaybackSlice slice);
+        void Producer(PlaybackSchedule& schedule, PlaybackSlice slice, double* sampleTimes = nullptr);
+
+        //! Advance the input policy without publishing timestamps for audio
+        //! which may still be inside an effect's compensation pre-roll.
+        //! The span contains one boundary more than the slice's frame count.
+        void GenerateTimes(PlaybackSchedule& schedule, PlaybackSlice slice, std::span<double> boundaries);
+        //! Publish only the times corresponding to audio actually enqueued.
+        //! The final entry is the boundary after the last audible sample.
+        void PublishTimes(std::span<const double> boundaries);
 
         //! Return the last time saved by Producer
         double GetLastTime() const;
@@ -238,6 +250,7 @@ struct AUDIO_IO_API PlaybackSchedule {
 
     private:
         double mLastTime {};
+        size_t mGeneratedOffset = 0;
 
         ///Wraps circular buffer that stores time points bound to a specific samples
         ///at constant rate (TimeQueueGrainSize). Ideally there should be
@@ -271,6 +284,8 @@ struct AUDIO_IO_API PlaybackSchedule {
 
         Node* mConsumerNode {};
         Node* mProducerNode {};
+
+        void AdvanceTail(Node*& node, int& tail, int& head, double time);
 
         ///When node's buffer becomes full consumer will pick up a new one from the
         ///pool, which also will be linked to the previous node, so that producer could

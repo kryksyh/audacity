@@ -55,6 +55,7 @@ typedef float PxBalance; /* -1.0 (left) --> 1.0 (right) */
 /*
  Px_OpenMixer() returns a mixer which will work with the given PortAudio
  audio device.  Pass 0 as the index for the first (default) mixer.
+ On CoreAudio, pa_stream may be NULL to query devices without opening I/O.
 */
 
 PxMixer* Px_OpenMixer(PaStream* pa_stream, PaDeviceIndex inputDeviceIndex, PaDeviceIndex outputDeviceIndex, int i);

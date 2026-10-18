@@ -1,4 +1,5 @@
 #pragma once
+#include <atomic>
 
 #include <public.sdk/source/vst/utility/uid.h>
 
@@ -33,12 +34,18 @@ class VST3_API VST3Instance : public PerTrackEffect::Instance
     size_t mUserBlockSize { 8192 };
     size_t mProcessingBlockSize { 8192 };
     bool mUseLatency { true };
-    sampleCount mInitialDelay { 0 };
+    std::atomic<uint64_t> mLatencyRevision { 0 };
 
     bool mRecruited{ false };
     std::vector<std::unique_ptr<VST3Instance> > mProcessors;
 
 public:
+    uint64_t RealtimeLatencyRevision() const noexcept override { return mLatencyRevision.load(std::memory_order_acquire); }
+    bool RealtimeLatencyUpdatePending() const noexcept override;
+    bool RefreshRealtimeLatency() override;
+    bool LatencyRefreshRequiresMainThread() const noexcept override { return mUseLatency; }
+    SampleCount GetReportedLatency(const EffectSettings& settings, double sampleRate) const override;
+    void SetRealtimeProcessingContext(size_t group, const EffectProcessingContext& context) override;
     VST3Instance(const PerTrackEffect& effect, VST3::Hosting::Module& module, const VST3::Hosting::ClassInfo& effectClassInfo);
     ~VST3Instance() override;
 
@@ -64,6 +71,7 @@ public:
     size_t ProcessBlock(EffectSettings& settings, const float* const* inBlock, float* const* outBlock, size_t blockLen) override;
 
     VST3Wrapper& GetWrapper();
+    void QueueRealtimeParameterChange(Steinberg::uint32 id, double value);
 
     unsigned GetAudioOutCount() const override;
     unsigned GetAudioInCount() const override;

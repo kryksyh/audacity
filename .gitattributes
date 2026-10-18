@@ -12,3 +12,6 @@
 *.ttl text=auto
 *.aps text=auto
 *.trig text=auto
+
+# Unified patches contain intentional context lines consisting of one space.
+buildscripts/patches/*.patch whitespace=-blank-at-eol

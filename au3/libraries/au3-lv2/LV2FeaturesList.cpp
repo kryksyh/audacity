@@ -82,7 +82,6 @@ bool LV2FeaturesList::InitializeFeatures()
    AddFeature(LV2_UI__idleInterface, nullptr);
    AddFeature(LV2_UI__makeResident, nullptr);
    AddFeature(LV2_BUF_SIZE__boundedBlockLength, nullptr);
-   AddFeature(LV2_BUF_SIZE__fixedBlockLength, nullptr);
    AddFeature(LV2_URI_MAP_URI, &mUriMapFeature);
    AddFeature(LV2_URID__map, &mURIDMapFeature);
    AddFeature(LV2_URID__unmap, &mURIDUnmapFeature);

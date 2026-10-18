@@ -1,0 +1,65 @@
+diff --git a/recipes/portaudio/patch/0003-coreaudio-device-id-query.patch b/recipes/portaudio/patch/0003-coreaudio-device-id-query.patch
+new file mode 100644
+index 0000000..09d3448
+--- /dev/null
++++ b/recipes/portaudio/patch/0003-coreaudio-device-id-query.patch
+@@ -0,0 +1,46 @@
++Expose the native device identity for metadata and mixer queries without
++opening a capture stream. PortAudio global/host indices are validated by the
++same conversion used by PaMacCore_GetBufferSizeRange.
++
++--- a/include/pa_mac_core.h
+++++ b/include/pa_mac_core.h
++@@ -107,6 +107,15 @@
++  * @return A valid AudioDeviceID, or NULL if an error occurred.
++  */
++ AudioDeviceID PaMacCore_GetStreamOutputDevice( PaStream* s );
+++
+++/** Retrieve a CoreAudio device ID without opening a stream.
+++ *
+++ * @param device A global PortAudio device index.
+++ * @return The AudioDeviceID, or kAudioDeviceUnknown for an invalid index or
+++ *         when PortAudio is not initialized. Valid until device re-enumeration.
+++ */
+++AudioDeviceID PaMacCore_GetDeviceID( PaDeviceIndex device );
+++
++ 
++ /**
++  * Returns a statically allocated string with the device's name
++--- a/src/hostapi/coreaudio/pa_mac_core.c
+++++ b/src/hostapi/coreaudio/pa_mac_core.c
++@@ -203,6 +203,21 @@
++ }
++ 
++ 
+++/* Allow device-property and mixer queries without opening capture I/O. */
+++AudioDeviceID PaMacCore_GetDeviceID( PaDeviceIndex device )
+++{
+++    PaUtilHostApiRepresentation *hostApi;
+++    PaDeviceIndex hostApiDeviceIndex;
+++    PaError result = PaUtil_GetHostApiRepresentation( &hostApi, paCoreAudio );
+++    if( result != paNoError )
+++        return kAudioDeviceUnknown;
+++    result = PaUtil_DeviceIndexToHostApiDeviceIndex( &hostApiDeviceIndex, device, hostApi );
+++    if( result != paNoError )
+++        return kAudioDeviceUnknown;
+++    return ((PaMacAUHAL*)hostApi)->devIds[hostApiDeviceIndex];
+++}
+++
+++
++ PaError PaMacCore_GetBufferSizeRange( PaDeviceIndex device,
++                                       long *minBufferSizeFrames, long *maxBufferSizeFrames )
++ {
+diff --git a/recipes/portaudio/spec.cmake b/recipes/portaudio/spec.cmake
+index 1568dbb..e4933ba 100644
+--- a/recipes/portaudio/spec.cmake
++++ b/recipes/portaudio/spec.cmake
+@@ -19,4 +19,8 @@ set(DEP_PATCHES_WINDOWS
+     patch/0002-asio-lazy-device-enumeration.patch
+ )
+ 
++set(DEP_PATCHES_MACOS
++    patch/0003-coreaudio-device-id-query.patch
++)
++
+ set(DEP_LICENSE_FILES LICENSE.txt)

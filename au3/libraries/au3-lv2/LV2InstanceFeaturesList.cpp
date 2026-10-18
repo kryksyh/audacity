@@ -12,7 +12,58 @@
 **********************************************************************/
 
 #include "LV2InstanceFeaturesList.h"
+#include "LV2Ports.h"
+#include "au3-utility/MemoryX.h"
+#include <cstdlib>
+#include <cstring>
+#include <filesystem>
+#include <stdexcept>
+#include <wx/filename.h>
 #include <wx/log.h>
+#include <lv2/buf-size/buf-size.h>
+#include <lv2/state/state.h>
+
+// Discovery validates instruments through the original LV2 wrapper too. Keep
+// their makePath storage alive for that wrapper's entire lifetime, so required
+// state features accepted by native instrument playback are also discoverable.
+struct LV2InstanceFeaturesList::StatePaths {
+   StatePaths()
+   {
+      const auto lease = wxFileName::CreateTempFileName(wxT("audacity-lv2-"));
+      if (lease.empty()) throw std::runtime_error("Could not create LV2 instrument storage.");
+      const auto cleanup = finally([&] { wxRemoveFile(lease); });
+      const auto directory = lease + wxT(".d");
+      root = std::filesystem::u8path(directory.utf8_string());
+      if (!wxFileName::Mkdir(directory, 0700)) throw std::runtime_error("Could not create LV2 instrument storage.");
+   }
+   ~StatePaths()
+   {
+      std::error_code error;
+      std::filesystem::remove_all(root, error);
+   }
+   static char* makePath(LV2_State_Make_Path_Handle handle, const char* relative) noexcept
+   {
+      if (!relative) return nullptr;
+      try {
+         const auto path = std::filesystem::u8path(relative).lexically_normal();
+         if (path.has_root_path() || (!path.empty() && *path.begin() == "..")) return nullptr;
+         const auto target = static_cast<StatePaths*>(handle)->root / path;
+         std::error_code error;
+         std::filesystem::create_directories(target.parent_path(), error);
+         if (error) return nullptr;
+         const auto bytes = target.u8string();
+         auto* copy = static_cast<char*>(std::malloc(bytes.size() + 1));
+         if (copy) std::memcpy(copy, bytes.c_str(), bytes.size() + 1);
+         return copy;
+      }
+      catch (...) { return nullptr; }
+   }
+   static void freePath(LV2_State_Free_Path_Handle, char* path) noexcept { std::free(path); }
+
+   std::filesystem::path root;
+   LV2_State_Make_Path make { this, makePath };
+   LV2_State_Free_Path free { this, freePath };
+};
 
 LV2InstanceFeaturesList::LV2InstanceFeaturesList(
    const LV2FeaturesList &baseFeatures
@@ -20,21 +71,49 @@ LV2InstanceFeaturesList::LV2InstanceFeaturesList(
    , mOk{ InitializeOptions() }
 {
    AddFeature(LV2_OPTIONS__options, mOptions.data());
+   InitializeStatePaths();
+}
+
+LV2InstanceFeaturesList::~LV2InstanceFeaturesList() = default;
+
+void LV2InstanceFeaturesList::InitializeStatePaths()
+{
+   const auto features = mBaseFeatures.GetFeaturePointers();
+   if (std::any_of(features.begin(), features.end(), [](const auto* feature) {
+      return feature && !std::strcmp(feature->URI, LV2_STATE__makePath);
+   })) return; // Native playback already supplies its archived resource owner.
+
+   const LilvNodePtr make { lilv_new_uri(LV2Symbols::gWorld, LV2_STATE__makePath) };
+   const LilvNodePtr free { lilv_new_uri(LV2Symbols::gWorld, LV2_STATE__freePath) };
+   if (!lilv_plugin_has_feature(&mPlug, make.get()) && !lilv_plugin_has_feature(&mPlug, free.get())) return;
+   const LV2Ports ports { mPlug };
+   if (!ports.mMidiIn || !ports.mAudioOut) return;
+
+   mStatePaths = std::make_unique<StatePaths>();
+   AddFeature(LV2_STATE__makePath, &mStatePaths->make);
+   AddFeature(LV2_STATE__freePath, &mStatePaths->free);
 }
 
 bool LV2InstanceFeaturesList::InitializeOptions()
 {
    using namespace LV2Symbols;
 
+   const LilvNodePtr fixed{ lilv_new_uri(gWorld, LV2_BUF_SIZE__fixedBlockLength) };
+   const LilvNodePtr power{ lilv_new_uri(gWorld, LV2_BUF_SIZE__powerOf2BlockLength) };
+   mPowerOf2BlockLength = lilv_plugin_has_feature(&mPlug, power.get());
+   mFixedBlockLength = mPowerOf2BlockLength || lilv_plugin_has_feature(&mPlug, fixed.get());
+   if (mFixedBlockLength) AddFeature(LV2_BUF_SIZE__fixedBlockLength, nullptr);
+   if (mPowerOf2BlockLength) AddFeature(LV2_BUF_SIZE__powerOf2BlockLength, nullptr);
+
    // Construct the null-terminated array describing options, and validate it
    AddOption(urid_SequenceSize, sizeof(mSeqSize), urid_Int, &mSeqSize);
    AddOption(urid_MinBlockLength,
-      sizeof(mMinBlockSize), urid_Int, &mMinBlockSize);
+      sizeof(mMinimumOption), urid_Int, &mMinimumOption);
    AddOption(urid_MaxBlockLength,
-      sizeof(mMaxBlockSize), urid_Int, &mMaxBlockSize);
+      sizeof(mMaximumOption), urid_Int, &mMaximumOption);
    // Two options are reset later
    mBlockSizeOption = AddOption(urid_NominalBlockLength,
-      sizeof(mBlockSize), urid_Int, &mBlockSize);
+      sizeof(mNominalOption), urid_Int, &mNominalOption);
    AddOption(urid_SampleRate,
       sizeof(mSampleRate), urid_Float, &mSampleRate);
    AddOption(0, 0, 0, nullptr);
@@ -61,8 +140,16 @@ bool LV2InstanceFeaturesList::InitializeOptions()
          mMaxBlockSize = std::min<size_t>(mMaxBlockSize, value);
    }
    mMaxBlockSize = std::max(mMaxBlockSize, mMinBlockSize);
+   UpdateBlockSizeOptions();
 
    return true;
+}
+
+void LV2InstanceFeaturesList::UpdateBlockSizeOptions()
+{
+   mMinimumOption = static_cast<int32_t>(mFixedBlockLength ? mBlockSize : mMinBlockSize);
+   mMaximumOption = static_cast<int32_t>(mFixedBlockLength ? mBlockSize : mMaxBlockSize);
+   mNominalOption = static_cast<int32_t>(mBlockSize);
 }
 
 size_t LV2InstanceFeaturesList::AddOption(
@@ -132,6 +219,7 @@ LV2WrapperFeaturesList::LV2WrapperFeaturesList(
 ) : ExtendedLV2FeaturesList{ WithBase, baseFeatures }
 {
    baseFeatures.mSampleRate = sampleRate;
+   baseFeatures.UpdateBlockSizeOptions();
    auto &base = baseFeatures.Base();
    if (base.SuppliesWorkerInterface()) {
       // Inform the plugin how to send work to another thread

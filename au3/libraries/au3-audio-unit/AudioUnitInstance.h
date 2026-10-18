@@ -21,6 +21,13 @@ struct AudioUnitEvent;
 class AudioUnitInstance : public PerTrackEffect::Instance, public AudioUnitWrapper
 {
 public:
+    uint64_t RealtimeLatencyRevision() const noexcept override { return mLatencyRevision.load(std::memory_order_acquire); }
+    bool RealtimeLatencyUpdatePending() const noexcept override;
+    bool RefreshRealtimeLatency() override;
+    bool LatencyRefreshRequiresMainThread() const noexcept override { return mUseLatency; }
+    SampleCount GetReportedLatency(const EffectSettings& settings, double sampleRate) const override;
+    void SetRealtimeProcessingContext(size_t group, const EffectProcessingContext& context) override;
+    void SetRealtimeParameter(AudioUnitParameterID id, AudioUnitParameterValue value);
     using Instance::mProcessor;
 
     AudioUnitInstance(const PerTrackEffect& effect, AudioComponent component, Parameters& parameters, const wxString& identifier,
@@ -78,6 +85,20 @@ private:
     bool BypassEffect(bool bypass);
 
 private:
+    struct LatencyListenerState { std::atomic<bool> pending { false }; };
+    static void LatencyPropertyChanged(void*, AudioUnit, AudioUnitPropertyID, AudioUnitScope, AudioUnitElement);
+    bool UpdateCachedLatency();
+    std::shared_ptr<LatencyListenerState> mLatencyListener = std::make_shared<LatencyListenerState>();
+    bool mLatencyListenerInstalled = false;
+    std::atomic<double> mCachedLatencySeconds { 0.0 };
+    std::atomic<uint64_t> mLatencyRevision { 0 };
+    static OSStatus BeatAndTempo(void*, Float64*, Float64*);
+    static OSStatus MusicalTime(void*, UInt32*, Float32*, UInt32*, Float64*);
+    static OSStatus TransportState(void*, Boolean*, Boolean*, Float64*, Boolean*, Float64*, Float64*);
+    EffectProcessingContext mTransport;
+    double mNextTransportTime = 0.0;
+    bool mHaveTransport = false;
+    bool mTransportChanged = true;
     //! Whether the master instance is now allocated to a group number
     bool mRecruited{ false };
     std::vector<std::unique_ptr<AudioUnitInstance> > mSlaves;

@@ -68,6 +68,10 @@ EffectType VST3EffectBase::GetType() const
     }
     const auto& cats = mEffectClassInfo->subCategories();
 
+    if (std::find(cats.begin(), cats.end(), kInstrument) != cats.end()) {
+        return EffectTypeInstrument;
+    }
+
     if (std::find(cats.begin(), cats.end(), kFx) != cats.end()) {
         return EffectTypeProcess;
     }

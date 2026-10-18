@@ -6,6 +6,7 @@ and application of effect transformations to buffers of samples.
 set( TARGET au3-realtime-effects )
 
 set( SOURCES
+   RealtimeProcessingTime.h
    RealtimeEffectList.cpp
    RealtimeEffectList.h
    RealtimeEffectManager.cpp
@@ -17,6 +18,7 @@ set( SOURCES
 )
 set( LIBRARIES
 PUBLIC
+   au3-automation-data
    au3-components
    au3-registries
    au3-utility

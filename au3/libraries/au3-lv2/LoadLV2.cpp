@@ -162,9 +162,8 @@ void LV2EffectsModule::AutoRegisterPlugins(PluginManagerInterface& pluginManager
     }
     alreadyLoaded = true;
 
-    //Plugins aren't registered in PluginManager here, but
-    //instead we update `LV2_PATH` and run `lilv_world_load_all`
-    //to register bundles within LV2 module.
+    // Plugins aren't registered in PluginManager here. Configure the world's
+    // search path and load its bundles without changing the process environment.
 
     wxString newVar;
 
@@ -229,7 +228,11 @@ void LV2EffectsModule::AutoRegisterPlugins(PluginManagerInterface& pluginManager
         pathVar += newVar;
     }
 
-    wxSetEnv(wxT("LV2_PATH"), pathVar);
+    // MIDI device discovery can read the environment concurrently. Mutating
+    // environ here races those readers, so keep host-specific paths in Lilv.
+    const auto encodedPath = pathVar.ToUTF8();
+    const LilvNodePtr searchPath{ lilv_new_string(LV2Symbols::gWorld, encodedPath.data()) };
+    lilv_world_set_option(LV2Symbols::gWorld, LILV_OPTION_LV2_PATH, searchPath.get());
     lilv_world_load_all(LV2Symbols::gWorld);
 }
 
@@ -259,7 +262,7 @@ PluginPaths LV2EffectsModule::FindModulePaths(PluginManagerInterface&,
                 uriDisplay = wxT("\u2026") + uriDisplay.Mid(uriDisplay.length() - (kMaxProgressLen - 1));
             }
             const auto result = progress->Poll(visited, total,
-                                               XO("Looking in: %s").Format(uriDisplay));
+                                               XO("Looking in: %1").arg(uriDisplay));
             if (result == BasicUI::ProgressResult::Cancelled) {
                 break;
             }
@@ -267,9 +270,7 @@ PluginPaths LV2EffectsModule::FindModulePaths(PluginManagerInterface&,
         ++visited;
 
         using namespace LV2Symbols;
-        if (lilv_node_equals(cls, node_InstrumentPlugin)
-            || lilv_node_equals(cls, node_MIDIPlugin)
-            || lilv_node_equals(cls, node_MathConstants)
+        if (lilv_node_equals(cls, node_MathConstants)
             || lilv_node_equals(cls, node_MathFunctions)) {
             wxLogInfo(wxT("LV2 plugin '%s' has unsupported type '%s'"), pluginUri,
                       lilv_node_as_string(cls));

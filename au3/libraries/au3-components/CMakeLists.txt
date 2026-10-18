@@ -18,6 +18,7 @@ set( SOURCES
    EffectAutomationParameters.h
    EffectInterface.cpp
    EffectInterface.h
+   EffectProcessingContext.h
    PluginProvider.cpp
    PluginProvider.h
    SettingsVisitor.cpp

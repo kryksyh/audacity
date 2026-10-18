@@ -73,6 +73,10 @@ wxString LV2EffectBase::GetVersion() const
 
 EffectType LV2EffectBase::GetType() const
 {
+    if (mPorts.mMidiIn > 0 && mPorts.mAudioOut > 0) {
+        return EffectTypeInstrument;
+    }
+
     if (mPorts.mAudioIn == 0 && mPorts.mAudioOut == 0) {
         return EffectTypeTool;
     }

@@ -20,6 +20,8 @@
 class AudacityProject;
 class TrackList;
 class WaveTrack;
+class MidiTrack;
+class PlayableTrack;
 
 template<typename TrackType> struct TrackIterRange;
 
@@ -46,6 +48,9 @@ class IMPORT_EXPORT_API ExportUtils final
 public:
 
     static TrackIterRange<const WaveTrack> FindExportWaveTracks(const TrackList& tracks, bool selectedOnly);
+
+    static TrackIterRange<const MidiTrack> FindExportMidiTracks(const TrackList& tracks, bool selectedOnly);
+    static TrackIterRange<const PlayableTrack> FindExportPlayableTracks(const TrackList& tracks, bool selectedOnly);
 
     static bool HasSelectedAudio(const AudacityProject& project);
 

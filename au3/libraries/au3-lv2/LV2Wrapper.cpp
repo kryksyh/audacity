@@ -47,6 +47,11 @@ std::unique_ptr<LV2Wrapper> LV2Wrapper::Create(
     wrapper->SendBlockSize();
     wrapper->ConnectPorts(ports, portStates, settings, pOutputs);
 
+    if (settings.mpState) {
+        const auto features = wrapper->GetFeatures().GetFeaturePointers();
+        lilv_state_restore(settings.mpState.get(), instance, nullptr, nullptr, 0, features.data());
+    }
+
     // Give plugin a chance to initialize.  The SWH plugins (like AllPass) need
     // this before it can be safely deleted.
     lilv_instance_activate(instance);
@@ -84,7 +89,15 @@ void LV2Wrapper::ConnectControlPorts(
                                : pValues ? &pValues->values[index]
                                : &blackHole
         ;
-        lilv_instance_connect_port(instance, port->mIndex, location);
+        // Keep latency in durable, per-instance storage; other output controls
+        // may share the fallback black hole when no UI outputs are requested.
+        if (static_cast<int>(port->mIndex) == latencyPort) {
+            auto* target = pValues ? &pValues->values[index] : &mLatency;
+            mLatencyValue = target;
+            lilv_instance_connect_port(instance, port->mIndex, target);
+        } else {
+            lilv_instance_connect_port(instance, port->mIndex, location);
+        }
         ++index;
     }
 }
@@ -188,7 +201,7 @@ LV2_Handle LV2Wrapper::GetHandle() const
 
 float LV2Wrapper::GetLatency() const
 {
-    return mLatency;
+    return *mLatencyValue;
 }
 
 // Where is this called?

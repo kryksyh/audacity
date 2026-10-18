@@ -45,6 +45,7 @@
 #include "ComponentInterface.h"
 #include "ComponentInterfaceSymbol.h"
 #include "EffectAutomationParameters.h"
+#include "EffectProcessingContext.h"
 
 #include "au3-utility/TypedAny.h"
 #include <cstdint>
@@ -67,6 +68,7 @@ typedef enum EffectType : int
     EffectTypeProcess,
     EffectTypeAnalyze,
     EffectTypeTool,
+    EffectTypeInstrument,
 } EffectType;
 
 enum class EffectGroup {
@@ -579,6 +581,10 @@ public:
      */
     virtual bool RealtimeProcessStart(MessagePackage& package);
 
+    // Called immediately before a processor's audio block, on its processing
+    // thread. Hosts must not consult the mutable project from plug-in callbacks.
+    virtual void SetRealtimeProcessingContext(size_t, const EffectProcessingContext&) {}
+
     /*!
      @return success
      Default implementation does nothing, returns 0
@@ -617,6 +623,19 @@ public:
      */
     virtual SampleCount GetLatency(
         const EffectSettings& settings, double sampleRate) const;
+
+    // Processing-safe change counter. Native hosts publish changes without
+    // asking the audio callback to query a UI-thread-only plug-in API.
+    virtual uint64_t RealtimeLatencyRevision() const noexcept { return 0; }
+    virtual bool RealtimeLatencyUpdatePending() const noexcept { return false; }
+    // Main thread only, with all processing of this instance stopped.
+    virtual bool RefreshRealtimeLatency() { return false; }
+    // Private offline processors may need to measure the completed block
+    // before a native restart changes the upcoming block's delay. Call only
+    // while quiescent, on the native control thread where required.
+    virtual SampleCount GetReportedLatency(const EffectSettings& settings, double sampleRate) const
+    { return GetLatency(settings, sampleRate); }
+    virtual bool LatencyRefreshRequiresMainThread() const noexcept { return false; }
 
     /*! If true (default result), then results require dither if later rendered
      to a narrower sample format */

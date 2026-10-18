@@ -34,6 +34,7 @@ class AudioIOBase;
 
 class AudacityProject;
 class AudioIOListener;
+class LiveAudioSource;
 class BoundedEnvelope;
 class Meter;
 using PRCrossfadeData = std::vector< std::vector < float > >;
@@ -62,6 +63,8 @@ struct AudioIOStartStreamOptions
 
     bool playNonWaveTracks{ true };
     bool inputMonitoring{ false };
+    bool interactivePlayback{ false };
+    std::shared_ptr<LiveAudioSource> liveOutput;
 
     // contents may get swapped with empty vector
     PRCrossfadeData* pCrossfadeData{};

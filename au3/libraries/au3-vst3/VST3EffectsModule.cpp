@@ -384,7 +384,8 @@ public:
         if (auto vst3effect = dynamic_cast<VST3EffectBase*>(&component)) {
             VST3Wrapper wrapper(
                 *vst3effect->mModule,
-                *vst3effect->mEffectClassInfo
+                *vst3effect->mEffectClassInfo,
+                vst3effect->GetType() == EffectTypeInstrument ? VST3Wrapper::Role::Instrument : VST3Wrapper::Role::Effect
                 );
             wrapper.InitializeComponents();
         } else {

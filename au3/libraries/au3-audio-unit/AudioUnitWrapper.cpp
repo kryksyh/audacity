@@ -277,14 +277,18 @@ bool AudioUnitWrapper::MoveSettingsContents(
 AudioUnitWrapper::~AudioUnitWrapper()
 {
     // Disposing a plug-in removes the run loop timers it registered on the
-    // thread that created it, so it has to happen on the main thread. The
-    // destructor itself can run on any thread, hence the dispatch; it is
-    // asynchronous so that an unresponsive out-of-process plug-in cannot
-    // block the caller.
+    // thread that created it, so it has to happen on the main thread. Finish
+    // immediately when already there: validation and application shutdown may
+    // exit before another queued block runs, leaving live units behind during
+    // plugin static destruction. Background owners still dispatch cleanup.
     if (AudioUnit unit = mUnit.release()) {
-        dispatch_async(dispatch_get_main_queue(), ^ {
+        if (CFRunLoopGetCurrent() == CFRunLoopGetMain()) {
             AudioComponentInstanceDispose(unit);
-        });
+        } else {
+            dispatch_async(dispatch_get_main_queue(), ^ {
+                AudioComponentInstanceDispose(unit);
+            });
+        }
     }
 }
 

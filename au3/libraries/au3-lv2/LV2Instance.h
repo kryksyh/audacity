@@ -18,12 +18,15 @@
 #include "LV2InstanceFeaturesList.h"
 #include "LV2Ports.h"
 #include "au3-effects/PerTrackEffect.h"
+#include <atomic>
 
 class LV2Wrapper;
 
 class LV2_API LV2Instance final : public PerTrackEffect::Instance
 {
 public:
+    uint64_t RealtimeLatencyRevision() const noexcept override { return mLatencyRevision.load(std::memory_order_acquire); }
+    void SetRealtimeProcessingContext(size_t group, const EffectProcessingContext& context) override;
     LV2Instance(const PerTrackEffect& effect, const LV2FeaturesList& features, const LV2Ports& ports);
     ~LV2Instance() override;
 
@@ -68,12 +71,16 @@ public:
     bool RealtimeProcessEnd(EffectSettings& settings) noexcept override;
 
 private:
+    struct FixedProcessor;
+    std::vector<std::unique_ptr<FixedProcessor>> mFixedProcessors;
     LV2InstanceFeaturesList mFeatures;
     const LV2Ports& mPorts;
     LV2PortStates mPortStates{ mPorts };
 
     //! Holds lv2 library state for destructive processing
     std::unique_ptr<LV2Wrapper> mMaster;
+    size_t mMasterBlockSize{};
+    std::vector<std::vector<float>> mMasterInput, mMasterOutput;
 
     //! Each holds lv2 library state for realtime processing of one track
     std::vector<std::unique_ptr<LV2Wrapper> > mSlaves;
@@ -83,12 +90,15 @@ private:
     // Position info
     float mPositionSpeed{ 1.0f };
     int64_t mPositionFrame{ 0 };
+    std::optional<EffectProcessingContext> mTransport;
 
     size_t mUserBlockSize{};
 
     size_t mNumSamples{};
     bool mRolling{ true };
     bool mUseLatency{ false };
+    std::atomic<SampleCount> mReportedLatency { 0 };
+    std::atomic<uint64_t> mLatencyRevision { 0 };
 };
 
 #endif

@@ -91,8 +91,12 @@ PxMixer* Px_OpenMixer(
    PaStream* pa_stream, PaDeviceIndex inputDeviceIndex, PaDeviceIndex outputDeviceIndex, int i
 )
 {
-   if (pa_stream == NULL || (inputDeviceIndex < 0 && outputDeviceIndex < 0))
+   if (inputDeviceIndex < 0 && outputDeviceIndex < 0)
       return NULL;
+#if !defined(PX_USE_MAC_COREAUDIO)
+   if (pa_stream == NULL)
+      return NULL;
+#endif
 
    px_mixer *Px;
    int good = TRUE;

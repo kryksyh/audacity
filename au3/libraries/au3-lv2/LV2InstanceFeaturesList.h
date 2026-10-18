@@ -19,6 +19,7 @@
 #include "au3-utility/GlobalVariable.h"
 #include "lv2/options/options.h"
 #include "lv2/worker/worker.h"
+#include <memory>
 
 struct LV2_API LV2InstanceFeaturesList final : ExtendedLV2FeaturesList {
    //! Perform extra initialization-time checks
@@ -29,6 +30,7 @@ struct LV2_API LV2InstanceFeaturesList final : ExtendedLV2FeaturesList {
 
    explicit LV2InstanceFeaturesList(
       const LV2FeaturesList &baseFeatures);
+   ~LV2InstanceFeaturesList() override;
 
    const LV2FeaturesList &Base() const {
       return static_cast<const LV2FeaturesList&>(mBaseFeatures);
@@ -36,6 +38,7 @@ struct LV2_API LV2InstanceFeaturesList final : ExtendedLV2FeaturesList {
 
    //! @return success
    bool InitializeOptions();
+   void UpdateBlockSizeOptions();
 
    //! @return may be null
    const LV2_Options_Option *NominalBlockLengthOption() const;
@@ -58,6 +61,10 @@ struct LV2_API LV2InstanceFeaturesList final : ExtendedLV2FeaturesList {
    std::vector<LV2_Options_Option> mOptions;
    size_t mBlockSizeOption{};
 
+   // LV2 atom:Int option values are signed 32-bit, even on a 64-bit host.
+   int32_t mMinimumOption{ 1 }, mMaximumOption{ LV2Preferences::DEFAULT_BLOCKSIZE };
+   int32_t mNominalOption{ LV2Preferences::DEFAULT_BLOCKSIZE };
+   bool mFixedBlockLength{ false }, mPowerOf2BlockLength{ false };
    size_t mBlockSize{ LV2Preferences::DEFAULT_BLOCKSIZE };
    int mSeqSize{ DEFAULT_SEQSIZE };
 
@@ -68,6 +75,11 @@ struct LV2_API LV2InstanceFeaturesList final : ExtendedLV2FeaturesList {
    float mSampleRate{ 44100.0f };
 
    const bool mOk;
+
+private:
+   struct StatePaths;
+   std::unique_ptr<StatePaths> mStatePaths;
+   void InitializeStatePaths();
 };
 
 struct LV2_API LV2WrapperFeaturesList final : ExtendedLV2FeaturesList {

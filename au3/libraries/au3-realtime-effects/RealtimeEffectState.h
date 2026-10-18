@@ -12,6 +12,7 @@
 #define __AUDACITY_REALTIMEEFFECTSTATE_H__
 
 #include <atomic>
+#include "au3-automation-data/AutomationData.h"
 #include <cstddef>
 #include <optional>
 #include <unordered_map>
@@ -23,6 +24,7 @@
 #include "au3-utility/Observer.h"
 #include "au3-components/PluginProvider.h" // for PluginID
 #include "au3-xml/XMLTagHandler.h"
+#include "RealtimeProcessingTime.h"
 
 class ChannelGroup;
 class EffectSettingsAccess;
@@ -36,6 +38,22 @@ class REALTIME_EFFECTS_API RealtimeEffectState : public XMLTagHandler, public st
     public Observer::Publisher<RealtimeEffectStateChange>
 {
 public:
+    class ProcessingAutomation {
+    public:
+        virtual ~ProcessingAutomation() = default;
+        virtual void BeforeProcessStart(double time) = 0;
+        virtual void AfterProcessStart(double time) = 0;
+    };
+    struct REALTIME_EFFECTS_API AutomationFactory : GlobalHook<AutomationFactory,
+        std::shared_ptr<ProcessingAutomation>(const EffectInstanceFactory&, EffectInstance&, EffectSettings&, const AutomationData&, double)> {};
+
+    //! Main-thread compilation. Superseded snapshots are retired on main.
+    void RefreshProcessingAutomation();
+    //! Processing-thread query, after instances have been initialized.
+    size_t ProcessingLatency(const ChannelGroup* group) const;
+    uint64_t ProcessingLatencyRevision() const;
+    bool LatencyUpdatePending() const;
+    bool RefreshRealtimeLatency();
     struct REALTIME_EFFECTS_API EffectFactory : GlobalHook<EffectFactory,
                                                            const EffectInstanceFactory* (const PluginID&)
                                                            > {};
@@ -94,7 +112,7 @@ public:
                    const float* const* inbuf, //!< chans input buffers
                    float* const* outbuf, //!< chans output buffers
                    float* dummybuf, //!<  one dummy output buffer
-                   size_t numSamples);
+                   size_t numSamples, const RealtimeEffects::ProcessingTime* time = nullptr, bool rawLatency = false, bool probe = false);
     //! Worker thread finishes a batch of samples
     bool ProcessEnd();
 
@@ -112,6 +130,9 @@ public:
     //! Main thread cleans up playback
     bool Finalize() noexcept;
 
+    AutomationData& Automation() { return mAutomation; }
+    const AutomationData& Automation() const { return mAutomation; }
+
     static const std::string& XMLTag();
     bool HandleXMLTag(
         const std::string_view& tag, const AttributesList& attrs) override;
@@ -127,9 +148,28 @@ public:
     std::shared_ptr<EffectSettingsAccess> GetAccess();
 
 private:
+    AutomationData mAutomation;
+    std::shared_ptr<ProcessingAutomation> mProcessingAutomation;
+    std::vector<std::shared_ptr<ProcessingAutomation>> mRetiredAutomation;
+    double mProcessingRate = 44100.0;
+    struct RawDelay {
+        bool ready = false;
+        size_t latency = 0;
+        size_t position = 0;
+        uint64_t revision = 0;
+        std::vector<std::vector<float>> history;
+    };
+    std::unordered_map<const ChannelGroup*, RawDelay> mRawDelays;
 
     std::shared_ptr<EffectInstance> MakeInstance();
     std::shared_ptr<EffectInstance> EnsureInstance(double rate, size_t audioThreadBufferSize);
+
+    //! Main-thread snapshots use manual settings, without waiting for the worker
+    //! or substituting its current automation values.
+    const EffectSettings& SnapshotSettings() const;
+    using Parameters = std::vector<std::pair<wxString, wxString>>;
+    Parameters SnapshotParameters() const;
+    bool LoadParameters(EffectSettings& settings) const;
 
     struct Access;
     struct AccessState;
@@ -205,7 +245,9 @@ private:
     // Destroy before mWorkerSettings:
     AtomicUniquePointer<AccessState> mpAccessState{ nullptr };
 
-    wxString mParameters; // Used only during deserialization
+    // Retain the original values until the plugin can successfully load them.
+    // An unavailable plugin must survive save, undo copies and later reopening.
+    Parameters mParameters;
     size_t mCurrentProcessor{ 0 };
     bool mInitialized{ false };
 

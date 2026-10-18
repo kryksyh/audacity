@@ -137,7 +137,13 @@
     URID(NotAutomatic,           LV2_PORT_PROPS__notAutomatic) \
     URID(Position,               LV2_TIME__Position) \
     URID(Speed,                  LV2_TIME__speed) \
-    URID(Frame,                  LV2_TIME__frame)
+    URID(Frame,                  LV2_TIME__frame) \
+    URID(BeatsPerMinute,         LV2_TIME__beatsPerMinute) \
+    URID(BeatsPerBar,            LV2_TIME__beatsPerBar) \
+    URID(BeatUnit,               LV2_TIME__beatUnit) \
+    URID(Bar,                    LV2_TIME__bar) \
+    URID(BarBeat,                LV2_TIME__barBeat) \
+    URID(FramesPerSecond,        LV2_TIME__framesPerSecond)
 
 namespace LV2Symbols {
 extern LV2_API LilvWorld* gWorld;

@@ -1,6 +1,6 @@
 #include "ExportFFmpegOptions.h"
 #include "FFmpegDefines.h"
-#include "au3-mixer/Mix.h"
+#include "au3-mixer/AudioRenderSource.h"
 #include "lib-ffmpeg-support/FFmpegFunctions.h"
 #include "lib-ffmpeg-support/FifoBuffer.h"
 #include "au3-import-export/ExportPlugin.h"
@@ -74,7 +74,7 @@ public:
     /// Flushes audio encoder
     bool Finalize();
 
-    std::unique_ptr<Mixer> CreateMixer(
+    std::unique_ptr<AudioRenderSource> CreateMixer(
         const AudacityProject& project, bool selectionOnly, double startTime, double stopTime, MixerOptions::Downmix* mixerSpec);
 
 private:
@@ -130,7 +130,7 @@ class FFmpegExportProcessor final : public ExportProcessor
         TranslatableString status;
         double t0;
         double t1;
-        std::unique_ptr<Mixer> mixer;
+        std::unique_ptr<AudioRenderSource> mixer;
         std::unique_ptr<FFmpegExporter> exporter;
     } context;
 

@@ -195,6 +195,7 @@ PluginPaths AudioUnitEffectsModule::FindModulePaths(PluginManagerInterface&,
         { kAudioUnitType_Generator, TranslatableString("audio-unit", "Audio Unit Generators") },
         { kAudioUnitType_Mixer, TranslatableString("audio-unit", "Audio Unit Mixers") },
         { kAudioUnitType_MusicEffect, TranslatableString("audio-unit", "Audio Unit Music Effects") },
+        { kAudioUnitType_MusicDevice, TranslatableString("audio-unit", "Audio Unit Instruments") },
         { kAudioUnitType_Panner, TranslatableString("audio-unit", "Audio Unit Panners") },
     };
 

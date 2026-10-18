@@ -17,6 +17,35 @@
 
 #include <wx/log.h>
 #include <cmath>
+#include <lv2/atom/util.h>
+
+namespace {
+void forgePosition(LV2_Atom_Forge& forge, int64_t frame, float speed, const EffectProcessingContext& context)
+{
+    using namespace LV2Symbols;
+    LV2_Atom_Forge_Frame position;
+    lv2_atom_forge_object(&forge, &position, 0, urid_Position);
+    lv2_atom_forge_key(&forge, urid_Speed);
+    lv2_atom_forge_float(&forge, speed);
+    lv2_atom_forge_key(&forge, urid_Frame);
+    lv2_atom_forge_long(&forge, frame);
+    lv2_atom_forge_key(&forge, urid_FramesPerSecond);
+    lv2_atom_forge_float(&forge, context.sampleRate);
+    lv2_atom_forge_key(&forge, urid_BeatsPerMinute);
+    lv2_atom_forge_float(&forge, context.tempo);
+    lv2_atom_forge_key(&forge, urid_BeatsPerBar);
+    lv2_atom_forge_float(&forge, context.numerator);
+    lv2_atom_forge_key(&forge, urid_BeatUnit);
+    lv2_atom_forge_int(&forge, context.denominator);
+    const double beat = context.time * context.tempo / 60.0 * context.denominator / 4.0;
+    const auto bar = std::floor(beat / context.numerator);
+    lv2_atom_forge_key(&forge, urid_Bar);
+    lv2_atom_forge_long(&forge, static_cast<int64_t>(bar));
+    lv2_atom_forge_key(&forge, urid_BarBeat);
+    lv2_atom_forge_float(&forge, beat - bar * context.numerator);
+    lv2_atom_forge_pop(&forge, &position);
+}
+}
 
 void LV2AtomPortState::SendToInstance(
     LV2_Atom_Forge& forge, const int64_t frameTime, const float speed)
@@ -35,26 +64,23 @@ void LV2AtomPortState::SendToInstance(
         const auto seq = reinterpret_cast<LV2_Atom_Sequence*>(
             lv2_atom_forge_sequence_head(&forge, &seqFrame, 0));
         if (port->mWantsPosition) {
-            lv2_atom_forge_frame_time(&forge, frameTime);
-            LV2_Atom_Forge_Frame posFrame;
-            lv2_atom_forge_object(&forge, &posFrame, 0, urid_Position);
-            lv2_atom_forge_key(&forge, urid_Speed);
-            lv2_atom_forge_float(&forge, speed);
-            lv2_atom_forge_key(&forge, urid_Frame);
-            lv2_atom_forge_long(&forge, frameTime);
-            lv2_atom_forge_pop(&forge, &posFrame);
+            lv2_atom_forge_frame_time(&forge, 0);
+            EffectProcessingContext context;
+            context.time = frameTime / context.sampleRate;
+            forgePosition(forge, frameTime, speed, context);
         }
         // Copy event information from the UI thread into plugin's atom input,
         // inserting frame time
         const auto ring = mRing.get();
         LV2_Atom atom;
         while (zix_ring_read(ring, &atom, sizeof(atom))) {
-            if (forge.offset + sizeof(LV2_Atom_Event) + atom.size < forge.size) {
-                lv2_atom_forge_frame_time(&forge, frameTime);
+            if (forge.offset + sizeof(LV2_Atom_Event) + lv2_atom_pad_size(atom.size) <= forge.size) {
+                lv2_atom_forge_frame_time(&forge, 0);
                 lv2_atom_forge_write(&forge, &atom, sizeof(atom));
                 zix_ring_read(ring, &forge.buf[forge.offset], atom.size);
                 forge.offset += atom.size;
                 seq->atom.size += atom.size;
+                lv2_atom_forge_pad(&forge, atom.size);
             } else {
                 zix_ring_skip(ring, atom.size);
                 wxLogError(wxT("LV2 sequence buffer overflow"));
@@ -74,13 +100,28 @@ void LV2AtomPortState::SendToInstance(
     }
 }
 
+void LV2AtomPortState::UpdatePosition(LV2_Atom_Forge& forge, const EffectProcessingContext& context)
+{
+    if (!mpPort->mIsInput || !mpPort->mWantsPosition) return;
+    auto* sequence = reinterpret_cast<LV2_Atom_Sequence*>(mBuffer.get());
+    auto* first = lv2_atom_sequence_begin(&sequence->body);
+    if (lv2_atom_sequence_is_end(&sequence->body, sequence->atom.size, first)
+        || first->body.type != LV2Symbols::urid_Object) return;
+    // SendToInstance reserves a fixed-size position object at the front. Rewrite
+    // only that object, retaining every UI/patch event already queued after it.
+    auto position = forge;
+    lv2_atom_forge_set_buffer(&position, reinterpret_cast<uint8_t*>(&first->body), sizeof(LV2_Atom) + first->body.size);
+    forgePosition(position, static_cast<int64_t>(std::llround(context.time * context.sampleRate)),
+                  context.playing ? context.speed : 0.0, context);
+}
+
 void LV2AtomPortState::ResetForInstanceOutput()
 {
     using namespace LV2Symbols;
     auto& port = mpPort;
     if (!port->mIsInput) {
         const auto buf = mBuffer.get();
-        *reinterpret_cast<LV2_Atom*>(buf) = { port->mMinimumSize, urid_Chunk };
+        *reinterpret_cast<LV2_Atom*>(buf) = { static_cast<uint32_t>(port->mMinimumSize - sizeof(LV2_Atom)), urid_Chunk };
     }
 }
 
@@ -110,9 +151,10 @@ void LV2AtomPortState::ReceiveFromInstance()
 {
     if (!mpPort->mIsInput) {
         const auto ring = mRing.get();
-        LV2_ATOM_SEQUENCE_FOREACH(
-            reinterpret_cast<LV2_Atom_Sequence*>(mBuffer.get()), ev
-            )
+        const auto* sequence = reinterpret_cast<const LV2_Atom_Sequence*>(mBuffer.get());
+        if (sequence->atom.type != LV2Symbols::urid_Sequence || sequence->atom.size < sizeof(LV2_Atom_Sequence_Body)
+            || sizeof(LV2_Atom) + sequence->atom.size > mpPort->mMinimumSize) return;
+        LV2_ATOM_SEQUENCE_FOREACH(sequence, ev)
         zix_ring_write(ring, &ev->body, ev->body.size + sizeof(LV2_Atom));
     }
 }

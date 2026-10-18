@@ -4,6 +4,7 @@
 #include <algorithm>
 #include <map>
 #include <vector>
+#include <cmath>
 
 #include "au3-components/EffectInterface.h"
 
@@ -163,7 +164,7 @@ bool MainAudioBusArrangementsAreSupported(Steinberg::Vst::IComponent& component,
 }
 
 //Activates main audio input/output buses and disables others (event, audio aux)
-bool ActivateMainAudioBuses(Steinberg::Vst::IComponent& component)
+bool ActivateMainAudioBuses(Steinberg::Vst::IComponent& component, bool midiInput)
 {
     using namespace Steinberg;
 
@@ -207,7 +208,7 @@ bool ActivateMainAudioBuses(Steinberg::Vst::IComponent& component)
         defaultOutputSpeakerArrangements.push_back(arrangement);
     }
     for (int i = 0, count = component.getBusCount(Vst::kEvent, Vst::kInput); i < count; ++i) {
-        component.activateBus(Vst::kEvent, Vst::kInput, i, 0);
+        component.activateBus(Vst::kEvent, Vst::kInput, i, midiInput && i == 0);
     }
     for (int i = 0, count = component.getBusCount(Vst::kEvent, Vst::kOutput); i < count; ++i) {
         component.activateBus(Vst::kEvent, Vst::kOutput, i, 0);
@@ -231,16 +232,13 @@ bool ActivateMainAudioBuses(Steinberg::Vst::IComponent& component)
 }
 
 //The component should be disabled
-bool SetupProcessing(Steinberg::Vst::IComponent& component, Steinberg::Vst::ProcessSetup& setup)
+bool SetupProcessing(Steinberg::Vst::IComponent& component, Steinberg::Vst::ProcessSetup& setup, bool midiInput)
 {
     using namespace Steinberg;
     auto processor = FUnknownPtr<Vst::IAudioProcessor>(&component);
 
     if (processor->setupProcessing(setup) == kResultOk) {
-        //We don't (yet) support custom input/output channel configuration
-        //on the host side. No support for event bus. Use default bus and
-        //channel configuration
-        return ActivateMainAudioBuses(component);
+        return ActivateMainAudioBuses(component, midiInput);
     }
     return false;
 }
@@ -419,7 +417,12 @@ public:
         return Steinberg::kResultOk;
     }
 
-    Steinberg::tresult PLUGIN_API restartComponent(Steinberg::int32 flags) override { return Steinberg::kNotImplemented; }
+    Steinberg::tresult PLUGIN_API restartComponent(Steinberg::int32 flags) override
+    {
+        if (!(flags & Steinberg::Vst::kLatencyChanged)) return Steinberg::kNotImplemented;
+        mWrapper.RequestRestart(flags & Steinberg::Vst::kLatencyChanged);
+        return Steinberg::kResultOk;
+    }
 
     DECLARE_FUNKNOWN_METHODS
 };
@@ -459,9 +462,10 @@ Steinberg::int32 SingleInputParameterValue::getPointCount()
 
 IMPLEMENT_FUNKNOWN_METHODS(SingleInputParameterValue, Steinberg::Vst::IParamValueQueue, Steinberg::Vst::IParamValueQueue::iid);
 
-VST3Wrapper::VST3Wrapper(VST3::Hosting::Module& module, const VST3::Hosting::ClassInfo& effectClassInfo)
+VST3Wrapper::VST3Wrapper(VST3::Hosting::Module& module, const VST3::Hosting::ClassInfo& effectClassInfo, Role role)
     : mModule{module}
     , mEffectClassInfo{effectClassInfo}
+    , mRole{role}
 {
     using namespace Steinberg;
 
@@ -619,7 +623,7 @@ void VST3Wrapper::InitializeComponents()
     mSetup.symbolicSampleSize = Vst::kSample32;
     mSetup.sampleRate = 44100.0;
 
-    if (!SetupProcessing(*mEffectComponent, mSetup)) {
+    if (!SetupProcessing(*mEffectComponent, mSetup, mRole == Role::Instrument)) {
         throw std::runtime_error("bus configuration not supported");
     }
 
@@ -805,7 +809,7 @@ bool VST3Wrapper::SavePresetToStream(Steinberg::IBStream* fileStream) const
 }
 
 bool VST3Wrapper::Initialize(EffectSettings& settings, Steinberg::Vst::SampleRate sampleRate, Steinberg::int32 processMode,
-                             Steinberg::int32 maxSamplesPerBlock)
+                             Steinberg::int32 maxSamplesPerBlock, bool applySettings)
 {
     using namespace Steinberg;
 
@@ -816,14 +820,14 @@ bool VST3Wrapper::Initialize(EffectSettings& settings, Steinberg::Vst::SampleRat
         sampleRate
     };
 
-    if (!SetupProcessing(*mEffectComponent.get(), setup)) {
+    if (!SetupProcessing(*mEffectComponent.get(), setup, mRole == Role::Instrument)) {
         return false;
     }
 
     mSetup = setup;
 
     constexpr auto fallbackOnDefaults = false;
-    FetchSettings(settings, fallbackOnDefaults);
+    if (applySettings) FetchSettings(settings, fallbackOnDefaults);
 
     if (mEffectComponent->setActive(true) == kResultOk) {
         if (mAudioProcessor->setProcessing(true) != kResultFalse) {
@@ -831,12 +835,21 @@ bool VST3Wrapper::Initialize(EffectSettings& settings, Steinberg::Vst::SampleRat
             mProcessContext.sampleRate = sampleRate;
 
             mActive = true;
-            ConsumeChanges(settings);
+            mProcessing = true;
+            if (applySettings) ConsumeChanges(settings);
             //make sure parameters are delivered to the processor...
             ProcessSilentBlock();
-            StoreSettings(settings);
+            if (applySettings) StoreSettings(settings);
+            mCachedLatency.store(std::max<Steinberg::int32>(0, GetLatencySamples()), std::memory_order_release);
+            mRestartFlags.fetch_and(~Vst::kLatencyChanged, std::memory_order_acq_rel);
             return true;
         }
+        // A processor may refuse to start after activation. Leave it inactive
+        // so a later explicit retry can legally call setupProcessing again.
+        mAudioProcessor->setProcessing(false);
+        mEffectComponent->setActive(false);
+        mActive = false;
+        mProcessing = false;
     }
     return false;
 }
@@ -853,6 +866,7 @@ void VST3Wrapper::Finalize(EffectSettings* settings)
     mAudioProcessor->setProcessing(false);
     mEffectComponent->setActive(false);
     mActive = false;
+    mProcessing = false;
 
     if (settings != nullptr) {
         StoreSettings(*settings);
@@ -862,6 +876,18 @@ void VST3Wrapper::Finalize(EffectSettings* settings)
 void VST3Wrapper::ProcessBlockStart(const EffectSettings& settings)
 {
     ConsumeChanges(settings);
+}
+
+void VST3Wrapper::QueueParameterChange(Steinberg::Vst::ParamID id, double value)
+{
+    const auto found = std::find_if(mParameters.begin(), mParameters.end(), [id](const auto& parameter) {
+        return parameter.first == id;
+    });
+    if (found != mParameters.end()) {
+        found->second = value;
+    } else {
+        mParameters.emplace_back(id, value);
+    }
 }
 
 void VST3Wrapper::ConsumeChanges(const EffectSettings& settings)
@@ -931,7 +957,7 @@ void VST3Wrapper::FlushParameters(EffectSettings& settings, bool* hasChanges)
             return;
         }
 
-        SetupProcessing(*mEffectComponent, mSetup);
+        SetupProcessing(*mEffectComponent, mSetup, mRole == Role::Instrument);
         mActive = true;
         if (mEffectComponent->setActive(true) == Steinberg::kResultOk) {
             ConsumeChanges(settings);
@@ -949,9 +975,32 @@ void VST3Wrapper::FlushParameters(EffectSettings& settings, bool* hasChanges)
     }
 }
 
-size_t VST3Wrapper::Process(const float* const* inBlock, float* const* outBlock, size_t blockLen)
+void VST3Wrapper::SetProcessingContext(const EffectProcessingContext& context)
+{
+    using namespace Steinberg::Vst;
+    mProcessContext = {};
+    mProcessContext.state = ProcessContext::kTempoValid | ProcessContext::kTimeSigValid
+                            | ProcessContext::kProjectTimeMusicValid | ProcessContext::kBarPositionValid
+                            | ProcessContext::kCycleValid | (context.playing ? ProcessContext::kPlaying : 0)
+                            | (context.cycling ? ProcessContext::kCycleActive : 0);
+    mProcessContext.sampleRate = context.sampleRate;
+    mProcessContext.projectTimeSamples = static_cast<Steinberg::int64>(std::llround(context.time * context.sampleRate));
+    mProcessContext.projectTimeMusic = context.time * context.tempo / 60.0;
+    mProcessContext.tempo = context.tempo;
+    mProcessContext.timeSigNumerator = context.numerator;
+    mProcessContext.timeSigDenominator = context.denominator;
+    const double bar = context.numerator * 4.0 / context.denominator;
+    mProcessContext.barPositionMusic = std::floor(mProcessContext.projectTimeMusic / bar) * bar;
+    mProcessContext.cycleStartMusic = context.cycleStart * context.tempo / 60.0;
+    mProcessContext.cycleEndMusic = context.cycleEnd * context.tempo / 60.0;
+}
+
+size_t VST3Wrapper::Process(const float* const* inBlock, float* const* outBlock, size_t blockLen,
+                           Steinberg::Vst::IEventList* events, const Steinberg::Vst::ProcessContext* context,
+                           Steinberg::Vst::IParameterChanges* parameters)
 {
     using namespace Steinberg;
+    if (!mActive) return 0;
 
     InputParameterChanges inputParameterChanges(mParameters, mParameterQueues.get());
     mParameters.clear();
@@ -959,8 +1008,9 @@ size_t VST3Wrapper::Process(const float* const* inBlock, float* const* outBlock,
     Vst::ProcessData data;
     data.processMode = mSetup.processMode;
     data.symbolicSampleSize = mSetup.symbolicSampleSize;
-    data.inputParameterChanges = &inputParameterChanges;
-    data.processContext = &mProcessContext;
+    data.inputParameterChanges = parameters ? parameters : &inputParameterChanges;
+    data.inputEvents = events;
+    data.processContext = context ? const_cast<Vst::ProcessContext*>(context) : &mProcessContext;
 
     static_assert(std::numeric_limits<decltype(blockLen)>::max()
                   >= std::numeric_limits<decltype(data.numSamples)>::max());
@@ -1025,14 +1075,91 @@ size_t VST3Wrapper::Process(const float* const* inBlock, float* const* outBlock,
            ? data.numSamples : 0;
 }
 
+bool VST3Wrapper::FlushProcessingParameters(Steinberg::Vst::IParameterChanges& parameters,
+                                           const Steinberg::Vst::ProcessContext& context)
+{
+    if (!mActive) return false;
+    Steinberg::Vst::ProcessData data;
+    data.processMode = mSetup.processMode;
+    data.symbolicSampleSize = mSetup.symbolicSampleSize;
+    data.inputParameterChanges = &parameters;
+    data.processContext = const_cast<Steinberg::Vst::ProcessContext*>(&context);
+    // Keep the negotiated bus count, using the SDK's zero-channel flush form.
+    data.numInputs = mEffectComponent->getBusCount(Steinberg::Vst::kAudio, Steinberg::Vst::kInput);
+    data.numOutputs = mEffectComponent->getBusCount(Steinberg::Vst::kAudio, Steinberg::Vst::kOutput);
+    if (data.numInputs < 0 || data.numOutputs < 0 || data.numInputs > 256 || data.numOutputs > 256) return false;
+    data.inputs = static_cast<Steinberg::Vst::AudioBusBuffers*>(alloca(sizeof(Steinberg::Vst::AudioBusBuffers) * data.numInputs));
+    data.outputs = static_cast<Steinberg::Vst::AudioBusBuffers*>(alloca(sizeof(Steinberg::Vst::AudioBusBuffers) * data.numOutputs));
+    for (auto buffers : { std::pair { data.inputs, data.numInputs }, std::pair { data.outputs, data.numOutputs } }) {
+        for (int i = 0; i < buffers.second; ++i) {
+            buffers.first[i].numChannels = 0;
+            buffers.first[i].silenceFlags = 0;
+            buffers.first[i].channelBuffers32 = nullptr;
+        }
+    }
+    // VST3 permits zero-sample/no-channel calls for parameter flushing.
+    // No notes or queued live input are consumed by this control-only block.
+    return mAudioProcessor->process(data) == Steinberg::kResultOk;
+}
+
 void VST3Wrapper::SuspendProcessing()
 {
     mAudioProcessor->setProcessing(false);
+    mProcessing = false;
 }
 
 void VST3Wrapper::ResumeProcessing()
 {
     mAudioProcessor->setProcessing(true);
+    mProcessing = true;
+}
+
+void VST3Wrapper::RequestRestart(Steinberg::int32 flags)
+{
+    mRestartFlags.fetch_or(flags, std::memory_order_release);
+}
+
+bool VST3Wrapper::LatencyUpdatePending() const
+{
+    return (mRestartFlags.load(std::memory_order_acquire) & Steinberg::Vst::kLatencyChanged) != 0;
+}
+
+bool VST3Wrapper::RefreshLatency(bool measureWithoutNotification)
+{
+    using namespace Steinberg;
+    const bool pending = (mRestartFlags.fetch_and(~Vst::kLatencyChanged, std::memory_order_acq_rel) & Vst::kLatencyChanged) != 0;
+    if (!mActive) return false;
+    if (!pending) {
+        // Private offline instruments also measure after their no-note probe,
+        // including processors which omit an initial latency notification.
+        if (!measureWithoutNotification) return false;
+        const auto latency = std::max<int32>(0, GetLatencySamples());
+        return mCachedLatency.exchange(latency, std::memory_order_acq_rel) != latency;
+    }
+    // Main thread, after the audio worker/callback has released this wrapper.
+    // Some processors only expose their new delay after reactivation.
+    const bool processing = mProcessing;
+    if (processing) SuspendProcessing();
+    mEffectComponent->setActive(false);
+    mActive = false;
+    if (mEffectComponent->setActive(true) != kResultOk) throw std::runtime_error("The VST3 effect could not reactivate after its latency changed.");
+    mActive = true;
+    // Reactivation notifications are covered by the measurement below. Clear
+    // them before querying/resuming so a later request cannot be mistaken for
+    // one we already serviced (setProcessing itself can change the delay).
+    mRestartFlags.fetch_and(~Vst::kLatencyChanged, std::memory_order_acq_rel);
+    const auto latency = std::max<int32>(0, GetLatencySamples());
+    if (processing) {
+        if (mAudioProcessor->setProcessing(true) == kResultFalse) {
+            mAudioProcessor->setProcessing(false);
+            mEffectComponent->setActive(false);
+            mActive = false;
+            mProcessing = false;
+            throw std::runtime_error("The VST3 effect could not resume after its latency changed.");
+        }
+        mProcessing = true;
+    }
+    return mCachedLatency.exchange(latency, std::memory_order_acq_rel) != latency;
 }
 
 void VST3Wrapper::BeginParameterEdit(EffectSettingsAccess& access)

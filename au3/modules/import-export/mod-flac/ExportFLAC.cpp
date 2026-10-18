@@ -60,7 +60,7 @@ class FLACExportProcessor final : public ExportProcessor
         sampleFormat format;
         FLAC::Encoder::File encoder;
         wxFFile f;
-        std::unique_ptr<Mixer> mixer;
+        std::unique_ptr<AudioRenderSource> mixer;
     } context;
 
 public:

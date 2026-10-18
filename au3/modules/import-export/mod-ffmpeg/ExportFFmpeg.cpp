@@ -416,7 +416,7 @@ FFmpegExporter::FFmpegExporter(std::shared_ptr<FFmpegFunctions> ffmpeg,
     }
 }
 
-std::unique_ptr<Mixer> FFmpegExporter::CreateMixer(
+std::unique_ptr<AudioRenderSource> FFmpegExporter::CreateMixer(
     const AudacityProject& project, bool selectionOnly, double startTime,
     double stopTime, MixerOptions::Downmix* mixerSpec)
 {
