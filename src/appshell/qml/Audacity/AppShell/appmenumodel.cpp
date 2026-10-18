@@ -394,9 +394,12 @@ MenuItem* AppMenuModel::makeTracksMenu()
     MenuItemList tracksItems {
         makeMenuItem("new-mono-track"),
         makeMenuItem("new-stereo-track"),
+        makeMenuItem("new-instrument-track"),
         makeMenuItem("new-label-track"),
         makeSeparator(),
         makeMenuItem("track-duplicate"),
+        makeSeparator(),
+        makeMenuItem("mix-render-to-new-track"),
         // makeMenuItem("remove-tracks"),
         // makeSeparator(),
         // makeMenuItem("mixdown-to"),

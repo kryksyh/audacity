@@ -46,6 +46,7 @@ public:
     virtual bool splitDeleteSelectedOnTracks(const TrackIdList tracksIds, secs_t begin, secs_t end) = 0;
 
     virtual bool newMonoTrack() = 0;
+    virtual bool newInstrumentTrack() = 0;
     virtual bool newStereoTrack() = 0;
     virtual muse::RetVal<TrackId> newLabelTrack(const muse::String& title = muse::String()) = 0;
 
@@ -68,6 +69,7 @@ public:
     virtual double nearestZeroCrossing(double time) const = 0;
 
     virtual au::trackedit::TrackId addWaveTrack(int nChannels) = 0;
+    virtual TrackId addInstrumentTrack(TrackId sourceId = INVALID_TRACK) = 0;
     virtual void removeDragAddedTracks(size_t numTracksWhenDragStarted, bool emptyOnly) = 0;
 
     virtual muse::Progress progress() const = 0;

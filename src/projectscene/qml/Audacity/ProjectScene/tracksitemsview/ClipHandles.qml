@@ -152,6 +152,7 @@ Item {
 
         MouseArea {
             id: leftTrimMa
+            objectName: root.objectName + "LeftTrim"
 
             anchors.fill: parent
             hoverEnabled: true
@@ -310,6 +311,7 @@ Item {
 
         MouseArea {
             id: rightTrimMa
+            objectName: root.objectName + "RightTrim"
 
             anchors.fill: parent
             hoverEnabled: true

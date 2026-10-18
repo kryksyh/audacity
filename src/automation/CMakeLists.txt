@@ -4,6 +4,9 @@
 
 declare_module(automation)
 
+set(MODULE_QRC automation.qrc)
+set(MODULE_QML_IMPORT ${CMAKE_CURRENT_LIST_DIR}/qml)
+
 set(MODULE_SRC
     ${CMAKE_CURRENT_LIST_DIR}/automationmodule.cpp
     ${CMAKE_CURRENT_LIST_DIR}/automationmodule.h
@@ -14,6 +17,8 @@ set(MODULE_SRC
     ${CMAKE_CURRENT_LIST_DIR}/internal/au3/au3clipgaininteraction.h
 
     # view/ settings
+    ${CMAKE_CURRENT_LIST_DIR}/view/trackautomationmodel.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/view/trackautomationmodel.h
     ${CMAKE_CURRENT_LIST_DIR}/view/clipgainmodel.cpp
     ${CMAKE_CURRENT_LIST_DIR}/view/clipgainmodel.h
 )
@@ -21,6 +26,8 @@ set(MODULE_SRC
 set(MODULE_USE_UNITY OFF)
 set(MODULE_LINK
         au3wrap
+        au3-midi-track
+        au3-realtime-effects
         au3-mixer
         au3-wave-track
 )

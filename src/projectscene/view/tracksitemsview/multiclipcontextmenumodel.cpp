@@ -42,6 +42,7 @@ MenuItemList MultiClipContextMenuModel::makeItems()
     MenuItemList items {
         makeMenuItem("action://trackedit/cut"),
         makeMenuItem("action://trackedit/copy"),
+        makeMenuItem("duplicate"),
         makeMenuItem("action://trackedit/delete"),
         makeSeparator(),
         makeMenu(muse::TranslatableString("multiclip", "Cut and…"), cutAndItems, "menu-cut-and"),
@@ -55,5 +56,11 @@ MenuItemList MultiClipContextMenuModel::makeItems()
         makeMenuItem("ungroup-clips"),
     };
 
+    const auto project = globalContext()->currentTrackeditProject();
+    const auto selected = selectionController()->selectedClips();
+    if (project && std::any_of(selected.begin(), selected.end(), [&project](const auto& key) { return project->clip(key).isMidi; })) {
+        items.erase(std::remove_if(items.begin(), items.end(),
+                                   [](const auto* item) { return item->action().code == "join"; }), items.end());
+    }
     return items;
 }

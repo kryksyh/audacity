@@ -82,7 +82,10 @@ set(MODULE_SRC
 
     ${CMAKE_CURRENT_LIST_DIR}/internal/au3/au3tracksinteraction.cpp
     ${CMAKE_CURRENT_LIST_DIR}/internal/au3/au3tracksinteraction.h
+    ${CMAKE_CURRENT_LIST_DIR}/internal/au3/mixrenderscenario.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/internal/au3/mixrenderscenario.h
     ${CMAKE_CURRENT_LIST_DIR}/internal/au3/au3clipsinteraction.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/internal/au3/au3midiclipsinteraction.cpp
     ${CMAKE_CURRENT_LIST_DIR}/internal/au3/au3clipsinteraction.h
     ${CMAKE_CURRENT_LIST_DIR}/internal/au3/au3labelsinteraction.cpp
     ${CMAKE_CURRENT_LIST_DIR}/internal/au3/au3labelsinteraction.h
@@ -104,6 +107,14 @@ set(MODULE_SRC
     ${CMAKE_CURRENT_LIST_DIR}/api/internal/projecteditstate.h
     ${CMAKE_CURRENT_LIST_DIR}/api/audiotransform.h
 
+    ${CMAKE_CURRENT_LIST_DIR}/view/instrumentview.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/view/instrumentview.h
+    ${CMAKE_CURRENT_LIST_DIR}/view/pianorollmodel.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/view/pianorollmodel.h
+    ${CMAKE_CURRENT_LIST_DIR}/view/trackroutingmodel.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/view/trackroutingmodel.h
+    ${CMAKE_CURRENT_LIST_DIR}/view/trackfreezemodel.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/view/trackfreezemodel.h
     ${CMAKE_CURRENT_LIST_DIR}/view/deletebehaviorpanelmodel.cpp
     ${CMAKE_CURRENT_LIST_DIR}/view/deletebehaviorpanelmodel.h
     ${CMAKE_CURRENT_LIST_DIR}/view/pastebehaviorpanelmodel.cpp
@@ -118,10 +129,12 @@ set(MODULE_LINK
         au3-effects
         au3-exceptions
         au3-label-track
+        au3-midi-track
         au3-math
         au3-mixer
         au3-numeric-formats
         au3-project
+        au3-project-file-io
         au3-project-history
         au3-project-rate
         au3-realtime-effects

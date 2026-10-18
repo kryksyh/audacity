@@ -14,6 +14,10 @@ import Audacity.Automation
 Rectangle {
     id: root
 
+    property bool isMidiClip: false
+    property var midiNotes: []
+    objectName: isMidiClip ? "midiClip" + clipKey.trackId() + "_" + clipKey.itemId() : ""
+
     property alias context: waveView.context
     property alias clipKey: waveView.clipKey
     property alias clipTime: waveView.clipTime
@@ -310,7 +314,10 @@ Rectangle {
     }
 
     function updateViews() {
-        waveView.update()
+        if (root.isMidiClip)
+            midiPreview.requestPaint()
+        else
+            waveView.update()
         if (spectrogramViewLoader.item) {
             spectrogramViewLoader.item.update()
         }
@@ -442,6 +449,7 @@ Rectangle {
 
     MouseArea {
         id: leftTrimStretchEdgeHover
+        objectName: root.objectName + "LeftEdge"
 
         x: distanceToLeftNeighbor >= -0.5 && distanceToLeftNeighbor <= 10 ? root.x - Math.min(distanceToLeftNeighbor / 2, 5) : root.x - 5
         width: distanceToLeftNeighbor >= -0.5 && distanceToLeftNeighbor <= 10 ? 6 + Math.min(distanceToLeftNeighbor / 2, 5) : 11
@@ -503,6 +511,7 @@ Rectangle {
 
     MouseArea {
         id: rightTrimStretchEdgeHover
+        objectName: root.objectName + "RightEdge"
 
         x: root.width - 5
         z: headerDragArea.z + 1
@@ -599,6 +608,7 @@ Rectangle {
 
             MouseArea {
                 id: headerDragArea
+                objectName: root.objectName + "Header"
                 anchors.fill: parent
 
                 onContainsMouseChanged: {
@@ -732,6 +742,7 @@ Rectangle {
 
                 TextInputField {
                     id: titleEdit
+                    objectName: root.objectName + "Title"
 
                     property string newTitle: ""
 
@@ -872,9 +883,47 @@ Rectangle {
 
             spacing: 0
 
+            Canvas {
+                id: midiPreview
+                objectName: root.objectName + "NotePreview"
+                visible: root.isMidiClip
+                Layout.fillWidth: true
+                Layout.fillHeight: true
+                clip: true
+                property var notes: root.midiNotes
+                property var clipTime: root.clipTime
+                property real zoom: root.context ? root.context.zoom : 1
+                property color noteColor: root.clipSelected ? root.clipSelectedColor : root.clipColor
+                onNotesChanged: requestPaint()
+                onClipTimeChanged: requestPaint()
+                onZoomChanged: requestPaint()
+                onNoteColorChanged: requestPaint()
+                onWidthChanged: requestPaint()
+                onHeightChanged: requestPaint()
+                onPaint: {
+                    const ctx = getContext("2d")
+                    ctx.clearRect(0, 0, width, height)
+                    ctx.fillStyle = waveView.backgroundColor
+                    ctx.fillRect(0, 0, width, height)
+                    let low = 48
+                    let high = 72
+                    for (const note of notes) {
+                        low = Math.min(low, note.pitch)
+                        high = Math.max(high, note.pitch)
+                    }
+                    ctx.fillStyle = ui.blendColors(noteColor, ui.theme.extra["black_color"], 0.4)
+                    const row = Math.max(2, (height - 8) / (high - low + 1))
+                    for (const note of notes) {
+                        const x = root.context.timeToPosition(clipTime.startTime + note.start) - root.parent.x
+                        const y = 4 + (high - note.pitch) / (high - low + 1) * (height - 8)
+                        ctx.fillRect(x, y, Math.max(2, note.length * zoom), Math.max(2, row - 1))
+                    }
+                }
+            }
+
             WaveView {
                 id: waveView
-                visible: root.isWaveformViewVisible
+                visible: root.isWaveformViewVisible && !root.isMidiClip
 
                 Layout.fillWidth: true
                 Layout.fillHeight: true
@@ -894,6 +943,8 @@ Rectangle {
                 displayBounds: root.displayBounds
 
                 function onWaveViewPositionChanged(x, y) {
+                    if (root.isMidiClip)
+                        return
                     if (waveView.isIsolationMode) {
                         waveView.setIsolatedPoint(x, y)
                         waveView.update()
@@ -1150,6 +1201,7 @@ Rectangle {
 
     ClipHandles {
         id: clipHandles
+        objectName: root.objectName + "Handles"
 
         // +1 not to overlap with header
         y: !root.collapsed ? header.height + 1 : 0

@@ -204,8 +204,15 @@ void notifyOfUndoRedo(const TracksAndItems& before,
     auto trackIdCheck = [](const Track& first, const Track& second) {
         return first.id == second.id;
     };
+    auto viewKind = [](TrackType type) {
+        // Mono/stereo use the same waveform delegate and support incremental
+        // updates; MIDI and label tracks use different item models.
+        return type == TrackType::Mono ? TrackType::Stereo : type;
+    };
 
-    //! Checking for Track reorder. If detected, reload and return.
+    //! Reordering or changing a track kind replaces its UI delegate. Reload
+    //! the snapshot without also sending clip additions to the new delegate,
+    //! which already loaded those clips (for example, undoing MIDI unfreeze).
     {
         auto trackBefore = before.tracks.begin();
         auto trackAfter = after.tracks.begin();
@@ -214,9 +221,7 @@ void notifyOfUndoRedo(const TracksAndItems& before,
         //  since a reorder could have happened as part of a compound action.
         while (trackBefore != before.tracks.end()
                && trackAfter != after.tracks.end()) {
-            if (trackBefore->id != trackAfter->id) {
-                //! Reorder found.
-                //  Reload and return.
+            if (trackBefore->id != trackAfter->id || viewKind(trackBefore->type) != viewKind(trackAfter->type)) {
                 trackeditProject->reload();
                 return;
             }

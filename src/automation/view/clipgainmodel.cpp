@@ -161,6 +161,11 @@ void ClipGainModel::reload()
         return;
     }
 
+    const auto project = globalContext()->currentTrackeditProject();
+    if (!project || project->clip(m_clipKey.key).isMidi) {
+        clear();
+        return;
+    }
     m_clipStartTime = clipsInteraction()->clipStartTime(m_clipKey.key);
     m_clipEndTime   = clipsInteraction()->clipEndTime(m_clipKey.key);
     emit clipTimeChanged();

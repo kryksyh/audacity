@@ -187,6 +187,20 @@ const std::vector<CommandInfo> commandInfos = {
         Decoration(IconCode::Code::SPLIT_TOOL)
     },
     CommandInfo{
+        TRACKEDIT_MIX_RENDER_COMMAND,
+        TranslatableString("command", "Mix and render to new track"),
+        TranslatableString("command_description", "Render selected audio, instruments, automation and bus routing into a new audio track"),
+        InputSchema(),
+        Decoration()
+    },
+    CommandInfo{
+        TRACKEDIT_NEW_INSTRUMENT_TRACK_COMMAND,
+        TranslatableString("command", "New instrument track"),
+        TranslatableString("command_description", "Add a MIDI track with an instrument"),
+        InputSchema(),
+        Decoration()
+    },
+    CommandInfo{
         TRACKEDIT_NEW_MONO_TRACK_COMMAND,
         //: Command title: shown as a menu item or a button label; keep it short
         TranslatableString("command", "New mono track"),

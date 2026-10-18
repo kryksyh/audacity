@@ -47,6 +47,10 @@
 #include "internal/undomanager.h"
 
 #include "view/deletebehaviorpanelmodel.h"
+#include "view/pianorollmodel.h"
+#include "view/trackroutingmodel.h"
+#include "view/trackfreezemodel.h"
+#include "view/instrumentview.h"
 #include "view/pastebehaviorpanelmodel.h"
 #include "view/tracknavigationmodel.h"
 
@@ -92,6 +96,10 @@ void TrackeditModule::registerExports()
 
 void TrackeditModule::registerUiTypes()
 {
+    qmlRegisterType<InstrumentView>("Audacity.TrackEdit", 1, 0, "InstrumentView");
+    qmlRegisterType<TrackFreezeModel>("Audacity.TrackEdit", 1, 0, "TrackFreezeModel");
+    qmlRegisterType<TrackRoutingModel>("Audacity.TrackEdit", 1, 0, "TrackRoutingModel");
+    qmlRegisterType<PianoRollModel>("Audacity.TrackEdit", 1, 0, "PianoRollModel");
     qmlRegisterType<DeleteBehaviorPanelModel>("Audacity.TrackEdit", 1, 0, "DeleteBehaviorPanelModel");
     qmlRegisterType<PasteBehaviorPanelModel>("Audacity.TrackEdit", 1, 0, "PasteBehaviorPanelModel");
     qmlRegisterType<TrackNavigationModel>("Audacity.TrackEdit", 1, 0, "TrackNavigationModel");

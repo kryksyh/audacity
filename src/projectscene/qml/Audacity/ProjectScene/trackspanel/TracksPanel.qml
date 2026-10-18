@@ -12,6 +12,7 @@ import Audacity.ProjectScene
 
 Item {
     id: root
+    objectName: "tracksPanelContent"
 
     property alias tracksModel: tracksModel
 
@@ -133,7 +134,9 @@ Item {
                 navigationOrderStart: trackEffectsSection.navigationOrderEnd + 1
 
                 Layout.fillWidth: true
-                Layout.preferredHeight: 300
+                // Leave room for the selected track's insert rows when a
+                // bottom editor reduces the available track-panel height.
+                Layout.preferredHeight: Math.min(300, effectColumn.height / 2)
                 Layout.minimumHeight: masterEffectsSection.minimumHeight
 
                 isMasterTrack: true

@@ -17,6 +17,7 @@ using namespace muse::rcommand;
 
 namespace {
 const std::vector<Command> commandsDisabledDuringRecording {
+    TRACKEDIT_MIX_RENDER_COMMAND,
     TRACKEDIT_UNDO_COMMAND,
     TRACKEDIT_REDO_COMMAND,
     TRACKEDIT_PASTE_OVERLAP_COMMAND,
@@ -31,6 +32,7 @@ const std::vector<Command> commandsDisabledDuringRecording {
     TRACKEDIT_STRETCH_CLIP_TO_MATCH_TEMPO_COMMAND,
     TRACKEDIT_TRACK_SPLIT_AT_COMMAND,
     TRACKEDIT_NEW_MONO_TRACK_COMMAND,
+    TRACKEDIT_NEW_INSTRUMENT_TRACK_COMMAND,
     TRACKEDIT_NEW_STEREO_TRACK_COMMAND,
     TRACKEDIT_NEW_LABEL_TRACK_COMMAND,
     TRACKEDIT_TRACK_DUPLICATE_COMMAND,
@@ -88,6 +90,7 @@ const std::vector<Command> labelsSelectionCommands {
 };
 
 const std::vector<Command> dataSelectionCommands {
+    TRACKEDIT_MIX_RENDER_COMMAND,
     TRACKEDIT_SILENCE_AUDIO_SELECTION_COMMAND,
 };
 
@@ -196,6 +199,10 @@ CommandState TrackeditCommandsState::commandState(const Command& command) const
 
     if (command == TRACKEDIT_UNDO_COMMAND) {
         return CommandState(projectHistory()->undoAvailable());
+    }
+
+    if (command == TRACKEDIT_MIX_RENDER_COMMAND) {
+        return CommandState(!selectionController()->selectedTracks().empty());
     }
 
     if (command == TRACKEDIT_REDO_COMMAND) {

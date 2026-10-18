@@ -3,6 +3,10 @@
         <file>qml/Audacity/TrackEdit/qmldir</file>
         <file>qml/Audacity/TrackEdit/CustomRateDialog.qml</file>
         <file>qml/Audacity/TrackEdit/CustomTimeDialog.qml</file>
+        <file>qml/Audacity/TrackEdit/PianoRollPanel.qml</file>
+        <file>qml/Audacity/TrackEdit/InstrumentEditorDialog.qml</file>
+        <file>qml/Audacity/TrackEdit/TrackRoutingPanel.qml</file>
+        <file>qml/Audacity/TrackEdit/PianoKeyboard.qml</file>
         <file>qml/Audacity/TrackEdit/ClipImageButton.qml</file>
         <file>qml/Audacity/TrackEdit/BehaviorChoice.qml</file>
         <file>qml/Audacity/TrackEdit/DeleteBehaviorOnboardingDialog.qml</file>

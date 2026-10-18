@@ -301,6 +301,25 @@ TEST_F(ChangeDetectionTests, TestTrackNotificationsForReordering)
     changeDetection::notifyOfUndoRedo(before, after, m_trackEditProject);
 }
 
+TEST_F(ChangeDetectionTests, TrackKindReplacementReloadsWithoutSendingClipsToTheReplacementDelegate)
+{
+    TracksAndItems midi, frozen;
+    addOneTrack(midi, 0);
+    addOneTrack(frozen, 0);
+    midi.tracks[0].type = TrackType::Midi;
+    frozen.tracks[0].type = TrackType::Stereo;
+    addClipToTrack(frozen, 0, 1);
+    EXPECT_CALL(*m_trackEditProject, reload()).Times(2);
+    EXPECT_CALL(*m_trackEditProject, trackInserted()).Times(0);
+    EXPECT_CALL(*m_trackEditProject, trackRemoved()).Times(0);
+    EXPECT_CALL(*m_trackEditProject, trackChanged()).Times(0);
+    EXPECT_CALL(*m_trackEditProject, notifyAboutClipAdded(_)).Times(0);
+    EXPECT_CALL(*m_trackEditProject, notifyAboutClipRemoved(_)).Times(0);
+    EXPECT_CALL(*m_trackEditProject, notifyAboutClipChanged(_)).Times(0);
+    changeDetection::notifyOfUndoRedo(midi, frozen, m_trackEditProject);
+    changeDetection::notifyOfUndoRedo(frozen, midi, m_trackEditProject);
+}
+
 TEST_F(ChangeDetectionTests, TestTrackNotificationForTitleChange)
 {
     TracksAndItems before = buildTracksAndClips();

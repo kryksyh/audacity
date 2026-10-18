@@ -28,11 +28,16 @@ bool isLabelTrack(TrackType type)
     return type == TrackType::Label;
 }
 
+bool isMidiTrack(TrackType type)
+{
+    return type == TrackType::Midi;
+}
+
 using TrackFilter = bool (*)(TrackType);
 
 TrackFilter filterFor(TrackType type)
 {
-    return isAudioTrack(type) ? isAudioTrack : isLabelTrack;
+    return isAudioTrack(type) ? isAudioTrack : isMidiTrack(type) ? isMidiTrack : isLabelTrack;
 }
 
 TrackIdList tracksMatching(const std::vector<Track>& tracks, TrackFilter filter)
@@ -358,27 +363,42 @@ void TrackItemsMoveController::updatePreview(double timeOffset, int trackOffset)
     }
 
     const auto tracks = m_project->trackList();
-    const TrackIdList audio = tracksMatching(tracks, isAudioTrack);
-    const int originalAudioCount = static_cast<int>(audio.size()) - static_cast<int>(tracks.size() - m_originalTrackCount);
-    for (const trackedit::ClipKey& key : m_clips) {
-        const int source = indexOf(audio, key.trackId);
-        if (source >= 0) {
-            trackOffset = std::max(trackOffset, -source);
+    const std::vector<Track> original(tracks.begin(), tracks.begin() + m_originalTrackCount);
+    for (const auto family : { isAudioTrack, isMidiTrack }) {
+        const auto compatible = tracksMatching(original, family);
+        for (const auto& key : m_clips) {
+            const int source = indexOf(compatible, key.trackId);
+            if (source >= 0) {
+                trackOffset = std::max(trackOffset, -source);
+            }
         }
     }
-    int extraTracks = 0;
-    for (const trackedit::ClipKey& key : m_clips) {
-        const int source = indexOf(audio, key.trackId);
-        if (source >= 0) {
-            extraTracks = std::max(extraTracks, source + trackOffset - (originalAudioCount - 1));
+    int extraAudio = 0, extraMidi = 0;
+    for (const auto family : { isAudioTrack, isMidiTrack }) {
+        const auto compatible = tracksMatching(original, family);
+        int& extra = family == isAudioTrack ? extraAudio : extraMidi;
+        for (const auto& key : m_clips) {
+            const int source = indexOf(compatible, key.trackId);
+            if (source >= 0) {
+                extra = std::max(extra, source + trackOffset - (static_cast<int>(compatible.size()) - 1));
+            }
         }
     }
-    const size_t targetCount = m_originalTrackCount + extraTracks;
-    if (tracks.size() > targetCount) {
-        tracksInteraction()->removeDragAddedTracks(targetCount, true /* emptyOnly */);
+    const int currentAudio = static_cast<int>(tracksMatching(tracks, isAudioTrack).size() - tracksMatching(original, isAudioTrack).size());
+    const int currentMidi = static_cast<int>(tracksMatching(tracks, isMidiTrack).size() - tracksMatching(original, isMidiTrack).size());
+    const bool rebuild = extraAudio < currentAudio || extraMidi < currentMidi;
+    if (rebuild) {
+        tracksInteraction()->removeDragAddedTracks(m_originalTrackCount, true /* emptyOnly */);
     }
-    for (size_t i = tracks.size(); i < targetCount; ++i) {
+    for (int i = rebuild ? 0 : currentAudio; i < extraAudio; ++i) {
         tracksInteraction()->addWaveTrack(1);
+    }
+    const auto midiSource = std::find_if(m_clips.begin(), m_clips.end(), [this](const auto& key) {
+        const auto track = m_project->track(key.trackId);
+        return track && isMidiTrack(track->type);
+    });
+    for (int i = rebuild ? 0 : currentMidi; i < extraMidi; ++i) {
+        tracksInteraction()->addInstrumentTrack(midiSource == m_clips.end() ? INVALID_TRACK : midiSource->trackId);
     }
     m_timeOffset = timeOffset;
     m_trackOffset = trackOffset;

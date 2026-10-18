@@ -7,6 +7,7 @@
 #include "iprojecthistory.h"
 
 #include "context/iglobalcontext.h"
+#include "itracksviewrequestsservice.h"
 #include "modularity/ioc.h"
 
 #include "au3wrap/au3types.h"
@@ -15,6 +16,7 @@ namespace au::trackedit {
 class Au3ProjectHistory : public IProjectHistory, public muse::Contextable
 {
     muse::ContextInject<context::IGlobalContext> globalContext { this };
+    muse::ContextInject<ITracksViewRequestsService> viewRequests { this };
 
 public:
     Au3ProjectHistory(const muse::modularity::ContextPtr& ctx)

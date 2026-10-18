@@ -7,6 +7,7 @@
 #include "global/realfn.h"
 
 #include "au3-track/Track.h"
+#include "au3-midi-track/MidiTrack.h"
 #include "au3-time-frequency-selection/ViewInfo.h"
 
 #include "au3wrap/internal/domconverter.h"
@@ -132,16 +133,12 @@ ClipKeyList Au3SelectionController::findClipsIntersectingRangeSelection() const
 
 ClipKeyList Au3SelectionController::clipKeysIntersecting(const TrackId& trackId, double startTime, double endTime) const
 {
-    WaveTrack* waveTrack = au3::DomAccessor::findWaveTrack(projectRef(), ::TrackId(trackId));
-    if (!waveTrack) {
-        return {};
-    }
-
     ClipKeyList result;
-    for (const auto& clip : waveTrack->GetSortedClipsIntersecting(startTime, endTime)) {
-        result.push_back(DomConverter::clip(waveTrack, clip.get()).key);
+    for (const auto& clip : globalContext()->currentTrackeditProject()->clipList(trackId)) {
+        if (clip.startTime < endTime && clip.endTime > startTime) {
+            result.push_back(clip.key);
+        }
     }
-
     return result;
 }
 
@@ -472,100 +469,46 @@ muse::async::Channel<ClipKeyList> Au3SelectionController::clipsSelected() const
 
 std::optional<secs_t> Au3SelectionController::selectedClipStartTime() const
 {
-    auto clipKeyList = selectedClips();
-    if (clipKeyList.empty()) {
+    const auto keys = selectedClips();
+    if (keys.empty()) {
         return std::nullopt;
     }
-
-    auto clipKey = clipKeyList.at(0);
-
-    WaveTrack* waveTrack = au3::DomAccessor::findWaveTrack(projectRef(), ::TrackId(clipKey.trackId));
-    IF_ASSERT_FAILED(waveTrack) {
-        return std::nullopt;
-    }
-
-    std::shared_ptr<WaveClip> clip = au3::DomAccessor::findWaveClip(waveTrack, clipKey.itemId);
-    if (!clip) {
-        return std::nullopt;
-    }
-
-    return clip->Start();
+    const auto clip = globalContext()->currentTrackeditProject()->clip(keys.front());
+    return clip.isValid() ? std::optional<secs_t>(clip.startTime) : std::nullopt;
 }
 
 std::optional<secs_t> Au3SelectionController::selectedClipEndTime() const
 {
-    auto clipKeyList = selectedClips();
-    if (clipKeyList.empty()) {
+    const auto keys = selectedClips();
+    if (keys.empty()) {
         return std::nullopt;
     }
-
-    auto clipKey = clipKeyList.at(0);
-
-    WaveTrack* waveTrack = au3::DomAccessor::findWaveTrack(projectRef(), ::TrackId(clipKey.trackId));
-    IF_ASSERT_FAILED(waveTrack) {
-        return std::nullopt;
-    }
-
-    std::shared_ptr<WaveClip> clip = au3::DomAccessor::findWaveClip(waveTrack, clipKey.itemId);
-    if (!clip) {
-        return std::nullopt;
-    }
-
-    return clip->End();
+    const auto clip = globalContext()->currentTrackeditProject()->clip(keys.front());
+    return clip.isValid() ? std::optional<secs_t>(clip.endTime) : std::nullopt;
 }
 
 std::optional<secs_t> Au3SelectionController::leftMostSelectedClipStartTime() const
 {
-    std::optional<secs_t> startTime;
-    for (const auto& selectedClip : selectedClips()) {
-        Au3WaveTrack* waveTrack = DomAccessor::findWaveTrack(projectRef(), Au3TrackId(selectedClip.trackId));
-        IF_ASSERT_FAILED(waveTrack) {
-            continue;
-        }
-
-        std::shared_ptr<Au3WaveClip> clip = DomAccessor::findWaveClip(waveTrack, selectedClip.itemId);
-        if (!clip) {
-            continue;
-        }
-
-        if (!startTime.has_value()) {
-            startTime = clip->GetPlayStartTime();
-            continue;
-        }
-
-        if (!muse::RealIsEqualOrMore(clip->GetPlayStartTime(), startTime.value())) {
-            startTime = clip->GetPlayStartTime();
+    std::optional<secs_t> result;
+    for (const auto& key : selectedClips()) {
+        const auto clip = globalContext()->currentTrackeditProject()->clip(key);
+        if (clip.isValid() && (!result || clip.startTime < *result)) {
+            result = clip.startTime;
         }
     }
-
-    return startTime;
+    return result;
 }
 
 std::optional<secs_t> Au3SelectionController::rightMostSelectedClipEndTime() const
 {
-    std::optional<secs_t> endTime;
-    for (const auto& selectedClip : selectedClips()) {
-        Au3WaveTrack* waveTrack = DomAccessor::findWaveTrack(projectRef(), Au3TrackId(selectedClip.trackId));
-        IF_ASSERT_FAILED(waveTrack) {
-            continue;
-        }
-
-        std::shared_ptr<Au3WaveClip> clip = DomAccessor::findWaveClip(waveTrack, selectedClip.itemId);
-        IF_ASSERT_FAILED(clip) {
-            continue;
-        }
-
-        if (!endTime.has_value()) {
-            endTime = clip->GetPlayEndTime();
-            continue;
-        }
-
-        if (!muse::RealIsEqualOrLess(clip->GetPlayEndTime(), endTime.value())) {
-            endTime = clip->GetPlayEndTime();
+    std::optional<secs_t> result;
+    for (const auto& key : selectedClips()) {
+        const auto clip = globalContext()->currentTrackeditProject()->clip(key);
+        if (clip.isValid() && (!result || clip.endTime > *result)) {
+            result = clip.endTime;
         }
     }
-
-    return endTime;
+    return result;
 }
 
 // label selection
@@ -886,12 +829,18 @@ bool au::trackedit::Au3SelectionController::timeSelectionHasAudioData() const
     }
 
     for (const auto& trackId : m_selectedTracks.val) {
-        WaveTrack* waveTrack = au3::DomAccessor::findWaveTrack(projectRef(), ::TrackId(trackId));
-        IF_ASSERT_FAILED(waveTrack) {
-            return false;
-        }
-
-        if (!waveTrack->IsEmpty(m_selectedStartTime.val, m_selectedEndTime.val)) {
+        const auto* track = au3::DomAccessor::findTrack(projectRef(), ::TrackId(trackId));
+        const auto* midi = dynamic_cast<const MidiTrack*>(track);
+        const auto* wave = dynamic_cast<const WaveTrack*>(track);
+        if (midi) {
+            for (const auto& clip : midi->GetClips()) {
+                const double start = clip.start * 60.0 / midi->GetTempo();
+                const double end = (clip.start + clip.length) * 60.0 / midi->GetTempo();
+                if (start < m_selectedEndTime.val && end > m_selectedStartTime.val) {
+                    return true;
+                }
+            }
+        } else if (wave && !wave->IsEmpty(m_selectedStartTime.val, m_selectedEndTime.val)) {
             return true;
         }
     }
@@ -1034,17 +983,12 @@ bool Au3SelectionController::selectionContainsGroup() const
     }
 
     for (const auto& clipKey : clipKeyList) {
-        WaveTrack* waveTrack = au3::DomAccessor::findWaveTrack(projectRef(), ::TrackId(clipKey.trackId));
-        IF_ASSERT_FAILED(waveTrack) {
+        const auto clip = globalContext()->currentTrackeditProject()->clip(clipKey);
+        if (!clip.isValid()) {
             return false;
         }
 
-        std::shared_ptr<WaveClip> clip = au3::DomAccessor::findWaveClip(waveTrack, clipKey.itemId);
-        if (!clip) {
-            return false;
-        }
-
-        if (clip->GetGroupId() != -1) {
+        if (clip.groupId != -1) {
             return true;
         }
     }
@@ -1062,22 +1006,17 @@ bool Au3SelectionController::isSelectionGrouped() const
     std::optional<int64_t> selectionGroupId;
 
     for (const auto& clipKey : clipKeyList) {
-        WaveTrack* waveTrack = au3::DomAccessor::findWaveTrack(projectRef(), ::TrackId(clipKey.trackId));
-        IF_ASSERT_FAILED(waveTrack) {
-            return false;
-        }
-
-        std::shared_ptr<WaveClip> clip = au3::DomAccessor::findWaveClip(waveTrack, clipKey.itemId);
-        if (!clip) {
+        const auto clip = globalContext()->currentTrackeditProject()->clip(clipKey);
+        if (!clip.isValid()) {
             return false;
         }
 
         if (!selectionGroupId.has_value()) {
-            selectionGroupId = clip->GetGroupId();
+            selectionGroupId = clip.groupId;
             continue;
         }
 
-        if (clip->GetGroupId() != selectionGroupId.value()) {
+        if (clip.groupId != selectionGroupId.value()) {
             return false;
         }
     }

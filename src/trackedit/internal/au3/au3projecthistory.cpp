@@ -31,6 +31,12 @@ bool au::trackedit::Au3ProjectHistory::undoAvailable() const
 
 void au::trackedit::Au3ProjectHistory::undo()
 {
+    if (const auto requests = viewRequests()) {
+        requests->requestFlushInstrumentChanges();
+    }
+    if (!undoAvailable()) {
+        return;
+    }
     doUndo();
 
     m_interactionOngoing = false;
@@ -49,6 +55,12 @@ bool au::trackedit::Au3ProjectHistory::redoAvailable() const
 
 void au::trackedit::Au3ProjectHistory::redo()
 {
+    if (const auto requests = viewRequests()) {
+        requests->requestFlushInstrumentChanges();
+    }
+    if (!redoAvailable()) {
+        return;
+    }
     doRedo();
 
     m_interactionOngoing = false;
@@ -134,6 +146,9 @@ void Au3ProjectHistory::markUnsaved()
 
 void Au3ProjectHistory::undoRedoToIndex(size_t index)
 {
+    if (const auto requests = viewRequests()) {
+        requests->requestFlushInstrumentChanges();
+    }
     if (currentStateIndex() == index) {
         return;
     }

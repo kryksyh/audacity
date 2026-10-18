@@ -136,6 +136,8 @@ void PanelTracksListModel::addTrack(TrackTypes::Type type)
         dispatcher()->dispatch("new-mono-track");
     } else if (type == TrackTypes::Type::STEREO) {
         dispatcher()->dispatch("new-stereo-track");
+    } else if (type == TrackTypes::Type::MIDI) {
+        dispatcher()->dispatch("new-instrument-track");
     } else if (type == TrackTypes::Type::LABEL) {
         dispatcher()->dispatch("new-label-track");
     }
@@ -181,7 +183,7 @@ void PanelTracksListModel::selectAudioData(int row)
 
     if (TrackItem* item = modelIndexToItem(index(row))) {
         const trackedit::TrackType type = item->trackType();
-        if (type == trackedit::TrackType::Mono || type == trackedit::TrackType::Stereo) {
+        if (type == trackedit::TrackType::Mono || type == trackedit::TrackType::Stereo || type == trackedit::TrackType::Midi) {
             selectionController()->setSelectedTrackAudioData(item->trackId());
         }
     }
@@ -571,6 +573,7 @@ TrackItem* PanelTracksListModel::buildTrackItem(const Track& track)
     switch (track.type) {
     case trackedit::TrackType::Mono:
     case trackedit::TrackType::Stereo:
+    case trackedit::TrackType::Midi:
         item = new WaveTrackItem(this);
         break;
     case trackedit::TrackType::Label:

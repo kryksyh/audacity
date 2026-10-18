@@ -287,8 +287,9 @@ ListItemBlank {
 
         BypassEffectButton {
             id: bypassButton
+            objectName: "realtimeEffectBypass-" + (item && item.isMasterEffect ? "master-" : "track-") + root.index
 
-            enabled: item && item.isAvailable
+            enabled: item !== null
 
             Layout.margins: 0
             Layout.alignment: Qt.AlignVCenter
@@ -312,6 +313,7 @@ ListItemBlank {
 
         FlatButton {
             id: effectNameButton
+            objectName: "realtimeEffectEditor-" + (item && item.isMasterEffect ? "master-" : "track-") + root.index
 
             enabled: item && item.isAvailable
             opacity: 1 // Force opacity to 1 even when disabled to ensure text stays sufficiently legible.

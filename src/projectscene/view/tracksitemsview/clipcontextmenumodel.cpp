@@ -42,6 +42,8 @@ void ClipContextMenuModel::load()
         return item;
     };
 
+    const auto trackeditProject = globalContext()->currentTrackeditProject();
+    m_isMidi = trackeditProject && trackeditProject->clip(m_clipKey.key).isMidi;
     auto enableStretchItem = makeItemWithArg(ENABLE_STRETCH_CODE);
     updateStretchEnabledState(*enableStretchItem);
 
@@ -93,8 +95,25 @@ void ClipContextMenuModel::load()
         renderPitchSpeedItem,
     };
 
+    if (m_isMidi) {
+        auto* pianoRoll = new MenuItem(this);
+        pianoRoll->setId("midi-piano-roll");
+        pianoRoll->setTitle(muse::TranslatableString("clip", "Open piano roll"));
+        pianoRoll->setState(muse::ui::UiActionState::make_enabled());
+        const auto audioOnly = [](const MenuItem* item) {
+            const auto code = item->action().code;
+            return code == "clip-properties" || code == "disjoin" || code == ENABLE_STRETCH_CODE
+                   || code == "clip-pitch-speed-open" || code == RENDER_PITCH_SPEED_CODE || code == RESET_PITCH_SPEED_CODE;
+        };
+        items.erase(std::remove_if(items.begin(), items.end(), audioOnly), items.end());
+        // The final separator preceded the audio-only pitch and speed controls.
+        if (!items.empty() && items.back()->id().isEmpty()) {
+            items.removeLast();
+        }
+        items.prepend(pianoRoll);
+    }
     const auto project = globalContext()->currentProject();
-    if (project && project->viewState()) {
+    if (!m_isMidi && project && project->viewState()) {
         muse::ValCh<trackedit::TrackViewType> valCh = project->viewState()->trackViewType(m_clipKey.trackId());
 
         if (valCh.val == trackedit::TrackViewType::Spectrogram || valCh.val == trackedit::TrackViewType::WaveformAndSpectrogram) {
@@ -128,6 +147,15 @@ void ClipContextMenuModel::load()
     updateColorMenu();
 }
 
+void ClipContextMenuModel::handleMenuItem(const QString& itemId)
+{
+    if (itemId == "midi-piano-roll") {
+        viewRequests()->requestPianoRoll(m_clipKey.trackId(), m_clipKey.itemId());
+        return;
+    }
+    AbstractMenuModel::handleMenuItem(itemId);
+}
+
 ClipKey ClipContextMenuModel::clipKey() const
 {
     return m_clipKey;
@@ -143,12 +171,12 @@ void ClipContextMenuModel::onActionsStateChanges(const muse::actions::ActionCode
 {
     AbstractMenuModel::onActionsStateChanges(codes);
 
-    if (containsAction(codes, ENABLE_STRETCH_CODE)) {
+    if (!m_isMidi && containsAction(codes, ENABLE_STRETCH_CODE)) {
         MenuItem& item = findItem(ActionCode(ENABLE_STRETCH_CODE));
         updateStretchEnabledState(item);
     }
 
-    if (containsAny(codes, PITCH_SPEED_CODES)) {
+    if (!m_isMidi && containsAny(codes, PITCH_SPEED_CODES)) {
         for (const auto& code : PITCH_SPEED_CODES) {
             MenuItem& item = findItem(ActionCode(code));
             updatePitchSpeedModifiedEnabledState(item);

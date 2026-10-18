@@ -70,6 +70,7 @@ public:
     MOCK_METHOD(muse::Ret, makeRoomForClip, (const trackedit::ClipKey&), (override));
 
     MOCK_METHOD(bool, newMonoTrack, (), (override));
+    MOCK_METHOD(bool, newInstrumentTrack, (), (override));
     MOCK_METHOD(bool, newStereoTrack, (), (override));
     MOCK_METHOD(muse::RetVal<TrackId>, newLabelTrack, (const muse::String&), (override));
 

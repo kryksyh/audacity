@@ -1,0 +1,2 @@
+module Audacity.Automation
+TrackAutomationPanel 1.0 TrackAutomationPanel.qml

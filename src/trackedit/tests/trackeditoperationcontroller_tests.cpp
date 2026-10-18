@@ -32,6 +32,11 @@ public:
         ON_CALL(*m_globalContext, currentProject()).WillByDefault(Return(m_currentProject));
         ON_CALL(*m_globalContext, currentTrackeditProject()).WillByDefault(Return(m_trackEditProject));
         initTestProject();
+        ON_CALL(*m_trackEditProject, clip(_)).WillByDefault([this](const ClipKey& key) {
+            auto* wave = DomAccessor::findWaveTrack(projectRef(), Au3TrackId(key.trackId));
+            const auto clip = wave ? DomAccessor::findWaveClip(wave, key.itemId) : nullptr;
+            return clip ? DomConverter::clip(wave, clip.get()) : Clip {};
+        });
 
         m_selection = std::make_shared<Au3SelectionController>(ctx);
         m_history = std::make_shared<NiceMock<ProjectHistoryMock> >();

@@ -3,6 +3,7 @@
 #include "internal/au3/au3clipgaininteraction.h"
 
 #include "view/clipgainmodel.h"
+#include "view/trackautomationmodel.h"
 
 #include <QtQml/qqml.h>
 
@@ -20,6 +21,7 @@ std::string AutomationModule::moduleName() const
 
 void AutomationModule::registerUiTypes()
 {
+    qmlRegisterType<TrackAutomationModel>("Audacity.Automation", 1, 0, "TrackAutomationModel");
     qmlRegisterType<ClipGainModel>("Audacity.Automation", 1, 0, "ClipGainModel");
 }
 
@@ -36,4 +38,14 @@ muse::modularity::IContextSetup* AutomationModule::newContext(
 void AutomationContext::registerExports()
 {
     ioc()->registerExport<IClipGainInteraction>(mname, std::make_shared<Au3ClipGainInteraction>(iocContext()));
+}
+
+static void automation_init_qrc()
+{
+    Q_INIT_RESOURCE(automation);
+}
+
+void AutomationModule::registerResources()
+{
+    automation_init_qrc();
 }

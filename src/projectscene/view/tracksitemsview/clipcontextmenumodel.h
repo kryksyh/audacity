@@ -8,6 +8,7 @@
 
 #include "iprojectsceneconfiguration.h"
 #include "types/projectscenetypes.h"
+#include "trackedit/itracksviewrequestsservice.h"
 
 namespace au::projectscene {
 class ClipContextMenuModel : public muse::uicomponents::AbstractMenuModel
@@ -17,12 +18,15 @@ class ClipContextMenuModel : public muse::uicomponents::AbstractMenuModel
     muse::GlobalInject<projectscene::IProjectSceneConfiguration> projectSceneConfiguration;
     muse::ContextInject<context::IGlobalContext> globalContext{ this };
 
+    muse::ContextInject<trackedit::ITracksViewRequestsService> viewRequests{ this };
+
     Q_PROPERTY(ClipKey clipKey READ clipKey WRITE setClipKey NOTIFY clipKeyChanged FINAL)
 
 public:
     ClipContextMenuModel() = default;
 
     Q_INVOKABLE void load() override;
+    Q_INVOKABLE void handleMenuItem(const QString& itemId) override;
 
     ClipKey clipKey() const;
     void setClipKey(const ClipKey& newClipKey);
@@ -40,6 +44,7 @@ private:
     void updateColorCheckedState();
     void updateColorMenu();
 
+    bool m_isMidi = false;
     ClipKey m_clipKey;
     muse::actions::ActionCodeList m_colorChangeActionCodeList;
 };

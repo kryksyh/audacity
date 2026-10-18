@@ -17,6 +17,8 @@ class TrackClipItem : public ViewTrackItem
     muse::GlobalInject<IProjectSceneConfiguration> configuration;
 
     Q_PROPERTY(bool isGrouped READ isGrouped NOTIFY groupIdChanged FINAL)
+    Q_PROPERTY(bool isMidi READ isMidi NOTIFY contentChanged FINAL)
+    Q_PROPERTY(QVariantList midiNotes READ midiNotes NOTIFY contentChanged FINAL)
     Q_PROPERTY(int pitch READ pitch NOTIFY pitchChanged FINAL)
     Q_PROPERTY(int speedPercentage READ speedPercentage NOTIFY speedPercentageChanged FINAL)
     Q_PROPERTY(bool isPitchModified READ isPitchModified NOTIFY pitchChanged FINAL)
@@ -29,6 +31,8 @@ public:
     void setClip(const trackedit::Clip& clip);
 
     bool isGrouped() const;
+    bool isMidi() const { return m_isMidi; }
+    QVariantList midiNotes() const { return m_midiNotes; }
 
     int pitch() const;
     int speedPercentage() const;
@@ -44,6 +48,8 @@ signals:
 
 private:
     int m_groupId = -1;
+    bool m_isMidi = false;
+    QVariantList m_midiNotes;
     int m_pitch = 0;
     double m_speed = 1.0;
 };

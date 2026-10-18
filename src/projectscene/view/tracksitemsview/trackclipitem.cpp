@@ -21,6 +21,11 @@ void TrackClipItem::setClip(const trackedit::Clip& clip)
     m_groupId = clip.groupId;
     m_pitch = clip.pitch;
     m_speed = clip.speed;
+    m_isMidi = clip.isMidi;
+    m_midiNotes.clear();
+    for (const auto& note : clip.midiNotes) {
+        m_midiNotes.push_back(QVariantMap { { "start", note.start }, { "length", note.length }, { "pitch", note.pitch } });
+    }
 
     emit titleChanged();
     emit pitchChanged();

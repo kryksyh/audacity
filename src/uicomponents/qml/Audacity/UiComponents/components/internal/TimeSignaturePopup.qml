@@ -9,6 +9,7 @@ import Muse.UiComponents
 
 StyledPopupView {
     id: root
+    navigationSection.name: "TimeSignaturePopup"
 
     property int upper: 0
     property int lower: 0
@@ -50,6 +51,7 @@ StyledPopupView {
 
             IncrementalPropertyControl {
                 id: control
+                objectName: "TimeSignatureNumerator"
 
                 implicitWidth: 80
                 anchors.verticalCenter: parent.verticalCenter
@@ -61,6 +63,7 @@ StyledPopupView {
                 minValue: 1
 
                 navigation.panel: navPanel
+                navigation.name: "TimeSignatureNumerator"
                 navigation.order: 1
                 navigation.accessible.name: titleLabel.text + " : " + currentValue
 
@@ -78,6 +81,7 @@ StyledPopupView {
 
             StyledDropdown {
                 id: timeComboBox
+                objectName: "TimeSignatureDenominator"
 
                 width: control.width
                 anchors.verticalCenter: parent.verticalCenter
@@ -112,7 +116,8 @@ StyledPopupView {
                 ]
 
                 navigation.panel: navPanel
-                navigation.order: 2
+                navigation.name: "TimeSignatureDenominator"
+                navigation.order: 3
 
                 onActivated: function (index, value) {
                     root.lowerChangeRequested(value)

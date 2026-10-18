@@ -4,11 +4,13 @@ import Muse.Ui
 import Muse.UiComponents
 
 import Audacity.ProjectScene
+import Audacity.TrackEdit
 import Audacity.Spectrogram
 
 TrackItemsContainer {
     id: root
 
+    property bool isMidiTrack: false
     property bool isBrush: false
     property bool isIsolationMode: false
     property bool isNearSample: false
@@ -47,8 +49,31 @@ TrackItemsContainer {
         context: root.context
     }
 
+    PianoRollModel {
+        id: midi
+        trackId: root.trackId
+    }
+
     onInitRequired: function () {
         clipsModel.init()
+        if (root.isMidiTrack)
+            midi.init()
+    }
+
+    function editMidiAt(x) {
+        if (!root.isMidiTrack || !midi.editable)
+            return false
+        const time = Math.max(0, root.context.positionToTime(x))
+        for (const clip of midi.clips) {
+            if (time >= clip.start && time < clip.start + clip.length) {
+                midi.openEditor(clip.id)
+                return true
+            }
+        }
+        const id = midi.addClip(time)
+        if (id > 0)
+            midi.openEditor(id)
+        return id > 0
     }
 
     function changeClipTitle(index, newTitle) {
@@ -388,6 +413,8 @@ TrackItemsContainer {
                                 clipSelectedColor: itemData.selectedColor
                                 isGrouped: itemData.isGrouped
                                 clipKey: itemData.key
+                                isMidiClip: itemData.isMidi
+                                midiNotes: itemData.midiNotes
                                 clipTime: itemData.time
                                 pitch: itemData.pitch
                                 isPitchModified: itemData.isPitchModified

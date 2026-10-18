@@ -21,6 +21,8 @@
 #include "project/tests/mocks/dummyeffectinstancefactory.h"
 
 #include "au3interactiontestbase.h"
+#include "au3-midi-track/MidiTrack.h"
+#include "au3wrap/internal/domconverter.h"
 #include "mocks/selectioncontrollermock.h"
 #include "mocks/trackeditconfigurationmock.h"
 #include "mocks/projecthistorymock.h"
@@ -68,6 +70,22 @@ public:
         .WillByDefault(Return(m_trackEditProject));
 
         initTestProject();
+        ON_CALL(*m_trackEditProject, clip(_)).WillByDefault([this](const ClipKey& key) {
+            auto* track = au3::DomAccessor::findTrack(projectRef(), au3::Au3TrackId(key.trackId));
+            if (const auto* midi = dynamic_cast<const MidiTrack*>(track)) {
+                for (const auto& clip : midi->GetClips()) {
+                    if (clip.id == key.itemId) {
+                        return au3::DomConverter::clip(midi, &clip);
+                    }
+                }
+            }
+            if (auto* wave = dynamic_cast<WaveTrack*>(track)) {
+                if (const auto clip = au3::DomAccessor::findWaveClip(wave, key.itemId)) {
+                    return au3::DomConverter::clip(wave, clip.get());
+                }
+            }
+            return Clip {};
+        });
     }
 
     std::shared_ptr<Au3ClipsInteraction> m_clipsInteraction;
@@ -77,6 +95,66 @@ public:
     std::shared_ptr<muse::IInteractive> m_interactive;
     std::shared_ptr<automation::ClipGainInteractionMock> m_clipGainInteraction;
 };
+
+TEST_F(Au3ClipsInteractionTests, MidiTrimRestoresHiddenNotesAndExtendsEmptySpaceWithoutMovingThem)
+{
+    auto* track = MidiTrack::New(projectRef());
+    track->SetTempo(120);
+    MidiClipData clip { 1, "MIDI", 2, 8, 1, { { 1, 1, 2, 60, 100 }, { 2, 6, 1, 72, 90 } }, {} };
+    ASSERT_TRUE(track->SetClips({ clip }));
+    const ClipKeyList keys { { track->GetId(), 1 } };
+    ASSERT_TRUE(m_clipsInteraction->trimClipsLeft(keys, 1.0, 0.01, true));
+    EXPECT_DOUBLE_EQ(track->GetClips().front().visibleStart(), 4);
+    ASSERT_EQ(track->GetClips().front().notes.size(), clip.notes.size());
+    for (size_t i = 0; i < clip.notes.size(); ++i) {
+        EXPECT_EQ(track->GetClips().front().notes[i].id, clip.notes[i].id);
+        EXPECT_DOUBLE_EQ(track->GetClips().front().notes[i].start, clip.notes[i].start);
+        EXPECT_DOUBLE_EQ(track->GetClips().front().notes[i].length, clip.notes[i].length);
+        EXPECT_EQ(track->GetClips().front().notes[i].pitch, clip.notes[i].pitch);
+        EXPECT_EQ(track->GetClips().front().notes[i].velocity, clip.notes[i].velocity);
+    }
+    ASSERT_TRUE(m_clipsInteraction->trimClipsRight(keys, 1.0, 0.01, true));
+    EXPECT_DOUBLE_EQ(track->GetClips().front().visibleEnd(), 8);
+    ASSERT_TRUE(m_clipsInteraction->trimClipsLeft(keys, -2.0, 0.01, true));
+    ASSERT_TRUE(m_clipsInteraction->trimClipsRight(keys, -2.0, 0.01, true));
+    const auto extended = track->GetClips().front();
+    EXPECT_DOUBLE_EQ(extended.visibleStart(), 0);
+    EXPECT_DOUBLE_EQ(extended.visibleEnd(), 12);
+    EXPECT_DOUBLE_EQ(extended.start + extended.notes.front().start, 3);
+    EXPECT_DOUBLE_EQ(extended.notes.back().length, 1);
+    removeTrack(track->GetId());
+}
+
+TEST_F(Au3ClipsInteractionTests, MidiMoveUsesCompatibleTracksAndResolvesDestinationIdsAndOverlaps)
+{
+    auto* source = MidiTrack::New(projectRef());
+    auto* target = MidiTrack::New(projectRef());
+    ASSERT_TRUE(source->SetClips({ { 1, "Move", 0, 4, 1, { { 1, 0, 1, 60, 90 } }, {} } }));
+    ASSERT_TRUE(target->SetClips({ { 1, "Existing", 0, 12, 1, {}, {} } }));
+    auto result = m_clipsInteraction->moveClips({ { source->GetId(), 1 } }, 1.0, 1);
+    ASSERT_TRUE(result.ret);
+    ASSERT_EQ(result.val.size(), 1u);
+    EXPECT_EQ(result.val.front().trackId, target->GetId());
+    EXPECT_NE(result.val.front().itemId, 1);
+    EXPECT_TRUE(source->GetClips().empty());
+    ASSERT_EQ(target->GetClips().size(), 3u);
+    const auto moved = m_trackEditProject->clip(result.val.front());
+    EXPECT_DOUBLE_EQ(moved.startTime, 1);
+    EXPECT_DOUBLE_EQ(moved.endTime, 3);
+    for (const auto& other : target->GetClips()) {
+        if (other.id == result.val.front().itemId) {
+            continue;
+        }
+        EXPECT_TRUE(other.visibleEnd() <= 2 || other.visibleStart() >= 6);
+    }
+    auto copy = m_clipsInteraction->copyClip(result.val.front());
+    ASSERT_NE(copy, nullptr);
+    EXPECT_DOUBLE_EQ(copy->endTime(), 2);
+    ASSERT_TRUE(m_clipsInteraction->duplicateClips(result.val));
+    EXPECT_EQ(Au3TrackList::Get(projectRef()).Any<MidiTrack>().size(), 3u);
+    removeTrack(source->GetId());
+    removeTrack(target->GetId());
+}
 
 TEST_F(Au3ClipsInteractionTests, EnablingTempoMatchingWithoutClipTempoPreservesDuration)
 {

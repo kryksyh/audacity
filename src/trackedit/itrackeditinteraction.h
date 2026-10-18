@@ -88,6 +88,7 @@ public:
     virtual muse::Ret makeRoomForClip(const trackedit::ClipKey& clipKey) = 0;
 
     virtual bool newMonoTrack() = 0;
+    virtual bool newInstrumentTrack() = 0;
     virtual bool newStereoTrack() = 0;
     virtual muse::RetVal<TrackId> newLabelTrack(const muse::String& title = muse::String()) = 0;
 

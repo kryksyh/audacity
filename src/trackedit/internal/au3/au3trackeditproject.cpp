@@ -3,6 +3,7 @@
 #include <algorithm>
 
 #include "au3-label-track/LabelTrack.h"
+#include "au3-midi-track/MidiTrack.h"
 #include "au3-track/Track.h"
 #include "au3-wave-track/WaveTrack.h"
 #include "au3-time-track/TimeTrack.h"
@@ -69,20 +70,9 @@ std::vector<int64_t> Au3TrackeditProject::groupsIdsList() const
     std::vector<int64_t> groupsList;
 
     for (const auto& trackId : trackIdList()) {
-        Au3WaveTrack* waveTrack = DomAccessor::findWaveTrack(*m_impl->prj, Au3TrackId(trackId));
-        if (!waveTrack) {
-            continue;
-        }
-
-        for (const auto& key : clipList(trackId)) {
-            std::shared_ptr<Au3WaveClip> au3Clip = DomAccessor::findWaveClip(waveTrack, key.key.itemId);
-            IF_ASSERT_FAILED(au3Clip) {
-                return {};
-            }
-
-            int64_t groupId = au3Clip->GetGroupId();
-            if (!muse::contains(groupsList, groupId)) {
-                groupsList.push_back(groupId);
+        for (const auto& clip : clipList(trackId)) {
+            if (!muse::contains(groupsList, static_cast<int64_t>(clip.groupId))) {
+                groupsList.push_back(clip.groupId);
             }
         }
     }
@@ -121,6 +111,9 @@ void Au3TrackeditProject::updateHasAudioContent()
         }
     }
 
+    for (const auto* track : m_impl->trackList->Any<const MidiTrack>()) {
+        has |= !track->GetClips().empty();
+    }
     setHasAudioContent(has);
 }
 
@@ -250,6 +243,13 @@ void Au3TrackeditProject::onProjectTempoChange(double newTempo)
 au::trackedit::Clips Au3TrackeditProject::getClips(const TrackId& trackId) const
 {
     au::trackedit::Clips clips;
+
+    if (const auto* midi = dynamic_cast<const MidiTrack*>(DomAccessor::findTrack(*m_impl->prj, Au3TrackId(trackId)))) {
+        for (const auto& source : midi->GetClips()) {
+            clips.push_back(DomConverter::clip(midi, &source));
+        }
+        return clips;
+    }
 
     const Au3WaveTrack* waveTrack = DomAccessor::findWaveTrack(*m_impl->prj, Au3TrackId(trackId));
     if (!waveTrack) {
@@ -409,6 +409,14 @@ void Au3TrackeditProject::notifyAboutTrackMoved(const Track& track, int pos)
 
 au::trackedit::Clip Au3TrackeditProject::clip(const ClipKey& key) const
 {
+    if (const auto* midi = dynamic_cast<const MidiTrack*>(DomAccessor::findTrack(*m_impl->prj, Au3TrackId(key.trackId)))) {
+        for (const auto& source : midi->GetClips()) {
+            if (source.id == key.itemId) {
+                return DomConverter::clip(midi, &source);
+            }
+        }
+        return {};
+    }
     Au3WaveTrack* waveTrack = DomAccessor::findWaveTrack(*m_impl->prj, Au3TrackId(key.trackId));
     if (!waveTrack) {
         return Clip();

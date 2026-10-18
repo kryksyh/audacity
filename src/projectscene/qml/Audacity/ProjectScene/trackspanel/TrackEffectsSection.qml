@@ -15,7 +15,7 @@ Rectangle {
     id: root
 
     property alias isMasterTrack: effectList.isMasterTrack
-    property alias minimumHeight: prv.addEffectButtonHeight
+    readonly property real minimumHeight: prv.headerHeight + separator.implicitHeight + prv.addEffectButtonHeight + 2 * prv.addEffectButtonMargin + 1
 
     property NavigationPanel navigationPanel: null
     property int navigationOrderStart: 0
@@ -99,7 +99,7 @@ Rectangle {
             id: effectListContainer
             visible: prv.enabled
             color: ui.theme.backgroundTertiaryColor
-            Layout.preferredHeight: !effectList.empty * Math.min(effectList.implicitHeight, root.height - prv.addEffectButtonHeight - 2 * prv.addEffectButtonMargin - prv.headerHeight - separator.height)
+            Layout.preferredHeight: effectList.empty ? 0 : Math.max(0, Math.min(effectList.implicitHeight, root.height - root.minimumHeight))
             Layout.alignment: Qt.AlignHCenter | Qt.AlignVTop
             Layout.fillWidth: true
             TrackEffectList {

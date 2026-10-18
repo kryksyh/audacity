@@ -53,6 +53,7 @@ public:
     DragTracksInteraction()
         : Au3TracksInteraction(muse::modularity::globalCtx()) {}
     MOCK_METHOD(trackedit::TrackId, addWaveTrack, (int), (override));
+    MOCK_METHOD(trackedit::TrackId, addInstrumentTrack, (trackedit::TrackId), (override));
     MOCK_METHOD(void, removeDragAddedTracks, (size_t, bool), (override));
 };
 
@@ -220,6 +221,47 @@ protected:
     std::unique_ptr<TimelineContext> m_context;
     std::unique_ptr<TrackItemsMoveController> m_controller;
 };
+
+TEST_F(TrackItemsMoveControllerTests, MidiGhostUsesCompatibleTracksAndCancelLeavesTheDocumentUnchanged)
+{
+    selectClip();
+    m_clip.isMidi = true;
+    m_tracks = { { 1, {}, trackedit::TrackType::Midi }, { 3, {}, trackedit::TrackType::Stereo },
+        { 2, {}, trackedit::TrackType::Midi } };
+    m_controller->start(TrackItemKey(m_clip.key));
+    movePointer(12.0, 250.0);
+    m_controller->update();
+    EXPECT_TRUE(m_controller->isDragged(m_clip.key));
+    EXPECT_EQ(m_controller->itemsOnTrack(2), m_selectedClips);
+    EXPECT_TRUE(m_controller->itemsOnTrack(3).empty());
+    EXPECT_DOUBLE_EQ(m_controller->timeOffset(), 2.0);
+    EXPECT_DOUBLE_EQ(m_clip.startTime, 10.0);
+    EXPECT_CALL(*m_tracksInteraction, removeDragAddedTracks(3, true));
+    EXPECT_TRUE(m_controller->cancel());
+    expectFinished();
+}
+
+TEST_F(TrackItemsMoveControllerTests, MidiDragBelowLastTrackCreatesAnInstrumentDestinationAndCommitsOnce)
+{
+    selectClip();
+    m_clip.isMidi = true;
+    m_tracks = { { 1, {}, trackedit::TrackType::Midi } };
+    EXPECT_CALL(*m_tracksInteraction, addWaveTrack(_)).Times(0);
+    EXPECT_CALL(*m_tracksInteraction, addInstrumentTrack(1)).WillOnce([this](trackedit::TrackId) {
+        m_tracks.push_back({ 2, {}, trackedit::TrackType::Midi });
+        return 2;
+    });
+    m_controller->start(TrackItemKey(m_clip.key));
+    movePointer(12, 120);
+    m_controller->update();
+    EXPECT_EQ(m_controller->itemsOnTrack(2), m_selectedClips);
+    // Stay over the newly created track, so releasing commits its current ghost.
+    const trackedit::ClipKeyList moved { { 2, 10 } };
+    EXPECT_CALL(*m_interaction, moveClips(m_selectedClips, trackedit::secs_t(2), 1))
+    .WillOnce(Return(muse::RetVal<trackedit::ClipKeyList>::make_ok(moved)));
+    EXPECT_EQ(m_controller->finish().key, moved.front());
+    expectFinished();
+}
 
 TEST_F(TrackItemsMoveControllerTests, DropAfterSourceDelegateIsDestroyed)
 {

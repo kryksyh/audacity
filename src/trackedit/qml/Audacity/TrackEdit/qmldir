@@ -3,3 +3,9 @@ ClipImageButton 1.0 ClipImageButton.qml
 BehaviorChoice 1.0 BehaviorChoice.qml
 DeleteBehaviorPanel 1.0 DeleteBehaviorPanel.qml
 PasteBehaviorPanel 1.0 PasteBehaviorPanel.qml
+PianoRollPanel 1.0 PianoRollPanel.qml
+PianoKeyboard 1.0 PianoKeyboard.qml
+
+TrackRoutingPanel 1.0 TrackRoutingPanel.qml
+
+InstrumentEditorDialog 1.0 InstrumentEditorDialog.qml

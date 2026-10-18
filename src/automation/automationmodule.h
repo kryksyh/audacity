@@ -15,6 +15,7 @@ public:
 public:
     std::string moduleName() const override;
     void registerUiTypes() override;
+    void registerResources() override;
 
     muse::modularity::IContextSetup* newContext(const muse::modularity::ContextPtr& ctx) const override;
 };

@@ -108,6 +108,8 @@ RowLayout {
         }
 
         navigation.panel: root.navigation.panel
+        navigation.name: "TimeSignaturePopupButton"
+        navigation.accessible.name: qsTrc("au/uicomponents", "Edit time signature")
         navigation.row: root.navigation.row
         navigation.column: root.navigation.column + 1
 

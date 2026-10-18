@@ -60,6 +60,7 @@ public:
     bool splitDeleteSelectedOnTracks(const TrackIdList tracksIds, secs_t begin, secs_t end) override;
 
     bool newMonoTrack() override;
+    bool newInstrumentTrack() override;
     bool newStereoTrack() override;
     muse::RetVal<TrackId> newLabelTrack(const muse::String& title = muse::String()) override;
 
@@ -82,6 +83,7 @@ public:
     double nearestZeroCrossing(double time) const override;
 
     au::trackedit::TrackId addWaveTrack(int nChannels) override;
+    TrackId addInstrumentTrack(TrackId sourceId = INVALID_TRACK) override;
     void removeDragAddedTracks(size_t numTracksWhenDragStarted, bool emptyOnly) override;
 
     muse::Progress progress() const override;

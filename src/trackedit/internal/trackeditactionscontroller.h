@@ -29,6 +29,7 @@
 #include "itracknavigationcontroller.h"
 
 #include "deletebehavioronboardingscenario.h"
+#include "au3/mixrenderscenario.h"
 
 #include "../itrackeditactionscontroller.h"
 
@@ -55,7 +56,7 @@ class TrackeditActionsController : public ITrackeditActionsController, public mu
 
 public:
     TrackeditActionsController(const muse::modularity::ContextPtr& ctx)
-        : muse::Contextable(ctx), m_deleteBehaviorOnboardingScenario(ctx) {}
+        : muse::Contextable(ctx), m_deleteBehaviorOnboardingScenario(ctx), m_mixRenderer(std::make_shared<MixRenderScenario>(ctx)) {}
 
     void init();
 
@@ -205,5 +206,6 @@ private:
     muse::async::Channel<muse::actions::ActionCode> m_actionCheckedChanged;
 
     DeleteBehaviorOnboardingScenario m_deleteBehaviorOnboardingScenario;
+    std::shared_ptr<MixRenderScenario> m_mixRenderer;
 };
 }

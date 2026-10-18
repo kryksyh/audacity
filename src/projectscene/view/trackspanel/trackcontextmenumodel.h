@@ -47,6 +47,7 @@ private:
     muse::uicomponents::MenuItemList makeMonoTrackItems();
     muse::uicomponents::MenuItemList makeStereoTrackItems();
     muse::uicomponents::MenuItemList makeLabelTrackItems();
+    muse::uicomponents::MenuItemList makeMidiTrackItems();
 
     muse::uicomponents::MenuItemList makeTrackColorItems();
     muse::uicomponents::MenuItemList makeTrackFormatItems();

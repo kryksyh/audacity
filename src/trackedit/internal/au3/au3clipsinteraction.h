@@ -96,6 +96,12 @@ public:
 private:
     friend class Au3ClipsInteractionTests;
 
+    bool editMidiClipBoundaries(const ClipKeyList& keys, secs_t delta, secs_t minimum, bool completed, bool left, bool stretch);
+    muse::RetVal<ClipKeyList> moveMidiClips(const ClipKeyList& keys, secs_t timeOffset, int trackOffset);
+    muse::Ret makeRoomForMidiClip(const ClipKey& key);
+    bool duplicateMidiClips(const ClipKeyList& keys);
+    void notifyMidiClipChanged(const ClipKey& key);
+
     int64_t determineNewGroupId(const ClipKeyList& clipKeyList) const;
 
     au3::Au3Project& projectRef() const;

@@ -702,6 +702,17 @@ Rectangle {
                     return
                 }
 
+                const targetTrack = tracksViewState.trackAtPosition(e.x, e.y)
+                if (tracksItemsView.checkIfAnyTrack(function (trackItem) {
+                    if (trackItem.editMidiAt && trackItem.isMidiTrack && trackItem.trackId == targetTrack) {
+                        const point = trackItem.mapFromItem(mainMouseArea, e.x, e.y)
+                        return trackItem.editMidiAt(point.x)
+                    }
+                    return false
+                })) {
+                    return
+                }
+
                 if (root.itemHovered) {
                     selectionViewController.selectItemData(root.hoveredItemKey)
                     playCursorController.seekToTimeKeepingView(timeline.context.selectedItemStartTime)
@@ -904,6 +915,7 @@ Rectangle {
                             trackId: itemData.trackId
                             trackTitle: itemData.trackTitle
                             trackColor: itemData.color
+                            isMidiTrack: itemData.trackType === TrackType.MIDI
                             headerHeight: prv.headerHeight
                             sampleRate: itemData.trackSampleRate
 
@@ -916,9 +928,9 @@ Rectangle {
                             isMultiSelectionActive: itemData.isMultiSelectionActive
                             isTrackAudible: itemData.isTrackAudible
                             dbRange: itemData.dbRange
-                            isAutomationEnabled: itemData.isAutomationEnabled
-                            isWaveformViewVisible: itemData.isWaveformViewVisible
-                            isSpectrogramViewVisible: itemData.isSpectrogramViewVisible
+                            isAutomationEnabled: !isMidiTrack && itemData.isAutomationEnabled
+                            isWaveformViewVisible: !isMidiTrack && itemData.isWaveformViewVisible
+                            isSpectrogramViewVisible: !isMidiTrack && itemData.isSpectrogramViewVisible
 
                             moveActive: tracksItemsView.mouseMoveActive || tracksViewState.keyboardMoveActive
 

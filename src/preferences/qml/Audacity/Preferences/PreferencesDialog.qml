@@ -27,6 +27,7 @@ import Muse.UiComponents
 
 StyledDialogView {
     id: root
+    objectName: "PreferencesDialog"
 
     title: qsTrc("preferences", "Preferences")
 
@@ -38,7 +39,9 @@ StyledDialogView {
     property var params: null
 
     property QtObject prv: QtObject {
-        property var pagesObjects: (new Map())
+        property var pagesObjects: ({})
+        property var pagesInfo: []
+        property bool pagesReady: false
 
         function resolveStackCurrentIndex() {
             var keys = Object.keys(root.prv.pagesObjects)
@@ -46,6 +49,11 @@ StyledDialogView {
         }
 
         function updateStackCurrentIndex() {
+            if (!pagesReady) {
+                return
+            }
+
+            root.initPageObject(preferencesModel.currentPageId)
             stack.currentIndex = resolveStackCurrentIndex()
         }
     }
@@ -53,17 +61,21 @@ StyledDialogView {
     Component.onCompleted: {
         preferencesModel.load(root.currentPageId)
 
-        initPagesObjects()
+        prv.pagesInfo = preferencesModel.availablePages()
+        prv.pagesReady = true
 
         prv.updateStackCurrentIndex()
     }
 
-    function initPagesObjects() {
-        var pages = preferencesModel.availablePages()
-        for (var i in pages) {
-            var pageInfo = pages[i]
+    function initPageObject(pageId) {
+        if (Boolean(prv.pagesObjects[pageId])) {
+            return prv.pagesObjects[pageId]
+        }
 
-            if (!Boolean(pageInfo.path)) {
+        for (var i = 0; i < prv.pagesInfo.length; ++i) {
+            var pageInfo = prv.pagesInfo[i]
+
+            if (pageInfo.id !== pageId || !Boolean(pageInfo.path)) {
                 continue
             }
 
@@ -98,7 +110,10 @@ StyledDialogView {
             })
 
             root.prv.pagesObjects[pageInfo.id] = obj
+            return obj
         }
+
+        return null
     }
 
     PreferencesModel {
@@ -157,7 +172,8 @@ StyledDialogView {
 
                 for (var i in pages) {
                     var page = pages[i]
-                    var obj = root.prv.pagesObjects[page.id]
+                    // Reset includes settings on pages that have not been visited.
+                    var obj = root.initPageObject(page.id)
                     if (Boolean(obj)) {
                         obj.reset()
                     }
