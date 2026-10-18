@@ -12,10 +12,10 @@ void EffectsProviderInitializer::setStartupPluginValidationPolicy(StartupPluginV
 void EffectsProviderInitializer::callAfterSplashScreen()
 {
     static bool effectsProviderInitialized = false;
-    if (effectsProviderInitialized) {
-        return;
+    if (!effectsProviderInitialized) {
+        effectsProvider()->initOnce(iocContext(), *interactive(), *registerAudioPluginsScenario(), m_validationPolicy);
+        effectsProviderInitialized = true;
     }
-    effectsProvider()->initOnce(iocContext(), *interactive(), *registerAudioPluginsScenario(), m_validationPolicy);
-    effectsProviderInitialized = true;
+    m_initializationCompleted = true;
 }
 } // namespace au::effects

@@ -36,3 +36,30 @@ TEST(EffectsBase_EffectsCommandsTests, EffectIdFromCommand_IsEmptyForNonEffectCo
     EXPECT_TRUE(effectIdFromCommand(EFFECTS_REPEAT_LAST_EFFECT_COMMAND).empty());
     EXPECT_TRUE(effectIdFromCommand(EFFECTS_PRESET_APPLY_COMMAND).empty());
 }
+
+TEST(EffectsBase_EffectsCommandsTests, MenuActionsKeepAudioUnitManufacturerCodesAndQuotedPluginPathsIntact)
+{
+    const std::vector<EffectId> ids {
+        EffectId::fromStdString("Effect_AudioUnit_MeldaProduction_MFlanger_Meld/aumf/MAE&/MeldaProduction: MFlanger"),
+        EffectId::fromQString(QString::fromUtf8("Effect_VST3_Mike's synth & 演奏/100%20 + #?.vst3"))
+    };
+    for (const auto& id : ids) {
+        for (const auto& action : { EFFECT_OPEN_ACTION, REALTIME_EFFECT_ADD_ACTION, REALTIME_EFFECT_REPLACE_ACTION }) {
+            const muse::actions::ActionQuery query(makeEffectAction(action, id));
+            ASSERT_TRUE(query.isValid());
+            EXPECT_EQ(query.params().size(), 2u); // No part of the ID became another query parameter.
+            EXPECT_EQ(effectIdFromAction(query), id);
+            EXPECT_EQ(effectIdFromCommand(Command(makeEffectOpenCommand(effectIdFromAction(query)).toString())), id);
+        }
+    }
+}
+
+TEST(EffectsBase_EffectsCommandsTests, ExistingMenuActionsAndLiteralPercentSequencesRemainUnchanged)
+{
+    const auto id = EffectId::fromStdString("Effect_VST3_Name_/Synth100%20.vst3");
+    const auto oldAction = QString::fromStdString(EFFECT_OPEN_ACTION).arg(id).toStdString();
+    EXPECT_EQ(makeEffectAction(EFFECT_OPEN_ACTION, id), oldAction);
+    const muse::actions::ActionQuery query(oldAction);
+    EXPECT_EQ(query.params().size(), 1u);
+    EXPECT_EQ(effectIdFromAction(query), id);
+}

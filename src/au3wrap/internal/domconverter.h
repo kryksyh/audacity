@@ -6,12 +6,16 @@
 
 #include "../au3types.h"
 
+class MidiTrack;
+struct MidiClipData;
+
 namespace au::au3 {
 class DomConverter
 {
 public:
 
     static trackedit::Clip clip(const Au3WaveTrack* waveTrack, const Au3WaveClip* au3clip);
+    static trackedit::Clip clip(const MidiTrack* track, const MidiClipData* source);
 
     static trackedit::Track track(const Au3Track* track);
 

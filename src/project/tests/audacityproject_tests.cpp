@@ -34,11 +34,20 @@
 #include "project/tests/mocks/projectviewstatecreatormock.h"
 #include "project/tests/mocks/cloudprojectsprovidermock.h"
 #include "trackedit/tests/mocks/clipboardmock.h"
+#include "au3wrap/tests/mocks/au3projectmock.h"
 
 #include "testtools.h"
 #include "testing/testcontext.h"
 
 namespace au::project {
+class CopyTestThumbnail final : public IThumbnailCreator
+{
+public:
+    std::optional<std::vector<uint8_t> > createThumbnail() override { return std::nullopt; }
+    muse::async::Notification captureThumbnailRequested() const override { return {}; }
+    void onThumbnailCreated(std::vector<uint8_t>) override {}
+};
+
 enum class AccessMode
 {
     Full,
@@ -112,7 +121,56 @@ protected:
             m_currentProject.reset();
         }
     }
+
+    std::shared_ptr<::testing::NiceMock<au::au3::Au3ProjectMock> > copySource()
+    {
+        auto source = std::make_shared<::testing::NiceMock<au::au3::Au3ProjectMock> >();
+        ON_CALL(*source, hasUnsavedChanges()).WillByDefault(::testing::Return(true));
+        m_currentProject->m_au3Project = source;
+        m_currentProject->m_path = "source.aup4";
+        m_currentProject->m_isNewlyCreated = true;
+        m_currentProject->m_needAutoSave = true;
+        m_currentProject->thumbnailCreator.set(std::make_shared<CopyTestThumbnail>());
+        return source;
+    }
 };
+
+TEST_F(Project_Audacity4ProjectTests, SaveCopyKeepsSourceIdentityAndUnsavedState)
+{
+    const auto source = copySource();
+    const muse::io::path_t destination("copy.aup4");
+    EXPECT_CALL(*source, save(::testing::_)).Times(0);
+    EXPECT_CALL(*source, markAsSaved()).Times(0);
+    EXPECT_CALL(*source, saveCopy(destination)).WillOnce(::testing::Return(true));
+    EXPECT_TRUE(m_currentProject->save(destination, SaveMode::SaveCopy));
+    EXPECT_EQ(m_currentProject->path(), muse::io::path_t("source.aup4"));
+    EXPECT_TRUE(m_currentProject->isNewlyCreated());
+    EXPECT_TRUE(m_currentProject->hasUnsavedChanges());
+    EXPECT_TRUE(m_currentProject->needAutoSave());
+}
+
+TEST_F(Project_Audacity4ProjectTests, SaveCopyFailureDoesNotMarkSourceSaved)
+{
+    const auto source = copySource();
+    EXPECT_CALL(*source, save(::testing::_)).Times(0);
+    EXPECT_CALL(*source, markAsSaved()).Times(0);
+    EXPECT_CALL(*source, saveCopy(::testing::_)).WillOnce(::testing::Return(false));
+    EXPECT_FALSE(m_currentProject->save("copy.aup4", SaveMode::SaveCopy));
+    EXPECT_EQ(m_currentProject->path(), muse::io::path_t("source.aup4"));
+    EXPECT_TRUE(m_currentProject->hasUnsavedChanges());
+    EXPECT_TRUE(m_currentProject->needAutoSave());
+}
+
+TEST_F(Project_Audacity4ProjectTests, SaveCopyRequiresADestinationInsteadOfFallingBackToTheOpenSource)
+{
+    const auto source = copySource();
+    EXPECT_CALL(*source, save(::testing::_)).Times(0);
+    EXPECT_CALL(*source, saveCopy(::testing::_)).Times(0);
+    EXPECT_CALL(*source, markAsSaved()).Times(0);
+    EXPECT_FALSE(m_currentProject->save({}, SaveMode::SaveCopy));
+    EXPECT_EQ(m_currentProject->path(), muse::io::path_t("source.aup4"));
+    EXPECT_TRUE(m_currentProject->hasUnsavedChanges());
+}
 
 TEST_F(Project_Audacity4ProjectTests, Load_ValidFile_ReturnsSuccess)
 {

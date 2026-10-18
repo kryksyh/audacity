@@ -114,6 +114,7 @@ set(MODULE_LINK_PUBLIC
         au3-audio-devices
         au3-basic-ui
         au3-label-track
+        au3-midi-track
         au3-project
         au3-registries
         au3-track

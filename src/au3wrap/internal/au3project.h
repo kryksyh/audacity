@@ -15,6 +15,7 @@
 #include "au3-utility/Observer.h"
 
 class TrackList;
+class ProjectSerializer;
 using TrackHolders = std::vector<std::shared_ptr<Track> >;
 
 namespace au::au3 {
@@ -24,10 +25,12 @@ class Au3ProjectAccessor : public IAu3Project
 public:
 
     Au3ProjectAccessor(const muse::modularity::ContextPtr& ctx);
+    ~Au3ProjectAccessor() override;
 
     [[nodiscard]] muse::Ret open() override;
     [[nodiscard]] muse::Ret load(const muse::io::path_t& filePath, bool ignoreAutosave) override;
     bool save(const muse::io::path_t& fileName) override;
+    bool saveCopy(const muse::io::path_t& fileName) override;
     void saveThumbnail(std::vector<uint8_t> pngData) override;
     void close() override;
 
@@ -57,6 +60,9 @@ private:
     Observer::Subscription mTrackListSubstription;
     Observer::Subscription mUndoSubscription;
     std::shared_ptr<TrackList> m_lastSavedTracks;
+    // Effect objects and project attributes can change independently of track
+    // copies. Keep their saved XML values for compaction and discard-on-close.
+    std::unique_ptr<ProjectSerializer> m_lastSavedDocument;
     muse::async::Notification m_projectChanged;
 };
 

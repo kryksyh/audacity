@@ -10,6 +10,8 @@ Item {
 
     required property var parameter
 
+    objectName: parameter ? "effectParameter" + parameter["key"] : ""
+
     property alias navigation: knob.navigation
 
     property double defaultValue: 0

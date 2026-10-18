@@ -151,6 +151,7 @@ EffectStyledDialogView {
         id: generatedViewerComponent
         GeneratedEffectViewer {
             instanceId: root.instanceId
+            dialogView: root
         }
     }
 

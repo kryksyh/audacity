@@ -69,7 +69,7 @@ private:
     };
 
     NewPluginsRegistered doScanPlugins(const muse::modularity::ContextPtr& ctx,
-                                       muse::audioplugins::IRegisterAudioPluginsScenario& registerAudioPluginsScenario,
+                                       muse::audioplugins::IRegisterAudioPluginsScenario& registerAudioPluginsScenario, bool showProgress,
                                        const std::function<bool()>& shouldValidateThirdPartyPlugins = nullptr);
     void doSave(EffectFilter removeFromConfig = nullptr);
 

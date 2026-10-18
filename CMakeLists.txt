@@ -24,6 +24,8 @@ set(FETCHCONTENT_BASE_DIR ${PROJECT_BINARY_DIR}/_deps)
 set(MUSE_FRAMEWORK_PATH ${CMAKE_SOURCE_DIR}/muse)
 set(MUSE_FRAMEWORK_SRC_PATH ${MUSE_FRAMEWORK_PATH}/framework)
 
+include(${CMAKE_CURRENT_LIST_DIR}/buildscripts/cmake/ApplyNativeMidiPatches.cmake)
+
 set(CMAKE_MODULE_PATH
     ${CMAKE_CURRENT_LIST_DIR}
     ${CMAKE_CURRENT_LIST_DIR}/buildscripts/cmake
@@ -91,9 +93,7 @@ option(AU_BUILD_USAGEINFO_MODULE "Build usage info module" ON)
 option(AU_MODULE_EFFECTS_VST "Build audacity vst module" ON)
 option(AU_MODULE_EFFECTS_NYQUIST "Build audacity nyquist module" ON)
 
-if (OS_IS_LIN)
-    option(AU_MODULE_EFFECTS_LV2 "Build audacity lv2 module" ON)
-endif(OS_IS_LIN)
+option(AU_MODULE_EFFECTS_LV2 "Build audacity lv2 module" ON)
 
 if( CMAKE_SYSTEM_NAME MATCHES "Darwin" )
     option(AU_MODULE_EFFECTS_AUDIO_UNIT "Build Audacity Audio Unit module" ON)
@@ -126,7 +126,7 @@ set(MUSE_MODULE_GLOBAL ON)
 set(MUSE_MODULE_GLOBAL_TESTS OFF)
 set(MUSE_MODULE_LANGUAGES ON)
 set(MUSE_MODULE_LEARN OFF)
-set(MUSE_MODULE_MIDI OFF)
+set(MUSE_MODULE_MIDI ON)
 set(MUSE_MODULE_MPE OFF)
 set(MUSE_MODULE_MULTIWINDOWS ON)
 set(MUSE_MODULE_MULTIWINDOWS_SINGLEPROC_MODE ON)

@@ -3,15 +3,21 @@
 */
 #pragma once
 
+#include <QTimer>
+
 #include "framework/global/modularity/ioc.h"
 
 #include "audio/iaudioengine.h"
+#include "audio/iinstrumenteditor.h"
 #include "record/irecordconfiguration.h"
 
 #include "au3-utility/Observer.h"
 
 namespace au::au3audio {
-class Au3AudioEngine final : public au::audio::IAudioEngine
+class LiveInstrumentSession;
+class NativeMonitorSource;
+
+class Au3AudioEngine final : public au::audio::IAudioEngine, public au::audio::IInstrumentPlayback
 {
 public:
     Au3AudioEngine() = default;
@@ -45,6 +51,10 @@ public:
     void startMonitoring(AudacityProject& project) override;
     void stopMonitoring() override;
 
+    std::shared_ptr<audio::IInstrumentEditor> existingInstrument(AudacityProject& project, const MidiTrack& track) const override;
+    muse::RetVal<std::shared_ptr<audio::IInstrumentEditor> > openInstrument(AudacityProject& project, MidiTrack& track) override;
+    void closeInstrument(const std::shared_ptr<audio::IInstrumentEditor>& editor) override;
+
     void setInputVolume(float newInputVolume) override;
     float getInputVolume() const override;
     void setPlaybackVolume(float newPlaybackVolume) override;
@@ -65,6 +75,18 @@ public:
     muse::async::Channel<au3::Au3TrackId, au3::Au3ClipId> recordingClipChanged() const override;
 
 private:
+    void refreshInstrumentLatencies();
+    bool resumeInstrumentMonitoring();
+    QTimer m_monitorResume;
+    QTimer m_monitorRefresh;
+    QTimer m_effectRefresh;
+    std::shared_ptr<NativeMonitorSource> m_liveMonitor;
+    std::vector<std::shared_ptr<LiveInstrumentSession> > m_transportSessions;
+    muse::String m_startError;
+    std::shared_ptr<LiveInstrumentSession> m_liveInstrument;
+    std::weak_ptr<AudacityProject> m_liveProject;
+    const MidiTrack* m_liveTrack = nullptr;
+    bool m_liveMonitoring = false;
     Observer::Subscription m_streamStatusSubscription;
     muse::async::Notification m_streamStopped;
 };

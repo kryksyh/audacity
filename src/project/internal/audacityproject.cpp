@@ -356,6 +356,10 @@ void Audacity4Project::setNeedAutoSave(bool val)
 
 bool Audacity4Project::hasUnsavedChanges()
 {
+    if (const auto requests = viewRequests(); requests && globalContext()
+        && globalContext()->currentProject().get() == this) {
+        requests->requestFlushInstrumentChanges();
+    }
     return needSave().val;
 }
 
@@ -365,8 +369,7 @@ Ret Audacity4Project::save(const muse::io::path_t& path, SaveMode saveMode)
 
     switch (saveMode) {
     case SaveMode::Save:
-    case SaveMode::SaveAs:
-    case SaveMode::SaveCopy: {
+    case SaveMode::SaveAs: {
         muse::io::path_t savePath = path;
         if (savePath.empty()) {
             IF_ASSERT_FAILED(!m_path.empty()) {
@@ -378,13 +381,13 @@ Ret Audacity4Project::save(const muse::io::path_t& path, SaveMode saveMode)
 
         Ret ret = saveProject(savePath);
         if (ret) {
-            if (saveMode != SaveMode::SaveCopy) {
-                markAsSaved(savePath);
-            }
+            markAsSaved(savePath);
         }
 
         return ret;
     }
+    case SaveMode::SaveCopy:
+        return doSave(path, true, true, SaveMode::SaveCopy);
     case SaveMode::AutoSave:
         return saveProject(path, false /*generateBackup*/, true /*createThumbnail*/);
     case SaveMode::SaveSelection:
@@ -399,9 +402,14 @@ Ret Audacity4Project::saveProject(const muse::io::path_t& path, bool generateBac
     return doSave(path, generateBackup, createThumbnail);
 }
 
-Ret Audacity4Project::doSave(const muse::io::path_t& savePath, bool generateBackup, bool createThumbnail)
+Ret Audacity4Project::doSave(const muse::io::path_t& savePath, bool generateBackup, bool createThumbnail, SaveMode saveMode)
 {
     TRACEFUNC;
+
+    if (const auto requests = viewRequests(); requests && globalContext()
+        && globalContext()->currentProject().get() == this) {
+        requests->requestFlushInstrumentChanges();
+    }
 
     UNUSED(generateBackup);
 
@@ -424,7 +432,7 @@ Ret Audacity4Project::doSave(const muse::io::path_t& savePath, bool generateBack
         }
     }
 
-    auto ret = m_au3Project->save(savePath);
+    const auto ret = saveMode == SaveMode::SaveCopy ? m_au3Project->saveCopy(savePath) : m_au3Project->save(savePath);
     if (!ret) {
         return make_ret(Ret::Code::UnknownError);
     }

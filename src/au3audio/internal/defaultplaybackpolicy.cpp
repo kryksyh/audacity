@@ -50,11 +50,14 @@ Mixer::WarpOptions DefaultPlaybackPolicy::MixerWarpOptions(
 }
 
 PlaybackPolicy::BufferTimes
-DefaultPlaybackPolicy::SuggestedBufferTimes(PlaybackSchedule&)
+DefaultPlaybackPolicy::SuggestedBufferTimes(PlaybackSchedule& schedule)
 {
     // Shorter times than in the default policy so that responses to changes of
     // loop region or speed slider don't lag too much
     using namespace std::chrono;
+    if (schedule.mInteractiveInput.load(std::memory_order_relaxed)) {
+        return { 0.005s, 0.010s, 0.25s };
+    }
     return { 0.05s, 0.05s, 0.25s };
 }
 
@@ -276,6 +279,11 @@ bool DefaultPlaybackPolicy::RepositionPlayback(
 bool DefaultPlaybackPolicy::Looping(const PlaybackSchedule&) const
 {
     return mLoopEnabled;
+}
+
+std::pair<double, double> DefaultPlaybackPolicy::LoopBounds(const PlaybackSchedule& schedule) const
+{
+    return { schedule.mT0, mLoopEndTime };
 }
 
 void DefaultPlaybackPolicy::WriteMessage()

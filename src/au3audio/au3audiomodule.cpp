@@ -7,6 +7,10 @@
 
 #include "internal/au3audioengine.h"
 #include "internal/au3audiodrivercontroller.h"
+#include "internal/nativeinstrumentfactory.h"
+#include "internal/nativeaudiorendersource.h"
+#include "internal/nativeplaybackprocessor.h"
+#include "internal/nativeeffectparameters.h"
 
 #if defined(Q_OS_MAC)
 #include "internal/platform/macos/macossystemaudiodeviceslistener.h"
@@ -30,7 +34,11 @@ std::string Au3AudioModule::moduleName() const
 
 void Au3AudioModule::registerExports()
 {
+    registerNativeAudioRenderer();
+    registerNativePlaybackProcessor();
+    registerNativeEffectAutomation();
     m_audioEngine = std::make_shared<Au3AudioEngine>();
+    m_instrumentFactory = std::make_shared<NativeInstrumentFactory>();
     m_audioDriverController = std::make_shared<Au3AudioDriverController>();
 
 #if defined(Q_OS_MAC)
@@ -44,6 +52,9 @@ void Au3AudioModule::registerExports()
 #endif
 
     globalIoc()->registerExport<audio::IAudioEngine>(mname, m_audioEngine);
+    globalIoc()->registerExport<audio::IInstrumentPlayback>(mname, m_audioEngine);
+    globalIoc()->registerExport<audio::IInstrumentEditorFactory>(mname, m_instrumentFactory);
+    globalIoc()->registerExport<audio::IPluginAutomation>(mname, m_instrumentFactory);
     globalIoc()->registerExport<audio::IAudioDriverController>(mname, m_audioDriverController);
     globalIoc()->registerExport<ISystemAudioDevicesListener>(mname, m_systemAudioDevicesListener);
 }

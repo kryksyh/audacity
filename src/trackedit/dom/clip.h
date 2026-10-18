@@ -12,6 +12,11 @@ namespace au::trackedit {
 using ClipVersion = int64_t;
 
 struct Clip {
+    struct NotePreview {
+        double start = 0.0;
+        double length = 0.0;
+        int pitch = 60;
+    };
     ClipKey key;
     ClipVersion clipVersion = -1;
 
@@ -22,6 +27,8 @@ struct Clip {
     double startTime = 0.0;
     double endTime = 0.0;
     bool stereo = false;
+    bool isMidi = false;
+    std::vector<NotePreview> midiNotes;
 
     int pitch = 0;
     double speed = 0.0;

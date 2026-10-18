@@ -10,6 +10,8 @@
 #include "au3-time-frequency-selection/SelectedRegion.h"
 #include "au3-track/Track.h"
 #include "au3-wave-track/WaveTrack.h"
+#include "au3-midi-track/MidiTrack.h"
+#include "au3-playable-track/TrackRouting.h"
 #include "au3-stretching-sequence/StretchingSequence.h"
 #include "au3-audio-devices/AudioIOBase.h"
 #include "au3-audio-io/ProjectAudioIO.h"
@@ -142,7 +144,7 @@ void Au3Player::play(std::optional<muse::secs_t> startTime)
     if (nonWaveToo) {
         hasaudio = !tracks.Any<PlayableTrack>().empty();
     } else {
-        hasaudio = !tracks.Any<Au3WaveTrack>().empty();
+        hasaudio = !tracks.Any<Au3WaveTrack>().empty() || !tracks.Any<MidiTrack>().empty();
     }
 
     double latestEnd = tracks.GetEndTime();
@@ -628,12 +630,13 @@ bool Au3Player::canStopAudioStream() const
 TransportSequences Au3Player::makeTransportTracks(Au3TrackList& trackList, bool selectedOnly)
 {
     TransportSequences result;
-    {
-        const auto range = trackList.Any<Au3WaveTrack>()
-                           + (selectedOnly ? &Au3Track::IsSelected : &Au3Track::Any);
-        for (auto pTrack : range) {
-            result.playbackSequences.push_back(
-                StretchingSequence::Create(*pTrack, pTrack->GetClipInterfaces()));
+    // Selection includes the downstream buses and, when a bus is selected,
+    // its sources. Keep muted tracks so their controls remain live in playback.
+    for (const auto* track : TrackRouting::AudibleSources(trackList, selectedOnly, TrackRouting::Audibility::Ignore)) {
+        if (const auto* wave = dynamic_cast<const Au3WaveTrack*>(track)) {
+            result.playbackSequences.push_back(StretchingSequence::Create(*wave, wave->GetClipInterfaces()));
+        } else if (const auto* midi = dynamic_cast<const MidiTrack*>(track)) {
+            result.otherPlayableSequences.push_back(std::static_pointer_cast<const MidiTrack>(midi->shared_from_this()));
         }
     }
     return result;

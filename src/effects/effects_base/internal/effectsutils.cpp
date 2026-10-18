@@ -34,9 +34,7 @@ muse::String utils::effectFamilyToString(EffectFamily family)
     switch (family) {
     case EffectFamily::Builtin: return u"Audacity";
     case EffectFamily::VST3: return u"VST3";
-#ifdef Q_OS_LINUX
     case EffectFamily::LV2: return u"LV2";
-#endif
 #ifdef Q_OS_MACOS
     case EffectFamily::AudioUnit: return u"AudioUnit";
 #endif
@@ -64,10 +62,8 @@ EffectFamily utils::effectFamilyFromString(const muse::String& family)
         return EffectFamily::Builtin;
     } else if (family == u"VST3") {
         return EffectFamily::VST3;
-#ifdef Q_OS_LINUX
     } else if (family == u"LV2") {
         return EffectFamily::LV2;
-#endif
 #ifdef Q_OS_MACOS
     } else if (family == u"AudioUnit") {
         return EffectFamily::AudioUnit;
@@ -88,9 +84,7 @@ std::string utils::effectFamilyToCacheType(EffectFamily family)
 #ifdef Q_OS_MACOS
     case EffectFamily::AudioUnit: return std::string(audio_unit::AUDIO_RESOURCE_TYPE_NAME);
 #endif
-#ifdef Q_OS_LINUX
     case EffectFamily::LV2:       return std::string(lv2::AUDIO_RESOURCE_TYPE_NAME);
-#endif
     case EffectFamily::Nyquist:   return std::string(nyquist::AUDIO_RESOURCE_TYPE_NAME);
     case EffectFamily::Builtin:   return std::string(builtin::AUDIO_RESOURCE_TYPE_NAME);
     case EffectFamily::Extension: return std::string(extensions::AUDIO_RESOURCE_TYPE_NAME);
@@ -111,11 +105,9 @@ EffectFamily utils::effectFamilyFromCacheType(const std::string& cacheType)
         return EffectFamily::AudioUnit;
     }
 #endif
-#ifdef Q_OS_LINUX
     if (cacheType == lv2::AUDIO_RESOURCE_TYPE_NAME) {
         return EffectFamily::LV2;
     }
-#endif
     if (cacheType == nyquist::AUDIO_RESOURCE_TYPE_NAME) {
         return EffectFamily::Nyquist;
     }
@@ -372,6 +364,7 @@ muse::String utils::effectTypeToString(EffectType type)
     case EffectType::Generator: return u"Generator";
     case EffectType::Processor: return u"Effect";
     case EffectType::Tool: return u"Tool";
+    case EffectType::Instrument: return u"Instrument";
     default:
         assert(false);
         return u"Unknown";
@@ -386,6 +379,7 @@ muse::String utils::effectTypeLabel(EffectType type)
     case EffectType::Generator: return muse::mtrc("effects", "Generator");
     case EffectType::Processor: return muse::mtrc("effects", "Effect");
     case EffectType::Tool: return muse::mtrc("effects", "Tool");
+    case EffectType::Instrument: return muse::mtrc("effects", "Instrument");
     default:
         return effectTypeToString(type);
     }
@@ -401,6 +395,8 @@ EffectType utils::effectTypeFromString(const muse::String& type)
         return EffectType::Processor;
     } else if (type == "Tool") {
         return EffectType::Tool;
+    } else if (type == "Instrument") {
+        return EffectType::Instrument;
     } else if (type.isEmpty() || type == "Unknown") {
         return EffectType::Unknown;
     }

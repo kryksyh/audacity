@@ -229,15 +229,16 @@ muse::Ret EffectExecutionScenario::doPerformEffect(au3::Au3Project& project, con
         if (!params.empty()) {
             LOGD() << "Loading effect params: " << params;
             CommandParameters eap(wxString::FromUTF8(params));
-            ShuttleSetAutomation shuttle;
-            shuttle.SetForValidating(&eap);
-            effect->VisitSettings(shuttle, *settings);
-            if (!shuttle.bOK) {
+            ShuttleSetAutomation validation;
+            validation.SetForValidating(&eap);
+            effect->VisitSettings(validation, *settings);
+            // The format-specific loader validates and updates derived state.
+            // Merely visiting fields skips built-in PostSet callbacks (Tone's
+            // end amplitude/frequency, for example) and native preset loading.
+            if (!validation.bOK || !effect->LoadSettings(eap, *settings)) {
                 LOGE() << "Failed to load effect params: " << params;
                 return make_ret(Err::UnknownError, "Failed to load effect settings from serialized params");
             }
-            shuttle.SetForWriting(&eap);
-            effect->VisitSettings(shuttle, *settings);
         }
 
         //! NOTE Step 2.2 - get oldDuration for EffectTypeGenerate

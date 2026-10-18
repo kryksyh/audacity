@@ -15,6 +15,7 @@
 #include "au3-import-export/ImportPlugin.h"
 #include "au3-numeric-formats/ProjectTimeSignature.h"
 #include "au3-project-file-io/ProjectFileIO.h"
+#include "au3-project-file-io/ProjectSerializer.h"
 #include "au3-project/Project.h"
 #include "au3-wave-track/WaveClip.h"
 #include "au3-wave-track/WaveTrack.h"
@@ -36,6 +37,7 @@
 #include "../au3types.h"
 
 #include <random>
+#include <wx/filename.h>
 
 using namespace au::au3;
 
@@ -193,24 +195,82 @@ void Au3ProjectAccessor::saveThumbnail(std::vector<uint8_t> pngData)
     ProjectThumbnail::Get(m_data->projectRef()).SetData(std::move(pngData));
 }
 
+Au3ProjectAccessor::~Au3ProjectAccessor() = default;
+
 bool Au3ProjectAccessor::save(const muse::io::path_t& filePath)
 {
     auto& project = m_data->projectRef();
 
     auto& projectFileIO = ProjectFileIO::Get(project);
+    auto destination = wxFromString(filePath.toString());
+    const auto current = projectFileIO.GetFileName();
+    // An alias of the active file is an ordinary save. Do not move the live
+    // database (or copy it onto itself) because its spelling changed.
+    if (wxFileName(destination).SameAs(wxFileName(current))) {
+        destination = current;
+    }
+    // Match classic Audacity's Save As protection: a destination's journal
+    // belongs to its old database, and must move with it before replacement.
+    // BackupProject restores the whole bundle if the new save fails.
+    std::optional<ProjectFileIO::BackupProject> backup;
+    if (destination != current && wxFileExists(destination)) {
+        backup.emplace(projectFileIO, destination);
+        if (!backup->IsOk()) {
+            return false;
+        }
+    }
 
-    // Refresh the saved master-effect snapshot before serializing so this save persists
-    // the current master effects. (updateSavedState() refreshes it only AFTER the save,
-    // intentionally, to keep "Save As" correct — see commit 86c2f8f7.)
-    SavedMasterEffectList::Get(project).UpdateCopy();
-
-    auto result = projectFileIO.SaveProject(wxFromString(filePath.toString()), m_lastSavedTracks.get());
+    // Serialize current effects into the destination, while retaining the
+    // original file's saved snapshot for compaction and for a failed save.
+    auto& master = SavedMasterEffectList::Get(project);
+    auto previous = master.SwapCopy(std::make_unique<RealtimeEffectList>(RealtimeEffectList::Get(project)));
+    bool result = false;
+    DEFER {
+        if (!result && projectFileIO.GetFileName() == current) {
+            master.SwapCopy(std::move(previous));
+        }
+    };
+    result = projectFileIO.SaveProject(destination, m_lastSavedTracks.get(), m_lastSavedDocument.get());
     if (result) {
+        if (backup) {
+            backup->Discard();
+        }
         UndoManager::Get(project).StateSaved();
         // Update state only when save succeeded
         updateSavedState();
     }
 
+    return result;
+}
+
+bool Au3ProjectAccessor::saveCopy(const muse::io::path_t& filePath)
+{
+    auto& project = m_data->projectRef();
+    auto& io = ProjectFileIO::Get(project);
+    const auto destination = wxFromString(filePath.toString());
+    // Copying over the open source would destroy its connection's database.
+    if (destination.empty() || wxFileName(destination).SameAs(wxFileName(io.GetFileName()))) {
+        return false;
+    }
+
+    std::optional<ProjectFileIO::BackupProject> backup;
+    if (wxFileExists(destination)) {
+        backup.emplace(io, destination);
+        if (!backup->IsOk()) {
+            return false;
+        }
+    }
+
+    auto& master = SavedMasterEffectList::Get(project);
+    auto previous = master.SwapCopy(std::make_unique<RealtimeEffectList>(RealtimeEffectList::Get(project)));
+    DEFER { master.SwapCopy(std::move(previous));
+    };
+    const auto result = io.SaveCopy(destination);
+    if (result && backup) {
+        backup->Discard();
+    }
+    // The active connection, last-saved tracks, undo save point and temporary
+    // status continue to belong to the source document.
     return result;
 }
 
@@ -225,10 +285,13 @@ void Au3ProjectAccessor::updateSavedState()
     for (auto t : TrackList::Get(project).Any<Track>()) {
         m_lastSavedTracks->Add(t->Duplicate(Track::DuplicateOptions {}.Backup()), TrackList::DoAssignId::No);
     }
+    auto& io = ProjectFileIO::Get(project);
+    m_lastSavedDocument = io.CaptureDocument(m_lastSavedTracks.get());
 }
 
 void Au3ProjectAccessor::clearSavedState()
 {
+    m_lastSavedDocument.reset();
     if (m_lastSavedTracks) {
         m_lastSavedTracks->Clear();
         m_lastSavedTracks.reset();
@@ -278,7 +341,7 @@ void Au3ProjectAccessor::close()
         }
 
         // Attempt to compact the project
-        projectFileIO.Compact({ m_lastSavedTracks.get() });
+        projectFileIO.Compact({ m_lastSavedTracks.get() }, false, m_lastSavedDocument.get());
 
         if (
             !projectFileIO.WasCompacted() && undoManager.UnsavedChanges()) {
@@ -288,7 +351,7 @@ void Au3ProjectAccessor::close()
             // with deletion of some new sample blocks.
             // REVIEW: UpdateSaved() might fail too.  Do we need to test
             // for that and report it?
-            projectFileIO.UpdateSaved(m_lastSavedTracks.get());
+            projectFileIO.UpdateSaved(m_lastSavedTracks.get(), m_lastSavedDocument.get());
         }
     }
 

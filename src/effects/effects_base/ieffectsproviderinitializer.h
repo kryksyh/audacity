@@ -18,5 +18,6 @@ public:
     //! NOTE Set before callAfterSplashScreen(); defaults to AskUser.
     virtual void setStartupPluginValidationPolicy(StartupPluginValidationPolicy policy) = 0;
     virtual void callAfterSplashScreen() = 0;
+    virtual bool initializationCompleted() const = 0;
 };
 }

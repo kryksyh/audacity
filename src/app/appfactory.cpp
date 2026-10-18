@@ -105,6 +105,7 @@
 #endif
 
 #include "au3wrap/au3wrapmodule.h"
+#include "framework/midi/midimodule.h"
 
 using namespace muse;
 using namespace au::app;
@@ -136,6 +137,7 @@ std::shared_ptr<muse::IApplication> AppFactory::newGuiApp(const std::shared_ptr<
     app->addModule(new muse::diagnostics::DiagnosticsModule());
 
     app->addModule(new muse::audioplugins::AudioPluginsModule());
+    app->addModule(new muse::midi::MidiModule());
     app->addModule(new muse::actions::ActionsModule());
     app->addModule(new muse::rcommand::RCommandModule());
     app->addModule(new muse::draw::DrawModule());

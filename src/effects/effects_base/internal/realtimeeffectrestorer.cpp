@@ -9,7 +9,7 @@
 #include "au3-project-history/UndoManager.h"
 #include "au3-realtime-effects/RealtimeEffectList.h"
 #include "au3-realtime-effects/RealtimeEffectState.h"
-#include "au3-wave-track/WaveTrack.h"
+#include "au3-playable-track/PlayableTrack.h"
 
 namespace au::effects {
 namespace {
@@ -45,11 +45,21 @@ public:
     void RestoreUndoRedoState(au3::Au3Project& project) override
     {
         for (const StateAndSettings& item : m_items) {
-            const auto access = item.state->GetAccess();
-            EffectSettings settings = item.settings;
-            item.state->SetActive(item.settings.extra.GetActive());
-            access->Set(std::move(settings));
-            access->Flush();
+            if (item.missingSnapshot) {
+                // Loading the plugin later consumes its opaque parameters.
+                // Keep an independent snapshot so undo can restore them too.
+                *item.state = *item.missingSnapshot;
+            } else {
+                item.state->SetActive(item.settings.extra.GetActive());
+                const auto access = item.state->GetAccess();
+                EffectSettings settings = item.settings;
+                access->Set(std::move(settings));
+                access->Flush();
+            }
+            // The state stays shared with live editors and other history
+            // entries. Restore its automation by value, just like its settings.
+            item.state->Automation() = item.automation;
+            item.state->RefreshProcessingAutomation();
         }
 
         // Use this `UndoStateExtension` to detect changes in the master effect list.
@@ -68,20 +78,24 @@ public:
 
 private:
     struct StateAndSettings {
-        StateAndSettings(RealtimeEffectStatePtr state, EffectSettings settings)
-            : state(std::move(state)), settings(std::move(settings))
+        StateAndSettings(RealtimeEffectStatePtr state, EffectSettings settings, bool hasPlugin)
+            : state(std::move(state)), settings(std::move(settings)), automation(this->state->Automation()),
+            missingSnapshot(hasPlugin ? nullptr : this->state->Clone())
         {
         }
 
         const RealtimeEffectStatePtr state;
         const EffectSettings settings;
+        const AutomationData automation;
+        const RealtimeEffectStatePtr missingSnapshot;
     };
 
     static void append(std::vector<StateAndSettings>& items, RealtimeEffectList& list)
     {
         for (auto i = 0; i < static_cast<int>(list.GetStatesCount()); ++i) {
             const auto state = list.GetStateAt(i);
-            items.emplace_back(state, state->GetSettings());
+            const auto hasPlugin = static_cast<const RealtimeEffectState&>(*state).GetEffect() != nullptr;
+            items.emplace_back(state, hasPlugin ? state->GetAccess()->Get() : state->GetSettings(), hasPlugin);
         }
     }
 
@@ -89,8 +103,8 @@ private:
     {
         std::vector<StateAndSettings> items;
         append(items, RealtimeEffectList::Get(project));
-        const auto tracks = TrackList::Get(project).Any<WaveTrack>();
-        for (WaveTrack* track : tracks) {
+        const auto tracks = TrackList::Get(project).Any<PlayableTrack>();
+        for (auto* track : tracks) {
             append(items, RealtimeEffectList::Get(*track));
         }
         return items;

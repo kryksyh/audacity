@@ -44,9 +44,11 @@ set(MODULE_LINK
         au3-lv2
         au3-module-manager
         au3-realtime-effects
-        X11
         Qt::Quick
 )
 
 set(MODULE_USE_UNITY OFF)
+if (OS_IS_LIN OR OS_IS_FBSD)
+    list(APPEND MODULE_LINK X11)
+endif()
 setup_module()

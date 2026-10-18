@@ -49,7 +49,7 @@ void EffectsProvider::initOnce(const muse::modularity::ContextPtr& ctx, muse::II
         return ret.standardButton() == muse::IInteractive::Button::Apply;
     };
 
-    doScanPlugins(ctx, registerAudioPluginsScenario, shouldValidateThirdPartyPlugins);
+    doScanPlugins(ctx, registerAudioPluginsScenario, false, shouldValidateThirdPartyPlugins);
 
     // Providers must be available in ModuleManager for on-demand plugin loading.
     ModuleManager::Get().DiscoverProviders();
@@ -70,7 +70,7 @@ void EffectsProvider::forgetPlugins(const EffectFilter& forget)
 void EffectsProvider::rescanPlugins(const muse::modularity::ContextPtr& ctx, muse::IInteractive& interactive,
                                     muse::audioplugins::IRegisterAudioPluginsScenario& registerAudioPluginsScenario)
 {
-    if (doScanPlugins(ctx, registerAudioPluginsScenario) == NewPluginsRegistered::No) {
+    if (doScanPlugins(ctx, registerAudioPluginsScenario, true) == NewPluginsRegistered::No) {
         interactive.infoSync(muse::trc("audio", "Audio plugins scan completed"), muse::trc("audio", "All audio plugins are up to date."));
     }
 }
@@ -78,16 +78,22 @@ void EffectsProvider::rescanPlugins(const muse::modularity::ContextPtr& ctx, mus
 EffectsProvider::NewPluginsRegistered EffectsProvider::doScanPlugins(
     const muse::modularity::ContextPtr& ctx,
     muse::audioplugins::IRegisterAudioPluginsScenario& registerAudioPluginsScenario,
+    bool showProgress,
     const std::function<bool()>& shouldValidateThirdPartyPlugins)
 {
     muse::audioplugins::PluginScanResult scanResult;
-    {
-        au3::ProgressDialog progressDialog(ctx, muse::trc("audio", "Validating audio plugins"));
+    if (showProgress) {
+        au3::ProgressDialog progressDialog(ctx, muse::trc("audio", "Scanning for audio plugins"));
         // Scanners publish through `muse::Progress` directly (not via
         // Poll), so the QML dialog wouldn't mount on its own. Open it
         // explicitly before exposing the channel.
         progressDialog.start();
         scanResult = registerAudioPluginsScenario.scanPlugins(&progressDialog.museProgress());
+    } else {
+        // Startup discovery compares installed paths with the persistent
+        // registry; it is not plugin validation. Actual new-plugin validation
+        // below owns its own progress dialog after the user's choice.
+        scanResult = registerAudioPluginsScenario.scanPlugins();
     }
 
     muse::io::paths_t& thirdPartyPluginPaths = scanResult.newPluginPaths;

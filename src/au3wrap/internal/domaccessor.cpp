@@ -2,6 +2,7 @@
 
 #include "framework/global/containers.h"
 #include "framework/global/log.h"
+#include "au3-midi-track/MidiTrack.h"
 
 using namespace au::au3;
 using namespace au::trackedit;
@@ -225,6 +226,14 @@ ClipKeyList DomAccessor::findSelectedClips(const Au3Project& prj)
     const Au3TrackList& tracks = Au3TrackList::Get(prj);
 
     for (const Au3Track* track : tracks) {
+        if (const auto* midi = dynamic_cast<const MidiTrack*>(track)) {
+            for (const auto& clip : midi->GetClips()) {
+                if (clip.selected) {
+                    selectedClips.push_back({ midi->GetId(), clip.id });
+                }
+            }
+            continue;
+        }
         const Au3WaveTrack* waveTrack = dynamic_cast<const Au3WaveTrack*>(track);
         if (!waveTrack) {
             continue;
@@ -245,6 +254,10 @@ ClipKeyList DomAccessor::findSelectedClips(const Au3Project& prj)
 
 void DomAccessor::setClipSelected(Au3Project& prj, const ClipKey& clipKey, bool selected)
 {
+    if (auto* midi = dynamic_cast<MidiTrack*>(findTrack(prj, ::TrackId { clipKey.trackId }))) {
+        midi->SetClipSelected(clipKey.itemId, selected);
+        return;
+    }
     auto track = findWaveTrack(prj, ::TrackId { clipKey.trackId });
     if (!track) {
         return;
@@ -262,6 +275,12 @@ void DomAccessor::clearAllClipSelection(Au3Project& prj)
     Au3TrackList& tracks = Au3TrackList::Get(prj);
 
     for (Au3Track* track : tracks) {
+        if (auto* midi = dynamic_cast<MidiTrack*>(track)) {
+            for (const auto& clip : midi->GetClips()) {
+                midi->SetClipSelected(clip.id, false);
+            }
+            continue;
+        }
         Au3WaveTrack* waveTrack = dynamic_cast<Au3WaveTrack*>(track);
         if (!waveTrack) {
             continue;

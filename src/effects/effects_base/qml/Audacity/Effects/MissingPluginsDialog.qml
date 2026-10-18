@@ -136,6 +136,7 @@ StyledDialogView {
 
         FlatButton {
             id: okButton
+            objectName: "missingPluginsAcceptButton"
 
             Layout.alignment: Qt.AlignRight
 

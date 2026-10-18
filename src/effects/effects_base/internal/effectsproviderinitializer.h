@@ -24,8 +24,10 @@ public:
 
     void setStartupPluginValidationPolicy(StartupPluginValidationPolicy policy) override;
     void callAfterSplashScreen() override;
+    bool initializationCompleted() const override { return m_initializationCompleted; }
 
 private:
     StartupPluginValidationPolicy m_validationPolicy = StartupPluginValidationPolicy::AskUser;
+    bool m_initializationCompleted = false;
 };
 }

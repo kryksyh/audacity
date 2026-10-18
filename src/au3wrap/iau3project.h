@@ -28,6 +28,8 @@ public:
     [[nodiscard]] virtual muse::Ret open() = 0;
     [[nodiscard]] virtual muse::Ret load(const muse::io::path_t& filePath, bool ignoreAutosave = false) = 0;
     virtual bool save(const muse::io::path_t& fileName) = 0;
+    // Write the current document without switching its database or saved state.
+    virtual bool saveCopy(const muse::io::path_t& fileName) = 0;
     virtual void saveThumbnail(std::vector<uint8_t> pngData) = 0;
     virtual void close() = 0;
 

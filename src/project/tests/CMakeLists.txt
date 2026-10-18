@@ -23,7 +23,10 @@ set(MODULE_TEST_LINK
     au3wrap
     au3-project
     au3-project-file-io
+    au3-project-history
     au3-realtime-effects
+    au3-effects
+    au3-wave-track
     trackedit
     muse::actions
     muse::draw
@@ -33,3 +36,9 @@ set(MODULE_TEST_LINK
 set(MODULE_TEST_DATA_ROOT ${CMAKE_CURRENT_LIST_DIR})
 
 include(SetupGTest)
+
+# These libraries include XML readers and tempo-change handlers registered by
+# static initializers. Persistence tests must link those objects even when they
+# do not invoke an unrelated destructive effect or stretching operation first.
+set_property(TARGET au_project_tests PROPERTY LINK_LIBRARY_OVERRIDE
+    "WHOLE_ARCHIVE,au3-effects,au3-wave-track")

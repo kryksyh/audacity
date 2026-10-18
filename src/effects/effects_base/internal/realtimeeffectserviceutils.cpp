@@ -4,6 +4,7 @@
 #include "realtimeeffectserviceutils.h"
 #include "irealtimeeffectservice.h"
 #include "au3wrap/internal/domaccessor.h"
+#include "au3-playable-track/PlayableTrack.h"
 
 std::optional<au::effects::TrackId> au::effects::utils::trackId(const au::project::IAudacityProjectPtr& project,
                                                                 const RealtimeEffectStatePtr& state)
@@ -13,7 +14,7 @@ std::optional<au::effects::TrackId> au::effects::utils::trackId(const au::projec
     }
     const auto au3Project = reinterpret_cast<au3::Au3Project*>(project->au3ProjectPtr());
     auto& trackList = TrackList::Get(*au3Project);
-    for (WaveTrack* track : trackList.Any<WaveTrack>()) {
+    for (auto* track : trackList.Any<PlayableTrack>()) {
         if (RealtimeEffectList::Get(*track).FindState(state)) {
             return track->GetId();
         }
@@ -33,7 +34,7 @@ std::optional<au::effects::EffectChainLinkIndex> au::effects::utils::effectIndex
     }
     const auto au3Project = reinterpret_cast<au3::Au3Project*>(project->au3ProjectPtr());
     auto& trackList = TrackList::Get(*au3Project);
-    for (WaveTrack* track : trackList.Any<WaveTrack>()) {
+    for (auto* track : trackList.Any<PlayableTrack>()) {
         if (const std::optional<size_t> index = RealtimeEffectList::Get(*track).FindState(state)) {
             return static_cast<EffectChainLinkIndex>(*index);
         }
@@ -51,13 +52,16 @@ std::optional<au::effects::utils::UtilData> au::effects::utils::utilData(const p
         return {};
     }
     const auto au3Project = reinterpret_cast<au3::Au3Project*>(project->au3ProjectPtr());
-    const auto isMasterTrack = trackId == IRealtimeEffectService::masterTrackId;
-    const auto au3Track
-        = isMasterTrack ? nullptr : dynamic_cast<au3::Au3Track*>(au3::DomAccessor::findTrack(*au3Project,
-                                                                                             au3::Au3TrackId(trackId)));
-    const auto effectList = au3Track ? &RealtimeEffectList::Get(*au3Track) : &RealtimeEffectList::Get(*au3Project);
-    if (!au3Project || !(isMasterTrack || au3Track)) {
+    if (!au3Project) {
         return {};
     }
+    const auto isMasterTrack = trackId == IRealtimeEffectService::masterTrackId;
+    const auto au3Track
+        = isMasterTrack ? nullptr : dynamic_cast<PlayableTrack*>(au3::DomAccessor::findTrack(*au3Project,
+                                                                                             au3::Au3TrackId(trackId)));
+    if (!(isMasterTrack || au3Track)) {
+        return {};
+    }
+    const auto effectList = au3Track ? &RealtimeEffectList::Get(*au3Track) : &RealtimeEffectList::Get(*au3Project);
     return UtilData{ au3Project, au3Track, effectList };
 }

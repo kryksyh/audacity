@@ -81,7 +81,7 @@ CommandQuery effectApplyConv(const Command& command, const ActionData& args, con
 
     CommandQuery query(makeEffectApplyCommand(it->id));
     for (const auto& [key, val] : legacy.params()) {
-        if (key != "effectId") {
+        if (key != "effectId" && key != "effectIdEncoding") {
             query.addParam(key, val);
         }
     }

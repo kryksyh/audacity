@@ -57,6 +57,7 @@ constexpr auto toAu4EffectType(::EffectType type)
     case ::EffectTypeProcess: return EffectType::Processor;
     case ::EffectTypeAnalyze: return EffectType::Analyzer;
     case ::EffectTypeTool: return EffectType::Tool;
+    case ::EffectTypeInstrument: return EffectType::Instrument;
     default:
         assert(false);
         return EffectType::Unknown;
@@ -70,6 +71,7 @@ constexpr ::EffectType toAu3EffectType(EffectType type)
     case EffectType::Processor: return ::EffectTypeProcess;
     case EffectType::Analyzer: return ::EffectTypeAnalyze;
     case EffectType::Tool: return ::EffectTypeTool;
+    case EffectType::Instrument: return ::EffectTypeInstrument;
     default: return ::EffectTypeNone;
     }
 }

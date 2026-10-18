@@ -1,6 +1,7 @@
 #include "domconverter.h"
 
 #include "au3-label-track/LabelTrack.h"
+#include "au3-midi-track/MidiTrack.h"
 #include "au3-time-track/TimeTrack.h"
 #include "au3-track/Track.h"
 #include "au3-wave-track/WaveClip.h"
@@ -19,6 +20,9 @@ au::trackedit::TrackType trackType(const Au3Track* track)
 {
     if (dynamic_cast<const LabelTrack*>(track)) {
         return au::trackedit::TrackType::Label;
+    }
+    if (dynamic_cast<const MidiTrack*>(track)) {
+        return au::trackedit::TrackType::Midi;
     }
 
     if (dynamic_cast<const TimeTrack*>(track)) {
@@ -108,6 +112,30 @@ au::trackedit::Clip DomConverter::clip(const Au3WaveTrack* waveTrack, const Au3W
 
     clip.stretchToMatchTempo = au3clip->GetStretchToMatchProjectTempo();
 
+    return clip;
+}
+
+au::trackedit::Clip DomConverter::clip(const MidiTrack* track, const MidiClipData* source)
+{
+    trackedit::Clip clip;
+    clip.key = { track->GetId(), source->id };
+    clip.title = wxToString(source->name);
+    const auto secondsPerBeat = 60.0 / track->GetTempo();
+    clip.startTime = source->visibleStart() * secondsPerBeat;
+    clip.endTime = source->visibleEnd() * secondsPerBeat;
+    clip.isMidi = true;
+    clip.speed = 1.0;
+    clip.isAutoColor = source->colorIndex == trackedit::CLIP_COLOR_INDEX_NONE;
+    clip.colorIndex = clip.isAutoColor ? TrackColor::Get(track).GetColorIndex() : source->colorIndex;
+    clip.groupId = source->groupId;
+    for (const auto& note : source->notes) {
+        const auto left = std::max(note.start, source->trimLeft);
+        const auto right = std::min(note.start + note.length, source->length - source->trimRight);
+        if (left < right) {
+            clip.midiNotes.push_back({ (left - source->trimLeft) * secondsPerBeat,
+                                       (right - left) * secondsPerBeat, note.pitch });
+        }
+    }
     return clip;
 }
 

@@ -4,6 +4,7 @@
 #include "au3wrap/internal/domaccessor.h"
 
 #include "au3-wave-track/WaveTrack.h"
+#include "au3-midi-track/MidiTrack.h"
 
 #include "au3trackplaybackcontrol.h"
 
@@ -18,22 +19,28 @@ Au3Project& Au3TrackPlaybackControl::projectRef() const
 
 volume_dbfs_t Au3TrackPlaybackControl::volume(long trackId) const
 {
-    Au3WaveTrack* track = DomAccessor::findWaveTrack(projectRef(), Au3TrackId(trackId));
-    IF_ASSERT_FAILED(track) {
-        return 0.0;
+    const auto* track = DomAccessor::findTrack(projectRef(), Au3TrackId(trackId));
+    const auto* midi = dynamic_cast<const MidiTrack*>(track);
+    if (midi) {
+        return LINEAR_TO_DB(midi->GetGain());
     }
-
-    return LINEAR_TO_DB(track->GetVolume());
+    const auto* wave = dynamic_cast<const Au3WaveTrack*>(track);
+    return wave ? LINEAR_TO_DB(wave->GetVolume()) : 0.0;
 }
 
 void Au3TrackPlaybackControl::setVolume(long trackId, volume_dbfs_t vol, bool completed)
 {
-    Au3WaveTrack* track = DomAccessor::findWaveTrack(projectRef(), Au3TrackId(trackId));
-    IF_ASSERT_FAILED(track) {
+    auto* track = DomAccessor::findTrack(projectRef(), Au3TrackId(trackId));
+    const double gain = vol > -60 ? DB_TO_LINEAR(vol) : 0;
+    auto* midi = dynamic_cast<MidiTrack*>(track);
+    auto* wave = dynamic_cast<Au3WaveTrack*>(track);
+    if (midi) {
+        midi->SetGain(gain);
+    } else if (wave) {
+        wave->SetVolume(gain);
+    } else {
         return;
     }
-
-    track->SetVolume(vol > -60 ? DB_TO_LINEAR(vol) : 0);
 
     if (completed) {
         projectHistory()->pushHistoryState(muse::trc("playback", "Moved volume slider"),
@@ -45,22 +52,27 @@ void Au3TrackPlaybackControl::setVolume(long trackId, volume_dbfs_t vol, bool co
 
 pan_t Au3TrackPlaybackControl::pan(long trackId) const
 {
-    Au3WaveTrack* track = DomAccessor::findWaveTrack(projectRef(), Au3TrackId(trackId));
-    IF_ASSERT_FAILED(track) {
-        return 0.0;
+    const auto* track = DomAccessor::findTrack(projectRef(), Au3TrackId(trackId));
+    const auto* midi = dynamic_cast<const MidiTrack*>(track);
+    if (midi) {
+        return midi->GetPan();
     }
-
-    return track->GetPan();
+    const auto* wave = dynamic_cast<const Au3WaveTrack*>(track);
+    return wave ? wave->GetPan() : 0.0;
 }
 
 void Au3TrackPlaybackControl::setPan(long trackId, au::audio::pan_t pan, bool completed)
 {
-    Au3WaveTrack* track = DomAccessor::findWaveTrack(projectRef(), Au3TrackId(trackId));
-    IF_ASSERT_FAILED(track) {
+    auto* track = DomAccessor::findTrack(projectRef(), Au3TrackId(trackId));
+    auto* midi = dynamic_cast<MidiTrack*>(track);
+    auto* wave = dynamic_cast<Au3WaveTrack*>(track);
+    if (midi) {
+        midi->SetPan(pan);
+    } else if (wave) {
+        wave->SetPan(pan);
+    } else {
         return;
     }
-
-    track->SetPan(pan);
 
     if (completed) {
         projectHistory()->pushHistoryState(muse::trc("playback", "Moved pan dial"),
@@ -72,7 +84,7 @@ void Au3TrackPlaybackControl::setPan(long trackId, au::audio::pan_t pan, bool co
 
 bool Au3TrackPlaybackControl::setMuteOrSolo(long trackId, bool value, MuteOrSolo which, bool exclusive)
 {
-    Au3WaveTrack* track = DomAccessor::findWaveTrack(projectRef(), Au3TrackId(trackId));
+    auto* track = dynamic_cast<PlayableTrack*>(DomAccessor::findTrack(projectRef(), Au3TrackId(trackId)));
     if (!track) {
         return false;
     }
@@ -115,7 +127,7 @@ void Au3TrackPlaybackControl::setSolo(long trackId, bool solo, bool exclusive)
 
 bool Au3TrackPlaybackControl::solo(long trackId) const
 {
-    Au3WaveTrack* track = DomAccessor::findWaveTrack(projectRef(), Au3TrackId(trackId));
+    auto* track = dynamic_cast<PlayableTrack*>(DomAccessor::findTrack(projectRef(), Au3TrackId(trackId)));
     if (!track) {
         return false;
     }
@@ -147,7 +159,7 @@ void Au3TrackPlaybackControl::setMuted(const trackedit::TrackIdList& trackIds, b
 
 bool Au3TrackPlaybackControl::muted(long trackId) const
 {
-    Au3WaveTrack* track = DomAccessor::findWaveTrack(projectRef(), Au3TrackId(trackId));
+    auto* track = dynamic_cast<PlayableTrack*>(DomAccessor::findTrack(projectRef(), Au3TrackId(trackId)));
     if (!track) {
         return false;
     }

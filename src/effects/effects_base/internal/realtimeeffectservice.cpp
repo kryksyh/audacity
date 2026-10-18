@@ -6,7 +6,7 @@
 #include "realtimeeffectserviceutils.h"
 #include "effectsutils.h"
 
-#include "au3-wave-track/WaveTrack.h"
+#include "au3-playable-track/PlayableTrack.h"
 #include "au3-effects/EffectManager.h"
 #include "au3-effects/Effect.h"
 #include "au3-realtime-effects/RealtimeEffectState.h"
@@ -28,7 +28,7 @@ namespace au::effects {
  * - Track added/removed, because user added/removed a track, undo or redo was called, or e.g. a destructive effect was applied
  * - A realtime effect was added/moved/replaced/removed
  *
- * Track realtime effects are attached to WaveTrack objects, so whenever there is an undo/redo,
+ * Track realtime effects are attached to playable tracks, so whenever there is an undo/redo,
  * the track realtime effect lists are updated and we just need to notify that there was a change.
  * For the master effects, undo and redo are specially handled by the `RealtimeEffectRestorer`.
  *
@@ -65,7 +65,7 @@ void RealtimeEffectService::onProjectChanged(const au::project::IAudacityProject
 
     auto& trackList = TrackList::Get(*au3Project);
 
-    for (WaveTrack* track : trackList.Any<WaveTrack>()) {
+    for (auto* track : trackList.Any<PlayableTrack>()) {
         registerRealtimeEffectList(track->GetId(), RealtimeEffectList::Get(*track));
     }
     registerRealtimeEffectList(masterTrackId, RealtimeEffectList::Get(*au3Project));
@@ -137,12 +137,12 @@ void RealtimeEffectService::onTrackListEvent(const TrackListEvent& e)
 {
     switch (e.mType) {
     case TrackListEvent::ADDITION: {
-        const auto waveTrack = std::dynamic_pointer_cast<WaveTrack>(e.mpTrack.lock());
-        if (!waveTrack) {
+        const auto track = std::dynamic_pointer_cast<PlayableTrack>(e.mpTrack.lock());
+        if (!track) {
             // TODO @saintmatthieu I've seen these transitory events but haven't looked for the cause.
             return;
         }
-        registerRealtimeEffectList(waveTrack->GetId(), RealtimeEffectList::Get(*waveTrack));
+        registerRealtimeEffectList(track->GetId(), RealtimeEffectList::Get(*track));
     }
     break;
     case TrackListEvent::DELETION:
@@ -396,18 +396,15 @@ void RealtimeEffectService::moveRealtimeEffect(const RealtimeEffectStatePtr& sta
 
 bool RealtimeEffectService::isActive(const RealtimeEffectStatePtr& state) const
 {
-    if (!isAvailable(state)) {
-        return false;
-    }
-    return state->GetSettings().extra.GetActive();
+    return state && state->IsEnabled();
 }
 
 void RealtimeEffectService::setIsActive(const RealtimeEffectStatePtr& state, bool isActive)
 {
-    if (!isAvailable(state)) {
+    if (!state) {
         return;
     }
-    if (state->GetSettings().extra.GetActive() == isActive) {
+    if (state->IsEnabled() == isActive) {
         return;
     }
     state->SetActive(isActive);
@@ -489,11 +486,12 @@ wxString RealtimeEffectService::resolveEffectId(const PluginID& id)
 
 bool RealtimeEffectService::isAvailable(const RealtimeEffectStatePtr& state) const
 {
-    if (!state) {
+    if (!state || !static_cast<const RealtimeEffectState&>(*state).GetEffect()) {
         return false;
     }
-    // isValid() passes for Missing/Error/Discovered entries too;
-    // only isLoadable (Validated) gates actual usability
+    // Cached validation does not prove the plugin still resolves. The state
+    // already tried loading it; UI queries must not repeatedly try again.
+    // Missing/Error/Discovered metadata also remains unavailable.
     const auto meta = effectsProvider()->meta(au3::wxToString(state->GetID()));
     return meta.isValid() && meta.isLoadable();
 }

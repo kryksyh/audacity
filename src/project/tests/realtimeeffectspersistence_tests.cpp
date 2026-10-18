@@ -13,6 +13,7 @@
 
 #include <gtest/gtest.h>
 #include <gmock/gmock.h>
+#include <QTemporaryDir>
 
 #include "global/io/fileinfo.h"
 #include "global/types/ret.h"
@@ -24,6 +25,12 @@
 #include "project/tests/mocks/dummyeffectinstancefactory.h"
 #include "project/tests/mocks/cloudprojectsprovidermock.h"
 #include "trackedit/tests/mocks/clipboardmock.h"
+#include "trackedit/internal/tracksviewrequestsservice.h"
+#include "context/tests/mocks/globalcontextmock.h"
+#include "au3-midi-track/MidiTrack.h"
+#include "au3-track/Track.h"
+#include "au3-project-history/UndoManager.h"
+#include "au3-utility/MemoryX.h"
 
 #include "testtools.h"
 #include "testing/testcontext.h"
@@ -44,6 +51,24 @@ protected:
     std::shared_ptr<au::projectscene::ProjectViewStateCreatorMock> m_projectViewStateCreator;
     std::shared_ptr<au::trackedit::ClipboardMock> m_clipboard;
     std::shared_ptr<au::au3cloud::CloudProjectsProviderMock> m_cloudProjectsProvider;
+    std::shared_ptr<au::context::GlobalContextMock> m_liveContext;
+    std::shared_ptr<au::trackedit::TracksViewRequestsService> m_viewRequests;
+
+    void bindLiveInstrumentRequests()
+    {
+        m_liveContext = std::make_shared<::testing::NiceMock<au::context::GlobalContextMock> >();
+        m_viewRequests = std::make_shared<au::trackedit::TracksViewRequestsService>(m_testCtx);
+        ON_CALL(*m_liveContext, currentProject()).WillByDefault([this] {
+            return IAudacityProjectPtr(m_currentProject.get(), [](IAudacityProject*) {});
+        });
+        m_currentProject->globalContext.set(m_liveContext);
+        m_currentProject->viewRequests.set(m_viewRequests);
+    }
+
+    static muse::Ret saveWithoutThumbnail(const std::unique_ptr<Audacity4Project>& project, const muse::io::path_t& path)
+    {
+        return project->doSave(path, false, false);
+    }
 
     void SetUp() override
     {
@@ -83,6 +108,52 @@ protected:
         return project->m_au3Project->save(path);
     }
 };
+
+TEST_F(Project_RealtimeEffectsPersistenceTests, SaveFlushesPendingInstrumentStateBeforeSerializingTheProject)
+{
+    QTemporaryDir temporary;
+    const auto source = std::string(au_project_tests_DATA_ROOT) + "/data/empty.aup4";
+    const auto path = temporary.filePath("instrument.aup4").toStdString();
+    ASSERT_TRUE(testtools::copyFile(source, path));
+    ASSERT_TRUE(m_currentProject->load(muse::io::path_t(path), false, "").success());
+    const auto closeProject = finally([&] { m_currentProject->close(); });
+    bindLiveInstrumentRequests();
+    auto track = MidiTrack::Create();
+    TrackList::Get(au3Project(m_currentProject)).Add(track);
+    muse::async::Asyncable receiver;
+    int flushes = 0;
+    m_viewRequests->flushInstrumentChangesRequested().onNotify(&receiver, [&] {
+        ++flushes;
+        track->SetInstrument("builtin:sine", "Latest controller preset");
+    });
+    ASSERT_TRUE(saveWithoutThumbnail(m_currentProject, muse::io::path_t(path)));
+    EXPECT_EQ(flushes, 1);
+    m_currentProject->close();
+    ASSERT_TRUE(m_currentProject->load(muse::io::path_t(path), false, "").success());
+    const auto midi = TrackList::Get(au3Project(m_currentProject)).Any<MidiTrack>();
+    ASSERT_FALSE(midi.empty());
+    EXPECT_EQ((*midi.begin())->GetInstrumentState().utf8_string(), "Latest controller preset");
+}
+
+TEST_F(Project_RealtimeEffectsPersistenceTests, ClosePromptChecksPendingInstrumentChangesBeforeReportingTheProjectClean)
+{
+    QTemporaryDir temporary;
+    const auto source = std::string(au_project_tests_DATA_ROOT) + "/data/empty.aup4";
+    const auto path = temporary.filePath("instrument.aup4").toStdString();
+    ASSERT_TRUE(testtools::copyFile(source, path));
+    ASSERT_TRUE(m_currentProject->load(muse::io::path_t(path), false, "").success());
+    const auto closeProject = finally([&] { m_currentProject->close(); });
+    auto& undo = UndoManager::Get(au3Project(m_currentProject));
+    undo.PushState(::TranslatableString::untranslatable(QStringLiteral("Initial")), {});
+    undo.StateSaved();
+    EXPECT_FALSE(m_currentProject->hasUnsavedChanges());
+    bindLiveInstrumentRequests();
+    muse::async::Asyncable receiver;
+    m_viewRequests->flushInstrumentChangesRequested().onNotify(&receiver, [&] {
+        UndoManager::Get(au3Project(m_currentProject)).MarkUnsaved();
+    });
+    EXPECT_TRUE(m_currentProject->hasUnsavedChanges());
+}
 
 TEST_F(Project_RealtimeEffectsPersistenceTests, MasterEffectList_SurvivesSaveReload)
 {

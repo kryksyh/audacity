@@ -9,6 +9,7 @@ IncrementalPropertyControl {
     id: root
 
     property var parameterData: null
+    objectName: parameterData ? "generatedParameterInput-" + parameterData.id : ""
 
     signal gestureStarted
     signal gestureEnded

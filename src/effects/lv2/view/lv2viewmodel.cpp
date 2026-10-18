@@ -28,8 +28,10 @@
 #include "global/translation.h"
 #include "log.h"
 
-#include <dlfcn.h>
+#include <QLibrary>
+#if defined(Q_OS_LINUX) || defined(Q_OS_FREEBSD)
 #include <X11/Xlib.h>
+#endif
 
 namespace au::effects {
 namespace {
@@ -248,7 +250,9 @@ bool Lv2ViewModel::buildFancy()
     // Hence we ensure that the UI binary doesn't get unloaded when we close the UI,
     // or some plugin crash the app when re-opening the UI.
     // It seems that not all libraries handle well being unloaded and reloaded...
-    dlopen(uiBinaryPath.get(), RTLD_NOW | RTLD_GLOBAL);
+    QLibrary library(QString::fromUtf8(uiBinaryPath.get()));
+    library.setLoadHints(QLibrary::ResolveAllSymbolsHint | QLibrary::ExportExternalSymbolsHint | QLibrary::PreventUnloadHint);
+    library.load();
 
     if (auto idleUi = tryCreateLv2IdleUi(*m_suilInstance, isExternalUi)) {
         m_pluginUi = std::move(idleUi);
@@ -258,6 +262,7 @@ bool Lv2ViewModel::buildFancy()
         return false;
     }
 
+#if defined(Q_OS_LINUX) || defined(Q_OS_FREEBSD)
     if (const std::optional<XID> window = x11Window()) {
         Display* const display = XOpenDisplay(nullptr);
         if (display) {
@@ -266,6 +271,7 @@ bool Lv2ViewModel::buildFancy()
             XCloseDisplay(display);
         }
     }
+#endif
 
     return true;
 }

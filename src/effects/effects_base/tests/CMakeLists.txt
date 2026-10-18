@@ -20,6 +20,8 @@ set(MODULE_TEST_LINK
     au3-realtime-effects
     au3-track
     au3-wave-track
+    au3-midi-track
+    au3-project-history
     effects_base
     muse_audioplugins
 

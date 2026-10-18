@@ -197,9 +197,7 @@ public:
         Unknown = -1,
         Builtin,
         VST3,
-#ifdef Q_OS_LINUX
         LV2,
-#endif
 #ifdef Q_OS_MACOS
         AudioUnit,
 #endif
@@ -233,6 +231,7 @@ enum class EffectType {
     Generator,
     Processor,
     Tool,
+    Instrument,
     _count
 };
 
@@ -272,12 +271,25 @@ const std::string DESTRUCTIVE_EFFECT_VIEWER_URI = "audacity://effects/destructiv
 
 inline std::string makeEffectAction(const std::string& action, const EffectId& id)
 {
+    // UriQuery splits '&' and treats apostrophes as quoted query strings.
+    // Keep working legacy action/shortcut IDs stable, but escape identifiers
+    // (including Audio Unit manufacturer codes) that contain those delimiters.
+    if (id.toStdString().find_first_of("&'") != std::string::npos) {
+        const auto encoded = QString::fromLatin1(id.toQString().toUtf8().toPercentEncoding());
+        return QString::fromStdString(action).arg(encoded).toStdString() + "&effectIdEncoding=percent";
+    }
     return QString::fromStdString(action).arg(id).toStdString();
 }
 
 inline EffectId effectIdFromAction(const muse::actions::ActionQuery& action)
 {
-    return EffectId::fromStdString(action.param("effectId").toString());
+    const auto id = action.param("effectId").toString();
+    // A marker distinguishes encoded IDs from old actions whose plugin paths
+    // legitimately contain literal text such as "%20".
+    if (action.param("effectIdEncoding").toString() == "percent") {
+        return EffectId::fromQString(QString::fromUtf8(QByteArray::fromPercentEncoding(QByteArray::fromStdString(id))));
+    }
+    return EffectId::fromStdString(id);
 }
 
 inline EffectId effectIdFromAction(const QString& action)

@@ -10,6 +10,7 @@
 #include "io/ifilesystem.h"
 #include "projectscene/iprojectviewstatecreator.h"
 #include "trackedit/iprojecthistory.h"
+#include "trackedit/itracksviewrequestsservice.h"
 #include "trackedit/itrackeditclipboard.h"
 #include "trackedit/itrackeditproject.h"
 #include "importexport/import/iimporter.h"
@@ -53,6 +54,7 @@ class Audacity4Project : public IAudacityProject, public muse::async::Asyncable,
 
     muse::ContextInject<context::IGlobalContext> globalContext { this };
     muse::ContextInject<au::trackedit::IProjectHistory> projectHistory { this };
+    muse::ContextInject<au::trackedit::ITracksViewRequestsService> viewRequests { this };
     muse::ContextInject<au::trackedit::ITrackeditClipboard> clipboard { this };
     muse::ContextInject<IThumbnailCreator> thumbnailCreator { this };
     muse::ContextInject<importexport::IImporter> importer { this };
@@ -114,8 +116,8 @@ private:
     muse::Ret doImportIntoTrack(const muse::io::path_t& path, trackedit::TrackId dstTrackId, muse::secs_t startTime);
 
     muse::Ret saveProject(const muse::io::path_t& path, bool generateBackup = true, bool createThumbnail = true);
-    muse::Ret doSave(const muse::io::path_t& path, /*engraving::MscIoMode ioMode,*/ bool generateBackup = true,
-                     bool createThumbnail = true);
+    muse::Ret doSave(const muse::io::path_t& path, /*engraving::MscIoMode ioMode,*/ bool generateBackup = true, bool createThumbnail = true,
+                     SaveMode saveMode = SaveMode::Save);
 
     void markAsSaved(const muse::io::path_t& path);
     void setNeedSave(bool needSave);
