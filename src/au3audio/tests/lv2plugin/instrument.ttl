@@ -1,0 +1,75 @@
+@prefix atom: <http://lv2plug.in/ns/ext/atom#> .
+@prefix bufsz: <http://lv2plug.in/ns/ext/buf-size#> .
+@prefix doap: <http://usefulinc.com/ns/doap#> .
+@prefix lv2: <http://lv2plug.in/ns/lv2core#> .
+@prefix midi: <http://lv2plug.in/ns/ext/midi#> .
+@prefix state: <http://lv2plug.in/ns/ext/state#> .
+@prefix time: <http://lv2plug.in/ns/ext/time#> .
+@prefix urid: <http://lv2plug.in/ns/ext/urid#> .
+@prefix ui: <http://lv2plug.in/ns/extensions/ui#> .
+
+<urn:audacity:test:native-instrument> ui:ui <urn:audacity:test:instrument-ui> .
+<urn:audacity:test:delayed-instrument> ui:ui <urn:audacity:test:instrument-ui> .
+<urn:audacity:test:instrument-ui> a ui:Qt6UI ; ui:binary <native_lv2_fixture@CMAKE_SHARED_MODULE_SUFFIX@> .
+
+<urn:audacity:test:audio-effect> a lv2:AmplifierPlugin ; doap:name "Audacity LV2 audio effect fixture" ;
+    lv2:port [ a lv2:InputPort, lv2:AudioPort ; lv2:index 0 ; lv2:symbol "input" ; lv2:name "Input" ],
+        [ a lv2:InputPort, lv2:ControlPort ; lv2:index 1 ; lv2:symbol "gain" ; lv2:name "Gain" ;
+          lv2:minimum 0.0 ; lv2:maximum 1.0 ; lv2:default 0.5 ],
+        [ a lv2:OutputPort, lv2:AudioPort ; lv2:index 2 ; lv2:symbol "output" ; lv2:name "Output" ] .
+
+<urn:audacity:test:native-instrument> a lv2:InstrumentPlugin ;
+    doap:name "Audacity native LV2 fixture" ;
+    lv2:requiredFeature urid:map, state:makePath ;
+    lv2:extensionData state:interface ;
+    lv2:port [ a lv2:InputPort, atom:AtomPort ; lv2:index 0 ; lv2:symbol "midi" ; lv2:name "MIDI" ;
+        atom:bufferType atom:Sequence ; atom:supports midi:MidiEvent, time:Position ],
+        [ a lv2:InputPort, lv2:ControlPort ; lv2:index 1 ; lv2:symbol "gain" ; lv2:name "Gain" ;
+          lv2:minimum 0.0 ; lv2:maximum 1.0 ; lv2:default 0.5 ],
+        [ a lv2:OutputPort, lv2:AudioPort ; lv2:index 2 ; lv2:symbol "left" ; lv2:name "Left" ],
+        [ a lv2:OutputPort, lv2:AudioPort ; lv2:index 3 ; lv2:symbol "right" ; lv2:name "Right" ],
+        [ a lv2:OutputPort, lv2:ControlPort ; lv2:index 4 ; lv2:symbol "tempo" ; lv2:name "Tempo" ;
+          lv2:minimum 1.0 ; lv2:maximum 1000.0 ; lv2:default 120.0 ] .
+
+<urn:audacity:test:fixed-instrument> a lv2:InstrumentPlugin ;
+    doap:name "Audacity fixed block LV2 fixture" ;
+    lv2:requiredFeature urid:map, state:makePath, bufsz:fixedBlockLength, bufsz:powerOf2BlockLength ;
+    lv2:extensionData state:interface ;
+    lv2:port [ a lv2:InputPort, atom:AtomPort ; lv2:index 0 ; lv2:symbol "midi" ; lv2:name "MIDI" ;
+        atom:bufferType atom:Sequence ; atom:supports midi:MidiEvent, time:Position ],
+        [ a lv2:InputPort, lv2:ControlPort ; lv2:index 1 ; lv2:symbol "gain" ; lv2:name "Gain" ;
+          lv2:minimum 0.0 ; lv2:maximum 1.0 ; lv2:default 0.5 ],
+        [ a lv2:OutputPort, lv2:AudioPort ; lv2:index 2 ; lv2:symbol "left" ; lv2:name "Left" ],
+        [ a lv2:OutputPort, lv2:AudioPort ; lv2:index 3 ; lv2:symbol "right" ; lv2:name "Right" ],
+        [ a lv2:OutputPort, lv2:ControlPort ; lv2:index 4 ; lv2:symbol "tempo" ; lv2:name "Tempo" ;
+          lv2:minimum 1.0 ; lv2:maximum 1000.0 ; lv2:default 120.0 ] .
+
+<urn:audacity:test:delayed-instrument> a lv2:InstrumentPlugin ;
+    doap:name "Audacity delayed LV2 instrument fixture" ;
+    lv2:requiredFeature urid:map, state:makePath ;
+    lv2:extensionData state:interface ;
+    lv2:port [ a lv2:InputPort, atom:AtomPort ; lv2:index 0 ; lv2:symbol "midi" ; lv2:name "MIDI" ;
+        atom:bufferType atom:Sequence ; atom:supports midi:MidiEvent, time:Position ],
+        [ a lv2:InputPort, lv2:ControlPort ; lv2:index 1 ; lv2:symbol "gain" ; lv2:name "Gain" ;
+          lv2:minimum 0.0 ; lv2:maximum 1.0 ; lv2:default 0.5 ],
+        [ a lv2:OutputPort, lv2:AudioPort ; lv2:index 2 ; lv2:symbol "left" ; lv2:name "Left" ],
+        [ a lv2:OutputPort, lv2:AudioPort ; lv2:index 3 ; lv2:symbol "right" ; lv2:name "Right" ],
+        [ a lv2:OutputPort, lv2:ControlPort ; lv2:index 4 ; lv2:symbol "tempo" ; lv2:name "Tempo" ;
+          lv2:minimum 1.0 ; lv2:maximum 1000.0 ; lv2:default 120.0 ],
+        [ a lv2:InputPort, lv2:ControlPort ; lv2:index 5 ; lv2:symbol "lookahead" ; lv2:name "Lookahead" ;
+          lv2:minimum 0 ; lv2:maximum 31 ; lv2:default 7 ; lv2:portProperty lv2:integer ],
+        [ a lv2:OutputPort, lv2:ControlPort ; lv2:index 6 ; lv2:symbol "latency" ; lv2:name "Latency" ;
+          lv2:designation lv2:latency ; lv2:portProperty lv2:reportsLatency ] .
+
+<urn:audacity:test:fixed-audio-effect> a lv2:AmplifierPlugin ; doap:name "Audacity fixed-block audio effect fixture" ;
+    lv2:requiredFeature urid:map, bufsz:fixedBlockLength, bufsz:powerOf2BlockLength ;
+    lv2:port [ a lv2:InputPort, lv2:AudioPort ; lv2:index 0 ; lv2:symbol "input" ; lv2:name "Input" ],
+        [ a lv2:InputPort, lv2:ControlPort ; lv2:index 1 ; lv2:symbol "gain" ; lv2:name "Gain" ;
+          lv2:minimum 0.0 ; lv2:maximum 1.0 ; lv2:default 0.5 ],
+        [ a lv2:OutputPort, lv2:AudioPort ; lv2:index 2 ; lv2:symbol "output" ; lv2:name "Output" ],
+        [ a lv2:InputPort, atom:AtomPort ; lv2:index 3 ; lv2:symbol "events" ; lv2:name "Events" ;
+          atom:bufferType atom:Sequence ; atom:supports atom:Float, time:Position ],
+        [ a lv2:InputPort, lv2:ControlPort ; lv2:index 4 ; lv2:symbol "lookahead" ; lv2:name "Lookahead" ;
+          lv2:minimum 0 ; lv2:maximum 31 ; lv2:default 0 ; lv2:portProperty lv2:integer ],
+        [ a lv2:OutputPort, lv2:ControlPort ; lv2:index 5 ; lv2:symbol "latency" ; lv2:name "Latency" ;
+          lv2:designation lv2:latency ; lv2:portProperty lv2:reportsLatency ] .

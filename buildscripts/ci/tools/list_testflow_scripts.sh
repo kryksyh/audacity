@@ -14,6 +14,7 @@ set -euo pipefail
 HERE="$(cd "$(dirname "$0")" && pwd)"
 SCRIPTS_DIR="$HERE/../../../share/testflowscripts"
 DISABLED_FILE="$SCRIPTS_DIR/disabled.json"
+MANUAL_FILE="$SCRIPTS_DIR/manual.json"
 
 list_script_filenames() {
     # Bare filenames, one per line; they become the matrix values and thereby
@@ -32,9 +33,12 @@ to_matrix_include() {
     # ["a.js",...] -> {"include":[{"script":"a.js"},...]}, tagging entries of
     # the disabled.json map with status: DISABLED, which GitHub appends to
     # the job name, e.g. "run (TC1.6_...js, DISABLED)".
-    jq --compact-output --slurpfile disabled "$DISABLED_FILE" '
-        $disabled[0] as $off
-        | { include: map(. as $s | { script: $s } + (if $off | has($s) then { status: "DISABLED" } else {} end)) }'
+    jq --compact-output --slurpfile disabled "$DISABLED_FILE" --slurpfile manual "$MANUAL_FILE" '
+        $disabled[0] as $off | $manual[0] as $manual
+        | { include: map(. as $s | { script: $s } +
+            (if $off | has($s) then { status: "DISABLED", reason: $off[$s] }
+             elif $manual | has($s) then { status: "MANUAL", reason: $manual[$s] }
+             else {} end)) }'
 }
 
 list_script_filenames | to_json_array | to_matrix_include

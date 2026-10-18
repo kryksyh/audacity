@@ -20,8 +20,8 @@
 
 using namespace au::app;
 
-//! NOTE No signal says the UI is ready: startupCompleted() is set before the
-//! startup page even opens, so the first step just has to wait
+//! Allow the startup page to settle; plugin discovery has its own readiness
+//! check because its nested event loop can deliver this timer before it ends.
 static constexpr int SETTLE_MS = 3000;
 
 namespace {
@@ -99,6 +99,14 @@ void TestflowRunner::run()
 
 void TestflowRunner::execAndReport(const muse::io::path_t& scriptPath)
 {
+    auto effectsInitializer = muse::modularity::ioc(m_ctx)->resolve<au::effects::IEffectsProviderInitializer>("app");
+    IF_ASSERT_FAILED(effectsInitializer) {
+        exitWithoutTeardown(2);
+    }
+    if (!effectsInitializer->initializationCompleted()) {
+        QTimer::singleShot(100, qApp, [this, scriptPath]() { execAndReport(scriptPath); });
+        return;
+    }
     auto testflow = muse::modularity::ioc(m_ctx)->resolve<muse::testflow::ITestflow>("app");
     IF_ASSERT_FAILED(testflow) {
         exitWithoutTeardown(2);

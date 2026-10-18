@@ -63,35 +63,39 @@ jobs:
       matrix: ${{ fromJSON(needs.discover.outputs.scripts) }}
     steps:
     - name: Report disabled test case
-      if: matrix.status == 'DISABLED'
+      if: matrix.status == 'DISABLED' || matrix.status == 'MANUAL'
       env:
         SCRIPT: ${{ matrix.script }}
-      run: echo "::warning title=Test case disabled::$SCRIPT is disabled - see share/testflowscripts/disabled.json for the reason"
+        STATUS: ${{ matrix.status }}
+        REASON: ${{ matrix.reason }}
+      run: echo "::notice title=Test case $STATUS::$SCRIPT - $REASON"
 
     # Before the artifact download: actions/checkout cleans the workspace
     - name: Clone repository
-      if: matrix.status != 'DISABLED'
+      if: matrix.status != 'DISABLED' && matrix.status != 'MANUAL'
       uses: actions/checkout@v7
       with:
         repository: ${{ inputs.app_repo || job.workflow_repository }}
         ref: ${{ inputs.app_ref || job.workflow_sha }}
         persist-credentials: false
-        sparse-checkout: buildscripts/ci/tools
+        sparse-checkout: |
+          buildscripts/ci/tools
+          share/testflowscripts
 
     - name: Setup environment
-      if: matrix.status != 'DISABLED'
+      if: matrix.status != 'DISABLED' && matrix.status != 'MANUAL'
       # A virtual display, plus the libraries the AppImage excludelist leaves to the host
       run: |
         sudo apt-get update
         sudo apt-get install -y --no-install-recommends \
-          xvfb openbox dbus-x11 \
+          xvfb openbox dbus-x11 x11-utils \
           libgl1 libglx0 libopengl0 libegl1 \
           libx11-6 libx11-xcb1 libxcb1 \
           libfontconfig1 libfreetype6 libexpat1 \
-          libasound2t64
+          libasound2t64 libasound2-plugins pulseaudio pulseaudio-utils
 
     - name: Download AppImage artifact
-      if: matrix.status != 'DISABLED'
+      if: matrix.status != 'DISABLED' && matrix.status != 'MANUAL'
       uses: actions/download-artifact@v8
       with:
         pattern: AU4_*_Lin_x86_64_*
@@ -101,7 +105,16 @@ jobs:
         github-token: ${{ github.token }}
 
     - name: Run testflow test case
-      if: matrix.status != 'DISABLED'
+      if: matrix.status != 'DISABLED' && matrix.status != 'MANUAL'
       env:
         SCRIPT: ${{ matrix.script }}
       run: bash ${CI_DIR}/tools/run_testflow_case.sh "$SCRIPT"
+
+    - name: Upload failed test diagnostics
+      if: failure()
+      uses: actions/upload-artifact@v7
+      with:
+        name: testflow-${{ matrix.script }}-${{ github.run_attempt }}
+        path: testflow_data/
+        retention-days: 3
+        if-no-files-found: ignore

@@ -1,0 +1,9 @@
+{
+    "TC3.4_MidiInputTiming.js": "Requires the macOS virtual CoreMIDI fixture and run_native_midi_timing_test.py to send timestamped MIDI.",
+    "TC3.8_MidiInputOwnership.js": "Requires the virtual CoreMIDI fixture and run_native_midi_ownership_test.py to disconnect the owned input during the test.",
+    "TC3.10_NativeInstrumentPersistence.js": "Requires a separately installed native instrument (Surge XT by default); built-in instrument persistence is covered by automated unit and UI tests.",
+    "TC3.12_AutomatedInsertDelay.js": "Requires the test-only LV2 fixed-block effect bundle from the au3audio test build, which is not part of the distributable app.",
+    "TC3.16_MissingInsert.js": "Requires run_native_missing_effect_test.py to remove and restore its owned LV2 fixture across three app processes.",
+    "TC3.17_NativeAudioCapture.js": "Requires a physical recording device selected through the test arguments; standard hosted CI uses virtual playback audio.",
+    "TC3.19_MidiInstrumentControls.js": "Requires installed Arturia Analog Lab V and the owned CoreMIDI control-message driver."
+}
