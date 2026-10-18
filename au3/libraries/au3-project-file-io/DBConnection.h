@@ -28,6 +28,7 @@ struct sqlite3;
 struct sqlite3_stmt;
 class wxString;
 class AudacityProject;
+class TransactionScopeImpl;
 
 struct DBConnectionErrors
 {
@@ -84,6 +85,7 @@ public:
     sqlite3_stmt* Prepare(enum StatementID id, const char* sql);
 
     std::mutex& TransactionMutex() { return mTransactionMutex; }
+    std::unique_ptr<TransactionScopeImpl> CreateTransactionScope();
 
     void SetBypass(bool bypass);
     bool ShouldBypass();

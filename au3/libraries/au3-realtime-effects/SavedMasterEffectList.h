@@ -19,6 +19,9 @@ public:
     static const SavedMasterEffectList& Get(const AudacityProject& project);
 
     void UpdateCopy();
+    // Temporarily serialize another snapshot while retaining the original
+    // saved-document snapshot for close/compaction during Save Copy or Save As.
+    std::unique_ptr<RealtimeEffectList> SwapCopy(std::unique_ptr<RealtimeEffectList> copy) noexcept;
     RealtimeEffectList& List();
     const RealtimeEffectList& List() const;
 

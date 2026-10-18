@@ -37,6 +37,8 @@ public:
      If no implementation factory is installed, or the factory returns null,
      then this object does nothing */
     TransactionScope(AudacityProject& project, const char* name);
+    //! Construct with an explicit implementation, independent of project association.
+    TransactionScope(std::unique_ptr<TransactionScopeImpl> implementation, const char* name);
 
     //! Rollback transaction if it was not yet committed
     ~TransactionScope();

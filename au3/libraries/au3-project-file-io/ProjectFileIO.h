@@ -122,8 +122,10 @@ public:
     std::optional<TentativeConnection>
     LoadProject(const FilePath& fileName, bool ignoreAutosave);
 
-    bool UpdateSaved(const TrackList* tracks = nullptr);
-    bool SaveProject(const FilePath& fileName, const TrackList* lastSaved);
+    bool UpdateSaved(const TrackList* tracks = nullptr, const ProjectSerializer* document = nullptr);
+    std::unique_ptr<ProjectSerializer> CaptureDocument(const TrackList* tracks = nullptr);
+    bool SaveProject(const FilePath& fileName, const TrackList* lastSaved,
+                     const ProjectSerializer* lastSavedDocument = nullptr);
     bool SaveCopy(const FilePath& fileName);
 
     wxLongLong GetFreeDiskSpace() const;
@@ -206,7 +208,7 @@ public:
 
     // Remove all unused space within a project file
     void Compact(
-        const std::vector<const TrackList*>& tracks, bool force = false);
+        const std::vector<const TrackList*>& tracks, bool force = false, const ProjectSerializer* document = nullptr);
 
     // The last compact check did actually compact the project file if true
     bool WasCompacted();
@@ -276,16 +278,17 @@ private:
 
     // Write project or autosave XML (binary) documents
     bool WriteDoc(const char* table, const ProjectSerializer& autosave, const char* schema = "main");
+    // Caller holds the connection's transaction mutex.
+    bool WriteDoc(DBConnection& connection, const char* table, const ProjectSerializer& document, const char* schema = "main");
+    bool WriteSavedDocument(DBConnection& connection, const ProjectSerializer& document);
 
     // Application defined function to verify blockid exists is in set of blockids
     static void InSet(sqlite3_context* context, int argc, sqlite3_value** argv);
 
-    // Return a database connection if successful, which caller must close
-    bool CopyTo(const FilePath& destpath, const TranslatableString& msg, bool isTemporary, bool prune = false, const std::vector<const TrackList*>& tracks = {} /*!<
-         First track list (or if none, then the project's track list) are tracks to write into document blob;
-         That list, plus any others, contain tracks whose sample blocks must be kept
-      */
-                );
+    // First track list (or the project's list) supplies the document unless an
+    // immutable serialized snapshot is given. All lists supply blocks to keep.
+    bool CopyTo(const FilePath& destpath, const TranslatableString& msg, bool isTemporary, bool prune = false,
+                const std::vector<const TrackList*>& tracks = {}, const ProjectSerializer* document = nullptr);
 
     //! Just set stored errors
     void SetError(const TranslatableString& msg, const TranslatableString& libraryError = {}, int errorCode = {});

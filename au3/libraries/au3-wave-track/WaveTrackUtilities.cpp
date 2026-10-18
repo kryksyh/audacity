@@ -10,6 +10,7 @@
 **********************************************************************/
 #include "WaveTrackUtilities.h"
 #include "SampleBlock.h"
+#include "TrackFreeze.h"
 #include "Sequence.h"
 #include "WaveClip.h"
 #include "WaveTrack.h"
@@ -278,6 +279,11 @@ void WaveTrackUtilities::VisitBlocks(TrackList& tracks, BlockVisitor visitor,
                                      SampleBlockIDSet* pIDs)
 {
     for (auto wt : tracks.Any<WaveTrack>()) {
+        for (auto& block : TrackFreeze::Get(*wt).blocks) {
+            if (block && (!pIDs || pIDs->insert(block->GetBlockID()).second) && visitor) {
+                visitor(block);
+            }
+        }
         // Scan all clips within current track
         for (const auto& pClip : wt->Intervals()) {
             // Scan all sample blocks within current clip

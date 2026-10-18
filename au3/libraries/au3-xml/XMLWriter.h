@@ -55,7 +55,6 @@ public:
 
     virtual void Write(const wxString& data) = 0;
 
-private:
     // Escape a string, replacing certain characters with their
     // XML encoding, i.e. '<' becomes '&lt;'
     static wxString XMLEsc(const wxString& s);

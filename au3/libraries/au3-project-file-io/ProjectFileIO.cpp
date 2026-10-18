@@ -955,7 +955,8 @@ bool ProjectFileIO::CopyTo(const FilePath& destpath,
                            const TranslatableString& msg,
                            bool isTemporary,
                            bool prune /* = false */,
-                           const std::vector<const TrackList*>& tracks /* = {} */)
+                           const std::vector<const TrackList*>& tracks /* = {} */,
+                           const ProjectSerializer* document)
 {
     using namespace BasicUI;
 
@@ -993,9 +994,11 @@ bool ProjectFileIO::CopyTo(const FilePath& destpath,
     }
 
     // Create the project doc
-    ProjectSerializer doc;
-    WriteXMLHeader(doc);
-    WriteXML(doc, false, tracks.empty() ? nullptr : tracks[0]);
+    std::unique_ptr<ProjectSerializer> currentDocument;
+    if (!document) {
+        currentDocument = CaptureDocument(tracks.empty() ? nullptr : tracks[0]);
+        document = currentDocument.get();
+    }
 
     auto db = DB();
     Connection destConn = nullptr;
@@ -1191,7 +1194,7 @@ bool ProjectFileIO::CopyTo(const FilePath& destpath,
         // If we're compacting a temporary project (user initiated from the File
         // menu), then write the doc to the "autosave" table since temporary
         // projects do not have a "project" doc.
-        if (!WriteDoc(isTemporary ? "autosave" : "project", doc, "outbound")) {
+        if (!WriteDoc(isTemporary ? "autosave" : "project", *document, "outbound")) {
             return false;
         }
 
@@ -1540,7 +1543,7 @@ static bool FlushToDisk(const wxString& path)
 }
 
 void ProjectFileIO::Compact(
-    const std::vector<const TrackList*>& tracks, bool force)
+    const std::vector<const TrackList*>& tracks, bool force, const ProjectSerializer* document)
 {
     // Haven't compacted yet
     mWasCompacted = false;
@@ -1579,7 +1582,7 @@ void ProjectFileIO::Compact(
     // REVIEW: Compact can fail on the CopyTo with no error messages.  That's OK?
     // LLL: We could display an error message or just ignore the failure and allow
     // the file to be compacted the next time it's saved.
-    if (CopyTo(tempName, TranslatableString("project-file-io", "Compacting project"), IsTemporary(), !tracks.empty(), tracks)) {
+    if (CopyTo(tempName, TranslatableString("project-file-io", "Compacting project"), IsTemporary(), !tracks.empty(), tracks, document)) {
         // Must close the database to rename it
         if (CloseConnection()) {
             // Only use the new file if it is actually smaller than the original.
@@ -1914,7 +1917,8 @@ bool ProjectFileIO::AutoSaveDelete(sqlite3* db /* = nullptr */)
         ADD_EXCEPTION_CONTEXT("sqlite3.context", "ProjectGileIO::AutoSaveDelete");
 
         SetDBError(
-            TranslatableString("project-file-io", "Failed to remove the autosave information from the project file.")
+            TranslatableString("project-file-io", "Failed to remove the autosave information from the project file."),
+            TranslatableString::untranslatable(sqlite3_errmsg(db)), rc
             );
         return false;
     }
@@ -1928,10 +1932,16 @@ bool ProjectFileIO::WriteDoc(const char* table,
                              const ProjectSerializer& autosave,
                              const char* schema /* = "main" */)
 {
-    auto db = DB();
-    std::lock_guard<std::mutex> lock(CurrConn()->TransactionMutex());
+    auto& connection = GetConnection();
+    std::lock_guard<std::mutex> lock(connection.TransactionMutex());
+    return WriteDoc(connection, table, autosave, schema);
+}
 
-    TransactionScope transaction(mProject, "UpdateProject");
+bool ProjectFileIO::WriteDoc(DBConnection& connection, const char* table,
+                             const ProjectSerializer& autosave, const char* schema)
+{
+    auto db = connection.DB();
+    TransactionScope transaction(connection.CreateTransactionScope(), "UpdateProject");
 
     int rc;
 
@@ -1958,7 +1968,7 @@ bool ProjectFileIO::WriteDoc(const char* table,
         ADD_EXCEPTION_CONTEXT("sqlite3.rc", std::to_string(rc));
         ADD_EXCEPTION_CONTEXT("sqlite3.context", "ProjectGileIO::WriteDoc::prepare");
 
-        SetDBError(
+        connection.SetDBError(
             //: %1 is the SQL command that could not be prepared
             TranslatableString("project-file-io", "Unable to prepare project file command:\n\n%1").arg(sql)
             );
@@ -1978,12 +1988,12 @@ bool ProjectFileIO::WriteDoc(const char* table,
         ADD_EXCEPTION_CONTEXT("sqlite3.rc", std::to_string(rc));
         ADD_EXCEPTION_CONTEXT("sqlite3.context", "ProjectGileIO::WriteDoc::bind");
 
-        SetDBError(TranslatableString("project-file-io", "Unable to bind to blob"));
+        connection.SetDBError(TranslatableString("project-file-io", "Unable to bind to blob"));
         return false;
     }
 
-    const auto reportError = [this](auto sql) {
-        SetDBError(
+    const auto reportError = [&connection](auto sql) {
+        connection.SetDBError(
             //: %1 is the SQL command that failed
             TranslatableString("project-file-io", "Failed to update the project file.\nThe following command failed:\n\n%1")
             .Format(sql));
@@ -2011,15 +2021,21 @@ bool ProjectFileIO::WriteDoc(const char* table,
     const wxString rowIDSql
         =wxString::Format("SELECT ROWID FROM %s.%s WHERE id = 1;", schema, table);
 
-    if (!GetValue(rowIDSql, rowID, true)) {
-        ADD_EXCEPTION_CONTEXT("sqlite3.rc", std::to_string(sqlite3_errcode(db)));
-        ADD_EXCEPTION_CONTEXT("sqlite3.context", "ProjectGileIO::WriteDoc::rowid");
-
-        reportError(rowIDSql);
-        return false;
+    {
+        sqlite3_stmt* rowStatement = nullptr;
+        const auto finalizeRow = finally([&] { sqlite3_finalize(rowStatement); });
+        rc = sqlite3_prepare_v2(db, rowIDSql.ToUTF8(), -1, &rowStatement, nullptr);
+        if (rc == SQLITE_OK) rc = sqlite3_step(rowStatement);
+        if (rc != SQLITE_ROW) {
+            ADD_EXCEPTION_CONTEXT("sqlite3.rc", std::to_string(rc));
+            ADD_EXCEPTION_CONTEXT("sqlite3.context", "ProjectGileIO::WriteDoc::rowid");
+            reportError(rowIDSql);
+            return false;
+        }
+        rowID = sqlite3_column_int64(rowStatement, 0);
     }
 
-    const auto writeStream = [db, schema, table, rowID, this](const char* column, const MemoryStream& stream) {
+    const auto writeStream = [db, schema, table, rowID, &connection](const char* column, const MemoryStream& stream) {
         auto blobStream
             =SQLiteBlobStream::Open(db, schema, table, column, rowID, false);
 
@@ -2028,7 +2044,7 @@ bool ProjectFileIO::WriteDoc(const char* table,
             ADD_EXCEPTION_CONTEXT("sqlite3.col", column);
             ADD_EXCEPTION_CONTEXT("sqlite3.context", "ProjectGileIO::WriteDoc::openBlobStream");
 
-            SetDBError(TranslatableString("project-file-io", "Unable to bind to blob"));
+            connection.SetDBError(TranslatableString("project-file-io", "Unable to bind to blob"));
             return false;
         }
 
@@ -2038,7 +2054,7 @@ bool ProjectFileIO::WriteDoc(const char* table,
                 ADD_EXCEPTION_CONTEXT("sqlite3.col", column);
                 ADD_EXCEPTION_CONTEXT("sqlite3.context", "ProjectGileIO::WriteDoc::writeBlobStream");
                 // The user visible message is not changed, so there is no need for new strings
-                SetDBError(TranslatableString("project-file-io", "Unable to bind to blob"));
+                connection.SetDBError(TranslatableString("project-file-io", "Unable to bind to blob"));
                 return false;
             }
         }
@@ -2051,7 +2067,7 @@ bool ProjectFileIO::WriteDoc(const char* table,
                 "sqlite3.context", "ProjectGileIO::WriteDoc::writeBlobStream");
             // The user visible message is not changed, so there is no need for new
             // strings
-            SetDBError(TranslatableString("project-file-io", "Unable to bind to blob"));
+            connection.SetDBError(TranslatableString("project-file-io", "Unable to bind to blob"));
             return false;
         }
 
@@ -2069,7 +2085,7 @@ bool ProjectFileIO::WriteDoc(const char* table,
     const wxString setVersionSql
         =wxString::Format("PRAGMA user_version = %u", ProjectSchemaVersion.GetPacked());
 
-    if (!Query(setVersionSql.c_str(), [](auto...) { return 0; })) {
+    if (sqlite3_exec(db, setVersionSql.ToUTF8(), nullptr, nullptr, nullptr) != SQLITE_OK) {
         // DV: Very unlikely case.
         // Since we need to improve the error messages in the future, let's use
         // the generic message for now, so no new strings are needed
@@ -2088,7 +2104,7 @@ bool ProjectFileIO::WriteDoc(const char* table,
             "   ORDER BY generation DESC LIMIT %d);",
             kProjectHistoryDepth);
 
-        if (!Query(journalSql.c_str(), [](auto...) { return 0; })) {
+        if (sqlite3_exec(db, journalSql.ToUTF8(), nullptr, nullptr, nullptr) != SQLITE_OK) {
             reportError(journalSql);
             return false;
         }
@@ -2232,22 +2248,38 @@ auto ProjectFileIO::LoadProject(const FilePath& fileName, bool ignoreAutosave)
     return result;
 }
 
-bool ProjectFileIO::UpdateSaved(const TrackList* tracks)
+std::unique_ptr<ProjectSerializer> ProjectFileIO::CaptureDocument(const TrackList* tracks)
 {
-    ProjectSerializer doc;
-    WriteXMLHeader(doc);
-    WriteXML(doc, false, tracks);
+    auto document = std::make_unique<ProjectSerializer>();
+    WriteXMLHeader(*document);
+    WriteXML(*document, false, tracks);
+    return document;
+}
 
-    if (!WriteDoc("project", doc)) {
+bool ProjectFileIO::WriteSavedDocument(DBConnection& connection, const ProjectSerializer& document)
+{
+    std::lock_guard<std::mutex> lock(connection.TransactionMutex());
+    const bool modified = mModified;
+    const auto restoreModified = finally([&] { mModified = modified; });
+    TransactionScope transaction(connection.CreateTransactionScope(), "SaveProject");
+    if (!WriteDoc(connection, "project", document) || !AutoSaveDelete(connection.DB())) return false;
+    return transaction.Commit();
+}
+
+bool ProjectFileIO::UpdateSaved(const TrackList* tracks, const ProjectSerializer* document)
+{
+    std::unique_ptr<ProjectSerializer> currentDocument;
+    if (!document) {
+        currentDocument = CaptureDocument(tracks);
+        document = currentDocument.get();
+    }
+
+    if (!WriteSavedDocument(GetConnection(), *document)) {
         return false;
     }
 
-    // Autosave no longer needed
-    if (!AutoSaveDelete()) {
-        return false;
-    }
-
-    ProjectFileIOExtensionRegistry::OnUpdateSaved(mProject, doc);
+    mModified = false;
+    ProjectFileIOExtensionRegistry::OnUpdateSaved(mProject, *document);
 
     return true;
 }
@@ -2256,8 +2288,32 @@ bool ProjectFileIO::UpdateSaved(const TrackList* tracks)
 // of failure.  Callers are believed not to need to do so if they receive 'false'.
 // LLL: All failures checks should now be displaying an error.
 bool ProjectFileIO::SaveProject(
-    const FilePath& fileName, const TrackList* lastSaved)
+    const FilePath& fileName, const TrackList* lastSaved, const ProjectSerializer* lastSavedDocument)
 {
+    std::unique_ptr<ProjectSerializer> completedDocument;
+    const auto originalName = mFileName;
+    const bool originalTemporary = mTemporary, originalModified = mModified, originalRecovered = mRecovered;
+    bool movedTemporary = false, saved = false;
+    const auto restoreTemporary = finally([&] {
+        if (movedTemporary && !saved) {
+            if (CloseConnection() && MoveProject(fileName, originalName) && OpenConnection(originalName)) {
+                mTemporary = originalTemporary;
+                mModified = originalModified;
+                mRecovered = originalRecovered;
+                SetFileName(originalName);
+            } else {
+                BasicUI::CallAfter([weak = weak_from_this()] {
+                    const auto io = weak.lock();
+                    if (io) {
+                        io->ShowError({}, TranslatableString("project-file-io", "Warning"),
+                            TranslatableString("project-file-io", "The project’s database failed to reopen, possibly because of limited space on the storage device."),
+                            "Error:_Disk_full_or_not_writable");
+                        io->Publish(ProjectFileIOMessage::ReconnectionFailure);
+                    }
+                });
+            }
+        }
+    });
     // In the case where we're saving a temporary project to a permanent project,
     // we'll try to simply rename the project to save a bit of time. We then fall
     // through to the normal Save (not SaveAs) processing.
@@ -2269,6 +2325,7 @@ bool ProjectFileIO::SaveProject(
             if (true == (moved = MoveProject(savedName, fileName))) {
                 if (OpenConnection(fileName)) {
                     reopened = true;
+                    movedTemporary = true;
                 } else {
                     MoveProject(fileName, savedName);
                     moved = false; // No longer moved
@@ -2319,6 +2376,12 @@ bool ProjectFileIO::SaveProject(
         Connection newConn = std::make_unique<DBConnection>(
             mProject.shared_from_this(), mpErrors,
             [this]{ OnCheckpointFailure(); });
+        const auto discardDestination = finally([&] {
+            if (newConn) {
+                if (newConn->DB()) newConn->Close();
+                RemoveProject(fileName);
+            }
+        });
 
         // NOTE: There is a noticeable delay here when dealing with large multi-hour
         //       projects that we just created. The delay occurs in Open() when it
@@ -2367,15 +2430,18 @@ bool ProjectFileIO::SaveProject(
                           TranslatableString("project-file-io", "The project failed to open, possibly due to limited space\non the storage device.\n\n%1").arg(GetLastError()),
                           "Error:_Disk_full_or_not_writable");
 
-                newConn = nullptr;
-
-                // Clean up the destination project
-                if (!wxRemoveFile(fileName)) {
-                    wxLogMessage("Failed to remove destination project after open failure: %s", fileName);
-                }
-
                 return false;
             }
+        }
+
+        // Complete destination writes before deleting source recovery data or
+        // compacting it, without redirecting audio reads away from the source.
+        completedDocument = CaptureDocument();
+        const bool destinationSaved = WriteSavedDocument(*newConn, *completedDocument);
+        if (!destinationSaved) {
+            ShowError({}, TranslatableString("project-file-io", "Error Saving Project"),
+                      FileException::WriteFailureMessage(fileName), "Error:_Disk_full_or_not_writable");
+            return false;
         }
 
         // Autosave no longer needed in original project file.
@@ -2386,13 +2452,6 @@ bool ProjectFileIO::SaveProject(
                       //: %1 is the underlying error message
                       TranslatableString("project-file-io", "Unable to remove autosave information, possibly due to limited space\non the storage device.\n\n%1").arg(GetLastError()),
                       "Error:_Disk_full_or_not_writable");
-
-            newConn = nullptr;
-
-            // Clean up the destination project
-            if (!wxRemoveFile(fileName)) {
-                wxLogMessage("Failed to remove destination project after AutoSaveDelete failure: %s", fileName);
-            }
 
             return false;
         }
@@ -2411,7 +2470,10 @@ bool ProjectFileIO::SaveProject(
 
         // Try to compact the original project file.
         auto empty = TrackList::Create(&mProject);
-        Compact({ lastSaved ? lastSaved : empty.get() }, true);
+        // Preserve the original document, including project metadata and
+        // effect values shared with live instances. Track copies alone cannot
+        // reconstruct that saved state. The destination already has live data.
+        Compact({ lastSaved ? lastSaved : empty.get() }, true, lastSavedDocument);
 
         // Safe to close the original project file now. Not much we can do if this fails,
         // but we should still be in good shape since we'll be switching to the newly
@@ -2422,7 +2484,9 @@ bool ProjectFileIO::SaveProject(
         UseConnection(std::move(newConn), fileName);
     }
 
-    if (!UpdateSaved()) {
+    if (completedDocument) {
+        ProjectFileIOExtensionRegistry::OnUpdateSaved(mProject, *completedDocument);
+    } else if (!UpdateSaved()) {
         ShowError(
             {}, TranslatableString("project-file-io", "Error Saving Project"),
             FileException::WriteFailureMessage(fileName),
@@ -2445,6 +2509,7 @@ bool ProjectFileIO::SaveProject(
     // Adjust the title
     SetProjectTitle();
 
+    saved = true;
     return true;
 }
 

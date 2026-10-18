@@ -607,12 +607,16 @@ struct DBConnectionTransactionScopeImpl final : TransactionScopeImpl {
     DBConnection& mConnection;
 };
 
+std::unique_ptr<TransactionScopeImpl> DBConnection::CreateTransactionScope()
+{
+    return std::make_unique<DBConnectionTransactionScopeImpl>(*this);
+}
+
 static TransactionScope::Factory::Scope scope {
     [](AudacityProject& project) -> std::unique_ptr<TransactionScopeImpl> {
         auto& connectionPtr = ConnectionPtr::Get(project);
         if (auto pConnection = connectionPtr.mpConnection.get()) {
-            return
-                std::make_unique<DBConnectionTransactionScopeImpl>(*pConnection);
+            return pConnection->CreateTransactionScope();
         } else {
             return nullptr;
         }

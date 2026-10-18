@@ -39,6 +39,7 @@ set( LIBRARIES
    au3-ipc
    au3-import-export
    au3-xml
+   au3-automation-data
    au3-audio-devices
    au3-project
    au3-screen-geometry
@@ -88,6 +89,7 @@ set( LIBRARIES
 #   au3-audacity-application-logic # not yet used in AU4
    au3-builtin-effects
    au3-label-track
+   au3-midi-track
    au3-wave-track-fft
    au3-musehub
 )

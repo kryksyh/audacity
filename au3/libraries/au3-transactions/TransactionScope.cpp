@@ -16,9 +16,13 @@ TransactionScopeImpl::~TransactionScopeImpl() = default;
 
 TransactionScope::TransactionScope(
     AudacityProject& project, const char* name)
-    :  mName(name)
+    : TransactionScope(Factory::Call(project), name)
 {
-    mpImpl = Factory::Call(project);
+}
+
+TransactionScope::TransactionScope(std::unique_ptr<TransactionScopeImpl> implementation, const char* name)
+    : mpImpl(std::move(implementation)), mInTrans(false), mName(name)
+{
     if (!mpImpl) {
         return;
     }

@@ -3,6 +3,7 @@
  */
 #include "SavedMasterEffectList.h"
 #include "au3-project/Project.h"
+#include <cassert>
 
 SavedMasterEffectList::SavedMasterEffectList(AudacityProject& project)
     : m_project(project)
@@ -13,6 +14,13 @@ SavedMasterEffectList::SavedMasterEffectList(AudacityProject& project)
 void SavedMasterEffectList::UpdateCopy()
 {
     mLastSavedList = std::make_unique<RealtimeEffectList>(RealtimeEffectList::Get(m_project));
+}
+
+std::unique_ptr<RealtimeEffectList> SavedMasterEffectList::SwapCopy(std::unique_ptr<RealtimeEffectList> copy) noexcept
+{
+    assert(copy);
+    mLastSavedList.swap(copy);
+    return copy;
 }
 
 static const AudacityProject::AttachedObjects::RegisteredFactory key2{
