@@ -686,7 +686,7 @@ bool ProjectActionsController::isFileSupported(const muse::io::path_t& path) con
         return true;
     }
 
-    const std::string ext = io::suffix(path);
+    const std::string ext = QString::fromStdString(io::suffix(path)).toLower().toStdString();
     if (ext.empty()) {
         return false;
     }
@@ -996,13 +996,15 @@ muse::io::paths_t ProjectActionsController::selectImportFiles()
         =
             "*.al *.ul *.s16be *.u16be *.s8 *.u8 *.ub *.uw *.4xm *.MTV *.afc *.aifc *.apc *.apl *.mac *.avs *.302 *.daud *.ffm *.cgi *.mm *.mpegtsraw *.mpegvideo *.nuv *.sw *.sb *.son *.sol *.vfwcap";
     std::string textFileExt = "*.txt *.srt *.vtt";
+    std::string midiFileExt = "*.mid *.midi";
 
     std::string allExt = audioFileExt + " " + videoFileExt + " " + gameMediaFileExt + " " + streamingFileExt + " "
-                         + animationAndImageFileExt + " " + rawFileExt + " " + textFileExt;
+                         + animationAndImageFileExt + " " + rawFileExt + " " + textFileExt + " " + midiFileExt;
 
     std::vector<std::string> filter {
         trc("project", "All supported files") + " (*.mp3,*.aac, ...) (" + allExt + ")",
         trc("project", "Audio files") + " (*.mp3,*.aac, ...) (" + audioFileExt + ")",
+        trc("project", "MIDI files") + " (*.mid,*.midi) (" + midiFileExt + ")",
         trc("project", "Video files") + " (*.mp4,*.avi, ...) (" + videoFileExt + ")",
         trc("project", "Game media files") + " (*.roq,*.ea, ...) (" + gameMediaFileExt + ")",
         trc("project", "Streaming files") + " (*.rtsp,*.sdp, ...) (" + streamingFileExt + ")",

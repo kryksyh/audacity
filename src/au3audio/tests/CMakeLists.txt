@@ -11,6 +11,7 @@ set(MODULE_TEST_SRC
     ${CMAKE_CURRENT_LIST_DIR}/nativeeffectchain_tests.cpp
     ${CMAKE_CURRENT_LIST_DIR}/nativeaudiorender_tests.cpp
     ${CMAKE_CURRENT_LIST_DIR}/mididocument_tests.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/midifile_tests.cpp
     ${CMAKE_CURRENT_LIST_DIR}/nativeeditmodels_tests.cpp
     ${PROJECT_SOURCE_DIR}/src/automation/view/trackautomationmodel.cpp
     ${PROJECT_SOURCE_DIR}/src/automation/view/trackautomationmodel.h
@@ -21,6 +22,8 @@ set(MODULE_TEST_SRC
 
 set(MODULE_TEST_LINK
     au3audio
+    importer
+    projectscene
     trackedit
     muse::ui_qml
     au3-builtin-effects

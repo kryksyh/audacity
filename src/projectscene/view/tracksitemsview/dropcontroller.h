@@ -33,6 +33,9 @@ public:
     Q_INVOKABLE void handleDroppedFiles(const std::vector<trackedit::TrackId>& trackIds, double startTime);
 
 private:
+    bool hasMidiFiles() const;
+    std::vector<bool> draggedMidiTypes(int count) const;
+    QVariantList midiAwareTrackIds(int currentTrackId, int count) const;
     std::vector<au::importexport::FileInfo> m_lastDraggedFilesInfo;
     QStringList m_lastDraggedUrls;
     int m_trackCountBeforeImport = -1;

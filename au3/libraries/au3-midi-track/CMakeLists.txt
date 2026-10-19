@@ -2,7 +2,7 @@
 MIDI tracks in the Audacity document.
 ]]
 set(TARGET au3-midi-track)
-set(SOURCES MidiTrack.cpp MidiTrack.h MidiSequence.cpp MidiSequence.h MidiController.h)
+set(SOURCES MidiTrack.cpp MidiTrack.h MidiSequence.cpp MidiSequence.h MidiController.h MidiFile.cpp MidiFile.h)
 set(LIBRARIES
 PUBLIC
     au3-playable-track

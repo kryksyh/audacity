@@ -4,6 +4,7 @@
 #pragma once
 
 #include <atomic>
+#include <utility>
 
 #include "au3-playable-track/PlayableTrack.h"
 #include "au3-mixer/AudioIOSequences.h"
@@ -17,9 +18,16 @@ struct MidiNoteData {
 };
 
 struct MidiControllerData {
+    enum class Type {
+        ControlChange = 0xb0, ProgramChange = 0xc0, ChannelPressure = 0xd0, PitchBend = 0xe0, PolyPressure = 0xa0
+    };
     double beat = 0.0;
     int number = 64;
     int value = 0;
+    Type type = Type::ControlChange;
+
+    MIDI_TRACK_API bool valid(double length) const;
+    std::pair<int, int> key() const { return { static_cast<int>(type), number }; }
 };
 
 struct MidiClipData {

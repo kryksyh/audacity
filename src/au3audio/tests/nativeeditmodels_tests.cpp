@@ -16,6 +16,7 @@
 #include <tuple>
 
 #include "../internal/nativeaudiorendersource.h"
+#include "importexport/import/internal/au3/au3importer.h"
 #include "../internal/nativeinstrumentfactory.h"
 #include "automation/view/trackautomationmodel.h"
 #include "mocks/audioenginemock.h"
@@ -28,6 +29,9 @@
 #include "interactive/tests/mocks/interactivemock.h"
 #include "trackedit/internal/tracksviewrequestsservice.h"
 #include "trackedit/tests/mocks/trackeditprojectmock.h"
+#include "trackedit/tests/mocks/selectioncontrollermock.h"
+#include "trackedit/tests/mocks/tracknavigationcontrollermock.h"
+#include "trackedit/internal/au3/au3tracksinteraction.h"
 #include "context/tests/mocks/globalcontextmock.h"
 #include "project/tests/mocks/audacityprojectmock.h"
 #include "project/tests/testtools.h"
@@ -2459,5 +2463,121 @@ TEST_F(NativeEditModelTests, MixCommandRejectsCancellationEditsReentryAndAnother
     EXPECT_CALL(*ui, showProgress(testing::_, testing::_)).Times(1);
     EXPECT_TRUE(mix.run());
     EXPECT_EQ(TrackList::Get(project()).Size(), 2u);
+}
+}
+
+namespace au::au3audio {
+TEST_F(NativeEditModelTests, MidiImportCreatesPlayableTracksAndSurvivesUndoAndProjectReopen)
+{
+    const QString source = QString::fromStdString(std::string(au3audio_tests_DATA_ROOT))
+                           + "/../../../share/testflowscripts/data/native-midi-import.mid";
+    const QString local = directory.filePath(QString::fromUtf8("Mélodie.MID"));
+    ASSERT_TRUE(QFile::copy(source, local));
+    importexport::Au3Importer importer(ctx);
+    const auto probe = importer.fileInfo(muse::io::path_t(local));
+    ASSERT_FALSE(probe.isEmpty());
+    EXPECT_TRUE(probe.midi);
+    EXPECT_EQ(probe.trackCount, 2);
+    EXPECT_NEAR(probe.duration, 0.9, 0.002);
+    ASSERT_TRUE(importer.import(muse::io::path_t(local)));
+    ASSERT_EQ(TrackList::Get(project()).Size(), 2u);
+    EXPECT_DOUBLE_EQ(ProjectTimeSignature::Get(project()).GetTempo(), 100.0);
+    EXPECT_EQ(ProjectTimeSignature::Get(project()).GetUpperTimeSignature(), 7);
+    EXPECT_EQ(ProjectTimeSignature::Get(project()).GetLowerTimeSignature(), 8);
+    auto tracks = TrackList::Get(project()).Any<MidiTrack>();
+    auto* lead = *tracks.begin();
+    EXPECT_EQ(lead->GetName(), "Lead");
+    const auto rendered = render(*lead);
+    EXPECT_TRUE(std::any_of(rendered.begin(), rendered.end(), [](float sample) { return std::abs(sample) > 0.001f; }));
+    history->pushHistoryState("Imported MIDI file", "Import MIDI");
+    history->undo();
+    EXPECT_TRUE(TrackList::Get(project()).empty());
+    history->redo();
+    ASSERT_EQ(TrackList::Get(project()).Size(), 2u);
+    reopen();
+    ASSERT_EQ(TrackList::Get(project()).Size(), 2u);
+    auto* restored = *TrackList::Get(project()).Any<MidiTrack>().begin();
+    EXPECT_EQ(restored->GetName(), "Lead");
+    ASSERT_EQ(restored->GetClips()[0].controllers.size(), 2u);
+    EXPECT_EQ(restored->GetClips()[0].controllers[0].type, MidiControllerData::Type::ProgramChange);
+    EXPECT_EQ(restored->GetClips()[0].controllers[1].type, MidiControllerData::Type::PitchBend);
+}
+
+TEST_F(NativeEditModelTests, MidiImportKeepsExistingAudioAndProjectTempo)
+{
+    auto existing = wave();
+    ProjectTimeSignature::Get(project()).SetTempo(90);
+    const auto before = render(*existing);
+    ON_CALL(*trackeditProject, hasAudioContent()).WillByDefault(Return(muse::ValCh<bool> { true, {} }));
+    importexport::Au3Importer importer(ctx);
+    const auto source = std::string(au3audio_tests_DATA_ROOT) + "/../../../share/testflowscripts/data/native-midi-import.mid";
+    ASSERT_TRUE(importer.import(muse::io::path_t(source)));
+    EXPECT_EQ(TrackList::Get(project()).Size(), 3u);
+    EXPECT_DOUBLE_EQ(ProjectTimeSignature::Get(project()).GetTempo(), 90.0);
+    auto* imported = *TrackList::Get(project()).Any<MidiTrack>().begin();
+    EXPECT_DOUBLE_EQ(imported->GetTempo(), 90.0);
+    EXPECT_NEAR(imported->GetClips()[0].notes[0].length * 60.0 / 90.0, 0.9, 1e-12);
+    expectSamples(before, render(*existing));
+}
+
+TEST_F(NativeEditModelTests, MalformedMidiImportDoesNotLeaveTracksOrChangeTempo)
+{
+    const auto tempo = ProjectTimeSignature::Get(project()).GetTempo();
+    const auto local = directory.filePath("bad.mid");
+    QFile file(local);
+    ASSERT_TRUE(file.open(QIODevice::WriteOnly));
+    file.write("MThd", 4);
+    file.close();
+    importexport::Au3Importer importer(ctx);
+    EXPECT_TRUE(importer.fileInfo(muse::io::path_t(local)).isEmpty());
+    EXPECT_FALSE(importer.import(muse::io::path_t(local)));
+    EXPECT_TRUE(TrackList::Get(project()).empty());
+    EXPECT_DOUBLE_EQ(ProjectTimeSignature::Get(project()).GetTempo(), tempo);
+}
+
+TEST_F(NativeEditModelTests, MidiDropFillsPreviewTracksAtTheDropPositionWithoutTouchingExistingClips)
+{
+    auto first = MidiTrack::Create();
+    auto second = MidiTrack::Create();
+    auto& list = TrackList::Get(project());
+    list.Add(first);
+    auto existing = wave();
+    list.Add(second);
+    ProjectTimeSignature::Get(project()).SetTempo(90);
+    MidiClipData clip;
+    clip.id = 1;
+    clip.name = "Existing";
+    clip.start = 0;
+    clip.length = 1;
+    clip.notes = { { 1, 0, 1, 72, 50 } };
+    ASSERT_TRUE(first->SetClips({ clip }));
+    first->SetName("My instrument");
+    const auto before = render(*existing);
+    ON_CALL(*trackeditProject, hasAudioContent()).WillByDefault(Return(muse::ValCh<bool> { true, {} }));
+    ON_CALL(*document, trackeditProject()).WillByDefault(Return(trackeditProject));
+    auto selection = std::make_shared<NiceMock<trackedit::SelectionControllerMock> >();
+    auto navigation = std::make_shared<NiceMock<trackedit::TrackNavigationControllerMock> >();
+    trackedit::TrackIdList selected;
+    ON_CALL(*selection, setSelectedTracks(testing::_, testing::_)).WillByDefault([&](const auto& ids, bool) { selected = ids; });
+    ON_CALL(*selection, selectedTracks()).WillByDefault([&] { return selected; });
+    auto interaction = std::make_shared<trackedit::Au3TracksInteraction>(ctx);
+    auto* ioc = muse::modularity::ioc(ctx);
+    ioc->registerExport<trackedit::ITracksInteraction>("utests", interaction);
+    ioc->registerExport<trackedit::ISelectionController>("utests", selection);
+    ioc->registerExport<trackedit::ITrackNavigationController>("utests", navigation);
+    importexport::Au3Importer importer(ctx);
+    const auto source = std::string(au3audio_tests_DATA_ROOT) + "/../../../share/testflowscripts/data/native-midi-import.mid";
+    ASSERT_TRUE(importer.importIntoTrack(muse::io::path_t(source), first->GetId(), 3.0));
+    EXPECT_EQ(list.Size(), 3u);
+    ASSERT_EQ(first->GetClips().size(), 2u);
+    ASSERT_EQ(second->GetClips().size(), 1u);
+    EXPECT_EQ(first->GetName(), "My instrument");
+    EXPECT_EQ(first->GetClips()[0].notes[0].pitch, 72);
+    EXPECT_NEAR(first->GetClips()[1].visibleStart() * 60.0 / 90.0, 3.0, 1e-12);
+    EXPECT_NEAR(second->GetClips()[0].visibleStart() * 60.0 / 90.0, 3.0, 1e-12);
+    EXPECT_NEAR(first->GetClips()[1].notes[0].length * 60.0 / 90.0, 0.9, 1e-12);
+    expectSamples(before, render(*existing));
+    EXPECT_FALSE(importer.importIntoTrack(muse::io::path_t(source), existing->GetId(), 0.0));
+    EXPECT_EQ(list.Size(), 3u);
 }
 }

@@ -25,6 +25,7 @@ fi
 export AU_ALLOW_MULTIPLE_PROCESSES=1
 export MUSE_TESTFLOW_DATA_PATH="$PWD/testflow_data"
 export MUSE_TESTFLOW_SCRIPTS_PATH="$SCRIPTS_DIR"
+export MUSE_TESTFLOW_FILES_PATH="$SCRIPTS_DIR/data"
 mkdir -p "$MUSE_TESTFLOW_DATA_PATH/diagnostics"
 
 # Fresh profile, so nothing leaks in from a previous test case

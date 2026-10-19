@@ -39,6 +39,8 @@ public:
 private:
     bool isProjectEmpty() const;
     bool importLegacyAup(const muse::io::path_t& filePath);
+    bool importMidi(const muse::io::path_t& filePath, trackedit::TrackId dstTrackId = trackedit::INVALID_TRACK,
+                    muse::secs_t startTime = 0.0);
     bool importIntoTrackInternal(const muse::io::path_t& filePath, trackedit::TrackId dstTrackId, muse::secs_t startTime,
                                  bool applyProjectTitle, bool runTempoDetection);
     void applyImportedProjectTitleIfNeeded(const muse::io::path_t& filePath);

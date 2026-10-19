@@ -1,5 +1,7 @@
 #include "audacityproject.h"
 
+#include <algorithm>
+
 #include "framework/global/log.h"
 #include "framework/global/io/fileinfo.h"
 #include "framework/global/io/ioretcodes.h"
@@ -10,6 +12,17 @@ using namespace muse;
 using namespace au::project;
 using namespace au::trackedit;
 using namespace au::projectscene;
+
+static bool midiImport(const muse::io::path_t& path)
+{
+    const auto name = path.toQString();
+    return name.endsWith(".mid", Qt::CaseInsensitive) || name.endsWith(".midi", Qt::CaseInsensitive);
+}
+
+static bool midiImports(const std::vector<muse::io::path_t>& paths)
+{
+    return !paths.empty() && std::all_of(paths.begin(), paths.end(), midiImport);
+}
 
 static QString projectDefaultTitle()
 {
@@ -74,7 +87,8 @@ Ret Audacity4Project::importIntoTrack(const muse::io::path_t& filePath,
 
     if (ok) {
         //: Name of the undo history entry created by importing files
-        projectHistory()->pushHistoryState(importInfo, muse::trc("project", "Import"));
+        projectHistory()->pushHistoryState(importInfo,
+                                           midiImport(filePath) ? muse::trc("project", "Import MIDI") : muse::trc("project", "Import"));
     }
 
     return ok;
@@ -100,7 +114,9 @@ Ret Audacity4Project::importIntoTracks(const std::vector<muse::io::path_t>& file
     }
 
     if (anyImported) {
-        projectHistory()->pushHistoryState(muse::trc("project", "Imported multiple files"), muse::trc("project", "Import"));
+        projectHistory()->pushHistoryState(midiImports(filePaths) ? muse::trc("project", "Imported MIDI files") : muse::trc("project",
+                                                                                                                            "Imported multiple files"),
+                                           midiImports(filePaths) ? muse::trc("project", "Import MIDI") : muse::trc("project", "Import"));
     }
 
     return ret;
@@ -113,7 +129,8 @@ Ret Audacity4Project::import(const muse::io::path_t& path, const bool forceMode)
 
     Ret ok = doImport(path, forceMode);
     if (ok) {
-        projectHistory()->pushHistoryState(importInfo, muse::trc("project", "Import"));
+        projectHistory()->pushHistoryState(importInfo,
+                                           midiImport(path) ? muse::trc("project", "Import MIDI") : muse::trc("project", "Import"));
     }
 
     return ok;
@@ -132,7 +149,9 @@ Ret Audacity4Project::import(const std::vector<muse::io::path_t>& paths, bool fo
     }
 
     if (anyImported) {
-        projectHistory()->pushHistoryState(muse::trc("project", "Imported multiple files"), muse::trc("project", "Import"));
+        projectHistory()->pushHistoryState(midiImports(paths) ? muse::trc("project", "Imported MIDI files") : muse::trc("project",
+                                                                                                                        "Imported multiple files"),
+                                           midiImports(paths) ? muse::trc("project", "Import MIDI") : muse::trc("project", "Import"));
     }
 
     return ret;

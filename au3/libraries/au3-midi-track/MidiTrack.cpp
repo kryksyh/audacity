@@ -2,6 +2,7 @@
 * Audacity: A Digital Audio Editor
 */
 #include "MidiTrack.h"
+#include "MidiController.h"
 #include "au3-playable-track/TrackAutomation.h"
 #include "au3-playable-track/TrackRouting.h"
 
@@ -38,8 +39,7 @@ bool validClip(const MidiClipData& clip)
         }
     }
     return std::all_of(clip.controllers.begin(), clip.controllers.end(), [&](const MidiControllerData& event) {
-        return std::isfinite(event.beat) && event.beat >= 0.0 && event.beat <= clip.length
-               && event.number >= 0 && event.number <= 127 && event.value >= 0 && event.value <= 127;
+        return event.valid(clip.length);
     });
 }
 
@@ -60,22 +60,38 @@ MidiClipData slice(const MidiClipData& source, double start, double end)
             result.notes.push_back(note);
         }
     }
-    std::map<int, MidiControllerData> initial;
-    for (auto event : source.controllers) {
+    std::map<std::pair<int, int>, MidiControllerData> initial;
+    auto controllers = source.controllers;
+    std::stable_sort(controllers.begin(), controllers.end(), [](const auto& a, const auto& b) { return a.beat < b.beat; });
+    for (auto event : controllers) {
         if (event.beat < start) {
-            auto found = initial.find(event.number);
+            if (event.type == MidiControllerData::Type::ControlChange && event.number == 121) {
+                for (auto& [key, state] : initial) {
+                    const auto type = state.type;
+                    const int reset = type == MidiControllerData::Type::ControlChange ? MidiControllerResetValue(state.number)
+                                      : type == MidiControllerData::Type::PitchBend ? 8192
+                                      : type == MidiControllerData::Type::ProgramChange ? -1 : 0;
+                    if (reset >= 0) {
+                        state.beat = event.beat;
+                        state.value = reset;
+                    }
+                }
+            }
+            auto found = initial.find(event.key());
             if (found == initial.end() || found->second.beat <= event.beat) {
-                initial[event.number] = event;
+                initial[event.key()] = event;
             }
         } else if (event.beat < end) {
             event.beat -= start;
             result.controllers.push_back(event);
         }
     }
+    std::vector<MidiControllerData> initialEvents;
     for (auto [number, event] : initial) {
         event.beat = 0.0;
-        result.controllers.insert(result.controllers.begin(), event);
+        initialEvents.push_back(event);
     }
+    result.controllers.insert(result.controllers.begin(), initialEvents.begin(), initialEvents.end());
     return result;
 }
 
@@ -101,6 +117,21 @@ const ProjectFileIORegistry::ObjectReaderEntry readerEntry { "miditrack", MidiTr
 }
 
 MidiTrack::MidiTrack() = default;
+
+bool MidiControllerData::valid(double length) const
+{
+    if (!std::isfinite(beat) || beat < 0.0 || beat > length || number < 0 || number > 127 || value < 0) {
+        return false;
+    }
+    switch (type) {
+    case Type::ControlChange:
+    case Type::PolyPressure: return value <= 127;
+    case Type::ProgramChange:
+    case Type::ChannelPressure: return number == 0 && value <= 127;
+    case Type::PitchBend: return number == 0 && value <= 16383;
+    }
+    return false;
+}
 
 MidiTrack::MidiTrack(const MidiTrack& other, ProtectedCreationArg&& arg)
     : UniqueChannelTrack(other, std::move(arg)), mTempo(other.mTempo), mGain(other.GetGain()), mPan(other.GetPan()),
@@ -182,14 +213,18 @@ int64_t MidiTrack::NextClipId() const
 void MidiTrack::SetClipSelected(int64_t id, bool selected)
 {
     for (auto& clip : mClips) {
-        if (clip.id == id) clip.selected = selected;
+        if (clip.id == id) {
+            clip.selected = selected;
+        }
     }
 }
 
 std::shared_ptr<MidiTrack> MidiTrack::CopyClip(int64_t id) const
 {
     for (auto clip : mClips) {
-        if (clip.id != id) continue;
+        if (clip.id != id) {
+            continue;
+        }
         auto result = std::static_pointer_cast<MidiTrack>(TrackEmptyCopy());
         result->mCopyLength = clip.visibleLength();
         clip.start = -clip.trimLeft;
@@ -417,7 +452,9 @@ bool MidiTrack::HandleXMLTag(const std::string_view& tag, const AttributesList& 
             // gain). Keep MIDI volume distinct, and accept old MIDI-only XML.
             if (name == "midigain" || (name == "gain" && !dedicatedGain)) {
                 double gain = 0.0;
-                if (!value.TryGet(gain) || !std::isfinite(gain) || gain < 0.0) return false;
+                if (!value.TryGet(gain) || !std::isfinite(gain) || gain < 0.0) {
+                    return false;
+                }
                 mGain = gain;
                 continue;
             }
@@ -509,10 +546,13 @@ bool MidiTrack::HandleXMLTag(const std::string_view& tag, const AttributesList& 
                 value.TryGet(event.number);
             } else if (name == "value") {
                 value.TryGet(event.value);
+            } else if (name == "type") {
+                int type = 0;
+                value.TryGet(type);
+                event.type = static_cast<MidiControllerData::Type>(type);
             }
         }
-        if (!std::isfinite(event.beat) || event.beat < 0.0 || event.beat > mClips.back().length
-            || event.number < 0 || event.number > 127 || event.value < 0 || event.value > 127) {
+        if (!event.valid(mClips.back().length)) {
             return false;
         }
         mClips.back().controllers.push_back(event);
@@ -552,10 +592,18 @@ void MidiTrack::WriteXML(XMLWriter& writer) const
         writer.WriteAttr("start", clip.start);
         writer.WriteAttr("length", clip.length);
         writer.WriteAttr("channel", clip.channel);
-        if (clip.trimLeft != 0.0) writer.WriteAttr("trimleft", clip.trimLeft);
-        if (clip.trimRight != 0.0) writer.WriteAttr("trimright", clip.trimRight);
-        if (clip.colorIndex != -1) writer.WriteAttr("colorindex", clip.colorIndex);
-        if (clip.groupId != -1) writer.WriteAttr("groupid", static_cast<long long>(clip.groupId));
+        if (clip.trimLeft != 0.0) {
+            writer.WriteAttr("trimleft", clip.trimLeft);
+        }
+        if (clip.trimRight != 0.0) {
+            writer.WriteAttr("trimright", clip.trimRight);
+        }
+        if (clip.colorIndex != -1) {
+            writer.WriteAttr("colorindex", clip.colorIndex);
+        }
+        if (clip.groupId != -1) {
+            writer.WriteAttr("groupid", static_cast<long long>(clip.groupId));
+        }
         for (const auto& note : clip.notes) {
             writer.StartTag("midinote");
             writer.WriteAttr("id", static_cast<long long>(note.id));
@@ -570,6 +618,9 @@ void MidiTrack::WriteXML(XMLWriter& writer) const
             writer.WriteAttr("beat", event.beat);
             writer.WriteAttr("number", event.number);
             writer.WriteAttr("value", event.value);
+            if (event.type != MidiControllerData::Type::ControlChange) {
+                writer.WriteAttr("type", static_cast<int>(event.type));
+            }
             writer.EndTag("midicontroller");
         }
         writer.EndTag("midiclip");

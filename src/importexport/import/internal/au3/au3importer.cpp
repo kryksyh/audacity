@@ -1,5 +1,10 @@
 #include "au3importer.h"
 
+#include <QFile>
+#include <cmath>
+#include "au3-midi-track/MidiFile.h"
+#include "au3wrap/internal/domaccessor.h"
+
 #include "framework/global/io/path.h"
 #include "global/log.h"
 #include "global/types/string.h"
@@ -32,6 +37,24 @@ using au::trackedit::Au3TrackData;
 using Au3TrackDataPtr = std::shared_ptr<Au3TrackData>;
 
 using namespace au::au3;
+
+namespace {
+bool isMidiFile(const muse::io::path_t& path)
+{
+    const auto name = path.toQString();
+    return name.endsWith(".mid", Qt::CaseInsensitive) || name.endsWith(".midi", Qt::CaseInsensitive);
+}
+
+MidiFileData readMidi(const muse::io::path_t& path, double tempo = 0.0)
+{
+    QFile file(path.toQString());
+    if (!file.open(QIODevice::ReadOnly) || file.size() > 64 * 1024 * 1024) {
+        return MidiFileData();
+    }
+    const auto bytes = file.readAll();
+    return ReadMidiFile({ reinterpret_cast<const uint8_t*>(bytes.constData()), static_cast<size_t>(bytes.size()) }, tempo);
+}
+}
 
 class ImportProgress final : public ImportProgressListener
 {
@@ -100,6 +123,14 @@ au::importexport::Au3Importer::~Au3Importer() = default;
 
 au::importexport::FileInfo au::importexport::Au3Importer::fileInfo(const muse::io::path_t& filePath)
 {
+    if (isMidiFile(filePath)) {
+        const auto midi = readMidi(filePath);
+        if (!midi.success) {
+            return FileInfo();
+        }
+        return { filePath, midi.duration, static_cast<int>(midi.tracks.size()), true };
+    }
+
     if (LegacyAupImporter::isLegacyAupFile(filePath)) {
         FileInfo fileInfo;
         fileInfo.path = filePath;
@@ -131,6 +162,10 @@ au::importexport::FileInfo au::importexport::Au3Importer::fileInfo(const muse::i
 
 bool au::importexport::Au3Importer::import(const muse::io::path_t& filePath)
 {
+    if (isMidiFile(filePath)) {
+        return importMidi(filePath);
+    }
+
     const std::string ext = suffix(filePath);
     for (const std::string& labelExt : labelsImporter()->supportedExtensions()) {
         if (labelExt == ext) {
@@ -188,6 +223,77 @@ bool au::importexport::Au3Importer::import(const muse::io::path_t& filePath)
 
     m_tempoDetection->onFilesImported({ filePath }, importedWaveTracks, dstTrackIds, acidTags, projectWasEmpty);
 
+    return true;
+}
+
+bool au::importexport::Au3Importer::importMidi(const muse::io::path_t& filePath,
+                                               trackedit::TrackId dstTrackId, muse::secs_t startTime)
+{
+    if (!std::isfinite(startTime) || startTime < 0.0) {
+        return false;
+    }
+    auto project = reinterpret_cast<Au3Project*>(globalContext()->currentProject()->au3ProjectPtr());
+    if (!project) {
+        return false;
+    }
+    if (dstTrackId != trackedit::INVALID_TRACK
+        && !dynamic_cast<MidiTrack*>(DomAccessor::findTrack(*project, Au3TrackId(dstTrackId)))) {
+        return false;
+    }
+    const bool empty = isProjectEmpty();
+    auto& signature = ProjectTimeSignature::Get(*project);
+    auto midi = readMidi(filePath, empty ? 0.0 : signature.GetTempo());
+    if (!midi.success) {
+        LOGE() << "MIDI import failed: " << midi.error.ToStdString();
+        return false;
+    }
+    const auto oldTempo = signature.GetTempo();
+    const auto oldNumerator = signature.GetUpperTimeSignature();
+    const auto oldDenominator = signature.GetLowerTimeSignature();
+    if (empty) {
+        signature.SetTempo(midi.tempo);
+        signature.SetUpperTimeSignature(midi.numerator);
+        signature.SetLowerTimeSignature(midi.denominator);
+    }
+    if (midi.hasSystemExclusive) {
+        LOGW() << "MIDI system-exclusive setup messages are not imported";
+    }
+    TrackHolders holders;
+    for (auto& track : midi.tracks) {
+        holders.push_back(std::move(track));
+    }
+    if (dstTrackId == trackedit::INVALID_TRACK) {
+        addImportedTracks(filePath, std::move(holders));
+    } else {
+        std::vector<ITrackDataPtr> data;
+        for (auto& track : holders) {
+            track->ShiftBy(startTime);
+            data.push_back(std::make_shared<Au3TrackData>(track));
+        }
+        bool modified = false;
+        // A multi-part MIDI file fills compatible tracks from the drop target.
+        // Select the pre-created preview tracks so paste does not leave empty
+        // ghosts and create a second set of instrument tracks.
+        trackedit::TrackIdList targets;
+        bool found = false;
+        for (auto* track : Au3TrackList::Get(*project).Any<MidiTrack>()) {
+            found = found || static_cast<trackedit::TrackId>(track->GetId()) == dstTrackId;
+            if (found && targets.size() < data.size()) {
+                targets.push_back(static_cast<trackedit::TrackId>(track->GetId()));
+            }
+        }
+        selectionController()->setSelectedTracks(targets, true);
+        auto result = tracksInteraction()->paste(data, 0.0, false, false, true, modified);
+        if (!result) {
+            if (empty) {
+                signature.SetTempo(oldTempo);
+                signature.SetUpperTimeSignature(oldNumerator);
+                signature.SetLowerTimeSignature(oldDenominator);
+            }
+            return false;
+        }
+        applyImportedProjectTitleIfNeeded(filePath);
+    }
     return true;
 }
 
@@ -253,6 +359,9 @@ bool au::importexport::Au3Importer::importIntoTrack(const muse::io::path_t& file
                                                     trackedit::TrackId dstTrackId,
                                                     muse::secs_t startTime)
 {
+    if (isMidiFile(filePath)) {
+        return importMidi(filePath, dstTrackId, startTime);
+    }
     return importIntoTrackInternal(filePath, dstTrackId, startTime, true, true);
 }
 
@@ -403,6 +512,8 @@ std::vector<std::string> au::importexport::Au3Importer::supportedExtensions() co
     // Audio formats (from au3) plus whatever the labels importer handles.
     std::vector<std::string> out = audioExtensions;
     out.push_back("aup");
+    out.push_back("mid");
+    out.push_back("midi");
     const std::vector<std::string> labelExtensions = labelsImporter()->supportedExtensions();
     out.insert(out.end(), labelExtensions.cbegin(), labelExtensions.cend());
     return out;
@@ -461,8 +572,8 @@ void au::importexport::Au3Importer::addImportedTracks(const muse::io::path_t& fi
     }
 
     for (auto& group : newTracks) {
+        results.push_back(group.get());
         if (auto pTrack = dynamic_cast<WaveTrack*>(group.get())) {
-            results.push_back(pTrack);
             if (outWaveTracks) {
                 outWaveTracks->push_back(pTrack);
             }
@@ -480,6 +591,9 @@ void au::importexport::Au3Importer::addImportedTracks(const muse::io::path_t& fi
     for (const auto& newTrack : results) {
         ++i;
         newTrack->SetSelected(true);
+        if (dynamic_cast<MidiTrack*>(newTrack)) {
+            continue; // Keep the names from the MIDI track/channel metadata.
+        }
         if (useSuffix) {
             //: Name default name assigned to a clip on track import
             newTrack->SetName(wxFromString(::TranslatableString("import-export", "%1 %2", "clip name template")

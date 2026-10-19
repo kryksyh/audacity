@@ -40,6 +40,7 @@ set(MODULE_LINK
         au3-import-export
         au3-import-export-modules
         au3-label-track
+        au3-midi-track
         au3-math
         au3-numeric-formats
         au3-project

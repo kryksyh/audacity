@@ -1,5 +1,7 @@
 #include "dropcontroller.h"
 
+#include <set>
+
 using namespace au::projectscene;
 
 namespace {
@@ -25,9 +27,8 @@ void DropController::probeAudioFiles(const QStringList& fileUrls)
         const QUrl url(fileUrl);
         QString local = url.isLocalFile() ? url.toLocalFile() : fileUrl;
         muse::io::path_t path = muse::io::path_t(local);
-        if (muse::contains(exts, muse::io::suffix(path))) {
+        if (muse::contains(exts, QString::fromStdString(muse::io::suffix(path)).toLower().toStdString())) {
             localPaths.push_back(path);
-            m_lastDraggedUrls.push_back(fileUrl);
         }
     }
 
@@ -40,6 +41,7 @@ void DropController::probeAudioFiles(const QStringList& fileUrls)
         if (fileInfo.isEmpty()) {
             continue;
         }
+        m_lastDraggedUrls.push_back(fileInfo.path.toQString());
         m_lastDraggedFilesInfo.push_back(std::move(fileInfo));
     }
 }
@@ -114,6 +116,25 @@ void DropController::prepareConditionalTracks(int currentTrackId, int draggedFil
         return;
     }
 
+    if (hasMidiFiles()) {
+        const auto types = draggedMidiTypes(draggedFilesCount);
+        for (int i = 0; i < draggedFilesCount; ++i) {
+            const auto ids = midiAwareTrackIds(currentTrackId, draggedFilesCount);
+            if (ids.size() != draggedFilesCount) {
+                return;
+            }
+            if (ids[i].toInt() != trackedit::INVALID_TRACK) {
+                continue;
+            }
+            if (types[i]) {
+                tracksInteraction()->addInstrumentTrack();
+            } else {
+                tracksInteraction()->addWaveTrack(1);
+            }
+        }
+        return;
+    }
+
     au::trackedit::ITrackeditProjectPtr prj = globalContext()->currentTrackeditProject();
     if (!prj) {
         return;
@@ -168,6 +189,9 @@ void DropController::prepareConditionalTracks(int currentTrackId, int draggedFil
 
 QVariantList DropController::draggedTracksIds(int currentTrackId, int draggedFilesCount)
 {
+    if (hasMidiFiles()) {
+        return midiAwareTrackIds(currentTrackId, draggedFilesCount);
+    }
     au::trackedit::ITrackeditProjectPtr prj = globalContext()->currentTrackeditProject();
     if (!prj) {
         return {};
@@ -245,6 +269,11 @@ QVariantList DropController::draggedTracksIds(int currentTrackId, int draggedFil
 
 void DropController::removeDragAddedTracks(int currentTrackId, int draggedFilesCount)
 {
+    // Keep compatible conditional tracks reusable as a mixed audio/MIDI drag
+    // crosses track types. endImportSession removes all unused empty tracks.
+    if (hasMidiFiles()) {
+        return;
+    }
     if (draggedFilesCount <= 0 || m_trackCountBeforeImport < 0) {
         return;
     }
@@ -314,6 +343,10 @@ void DropController::handleDroppedFiles(const std::vector<trackedit::TrackId>& t
     std::vector<trackedit::TrackId> adjustedDstTrackIds;
     auto dstTrackIter = trackIds.begin();
     for (const auto& info : m_lastDraggedFilesInfo) {
+        if (info.trackCount <= 0 || std::distance(dstTrackIter, trackIds.end()) < info.trackCount
+            || *dstTrackIter == trackedit::INVALID_TRACK) {
+            return;
+        }
         localPaths.push_back(info.path);
 
         adjustedDstTrackIds.push_back(*dstTrackIter);
@@ -322,5 +355,91 @@ void DropController::handleDroppedFiles(const std::vector<trackedit::TrackId>& t
 
     project::IAudacityProjectPtr prj = globalContext()->currentProject();
 
+    if (hasMidiFiles() && m_trackCountBeforeImport >= 0) {
+        // Discard unused conditional tracks before the project's Import undo
+        // snapshot is made, including gaps in a mixed audio/MIDI preview.
+        const auto tracks = globalContext()->currentTrackeditProject()->trackList();
+        trackedit::TrackIdList unused;
+        for (size_t i = static_cast<size_t>(m_trackCountBeforeImport); i < tracks.size(); ++i) {
+            if (!muse::contains(trackIds, tracks[i].id)
+                && globalContext()->currentTrackeditProject()->clipList(tracks[i].id).empty()) {
+                unused.push_back(tracks[i].id);
+            }
+        }
+        if (!unused.empty()) {
+            tracksInteraction()->deleteTracks(unused);
+        }
+    }
+
     prj->importIntoTracks(localPaths, adjustedDstTrackIds, startTime);
+}
+
+bool DropController::hasMidiFiles() const
+{
+    return std::any_of(m_lastDraggedFilesInfo.begin(), m_lastDraggedFilesInfo.end(), [](const auto& info) { return info.midi; });
+}
+
+std::vector<bool> DropController::draggedMidiTypes(int count) const
+{
+    std::vector<bool> types;
+    for (const auto& info : m_lastDraggedFilesInfo) {
+        for (int i = 0; i < info.trackCount; ++i) {
+            types.push_back(info.midi);
+        }
+    }
+    types.resize(std::max(0, count), false);
+    return types;
+}
+
+QVariantList DropController::midiAwareTrackIds(int currentTrackId, int count) const
+{
+    const auto project = globalContext()->currentTrackeditProject();
+    if (!project || count <= 0) {
+        return QVariantList();
+    }
+    const auto tracks = project->trackList();
+    const auto types = draggedMidiTypes(count);
+    size_t cursor = tracks.size();
+    for (size_t i = 0; i < tracks.size(); ++i) {
+        if (tracks[i].id == currentTrackId) {
+            cursor = i;
+        }
+    }
+    if (cursor == tracks.size() || (m_trackCountBeforeImport >= 0 && cursor >= static_cast<size_t>(m_trackCountBeforeImport))) {
+        // Conditional rows are one preview group. Hovering a later row must
+        // not rotate the parts or keep creating more preview tracks.
+        cursor = std::min(tracks.size(), static_cast<size_t>(std::max(0, m_trackCountBeforeImport)));
+    }
+    std::set<trackedit::TrackId> used;
+    size_t midiMinimum = 0;
+    QVariantList result;
+    for (bool midi : types) {
+        if (!midi) {
+            midiMinimum = 0;
+        }
+        const auto matches = [&](size_t i) {
+            return !used.contains(tracks[i].id) && (midi ? tracks[i].type == trackedit::TrackType::Midi : isAudioTrack(tracks[i].type));
+        };
+        size_t found = cursor;
+        while (found < tracks.size() && !matches(found)) {
+            ++found;
+        }
+        if (found == tracks.size() && m_trackCountBeforeImport >= 0) {
+            found = std::min(tracks.size(), std::max(midi ? midiMinimum : size_t(0), static_cast<size_t>(m_trackCountBeforeImport)));
+            while (found < tracks.size() && !matches(found)) {
+                ++found;
+            }
+        }
+        if (found == tracks.size()) {
+            result.push_back(static_cast<int>(trackedit::INVALID_TRACK));
+        } else {
+            used.insert(tracks[found].id);
+            result.push_back(static_cast<int>(tracks[found].id));
+            cursor = found + 1;
+            if (midi) {
+                midiMinimum = cursor;
+            }
+        }
+    }
+    return result;
 }
