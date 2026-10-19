@@ -20,6 +20,8 @@ set( TARGET au3-wave-track )
 set( SOURCES
    SampleBlock.cpp
    SampleBlock.h
+   TrackFreeze.cpp
+   TrackFreeze.h
    Sequence.cpp
    Sequence.h
    TimeStretching.cpp

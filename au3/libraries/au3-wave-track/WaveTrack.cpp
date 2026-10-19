@@ -26,6 +26,9 @@ from the project that will own the track.
 */
 
 #include "WaveTrack.h"
+#include "au3-playable-track/TrackAutomation.h"
+#include "au3-playable-track/TrackRouting.h"
+#include "TrackFreeze.h"
 
 #include "WaveClip.h"
 
@@ -1065,6 +1068,7 @@ WaveTrack::Holder WaveTrack::EmptyCopy(size_t nChannels,
     // with the opposite channel in a TrackList.
     result->DoSetRate(rate);
     result->mpFactory = pFactory ? pFactory : mpFactory;
+    TrackFreeze::Get(*result).CopyToFactory(result->mpFactory);
     WaveTrackData::Get(*result).SetOrigin(0);
     return result;
 }
@@ -2612,6 +2616,12 @@ void WaveTrack::HandleXMLEndTag(const std::string_view& WXUNUSED(tag))
 
 XMLTagHandler* WaveTrack::HandleXMLChild(const std::string_view& tag)
 {
+    if (tag == TrackRouting::XMLTag) {
+        return &TrackRouting::Get(*this);
+    }
+    if (tag == AutomationData::XMLTag) {
+        return &TrackAutomation::Get(*this);
+    }
     if (auto pChild = WaveTrackIORegistry::Get().CallObjectAccessor(tag, *this)) {
         // Deserialize any extra attached structures
         return pChild;
@@ -2728,6 +2738,8 @@ void WaveTrack::WriteOneXML(const WaveChannel& channel, XMLWriter& xmlFile,
     // Other persistent data specified elsewhere;
     // NOT written redundantly any more
     if (iChannel == 0) {
+        TrackRouting::Get(track).WriteXML(xmlFile);
+        TrackAutomation::Get(track).WriteXML(xmlFile);
         WaveTrackIORegistry::Get().CallWriters(track, xmlFile);
     }
 
