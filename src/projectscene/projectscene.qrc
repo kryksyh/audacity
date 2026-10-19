@@ -8,6 +8,7 @@
         <file>qml/Audacity/ProjectScene/tracksitemsview/ItemsSelection.qml</file>
         <file>qml/Audacity/ProjectScene/tracksitemsview/TrackLabelsContainer.qml</file>
         <file>qml/Audacity/ProjectScene/tracksitemsview/TrackItemsContainer.qml</file>
+        <file>qml/Audacity/ProjectScene/tracksitemsview/TrackMidiContainer.qml</file>
         <file>qml/Audacity/ProjectScene/tracksitemsview/LabelItem.qml</file>
         <file>qml/Audacity/ProjectScene/tracksitemsview/LabelHeader.qml</file>
         <file>qml/Audacity/ProjectScene/tracksitemsview/LabelEar.qml</file>

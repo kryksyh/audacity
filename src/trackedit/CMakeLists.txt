@@ -104,6 +104,14 @@ set(MODULE_SRC
     ${CMAKE_CURRENT_LIST_DIR}/api/internal/projecteditstate.h
     ${CMAKE_CURRENT_LIST_DIR}/api/audiotransform.h
 
+    ${CMAKE_CURRENT_LIST_DIR}/view/instrumentview.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/view/instrumentview.h
+    ${CMAKE_CURRENT_LIST_DIR}/view/pianorollmodel.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/view/pianorollmodel.h
+    ${CMAKE_CURRENT_LIST_DIR}/view/trackroutingmodel.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/view/trackroutingmodel.h
+    ${CMAKE_CURRENT_LIST_DIR}/view/trackfreezemodel.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/view/trackfreezemodel.h
     ${CMAKE_CURRENT_LIST_DIR}/view/deletebehaviorpanelmodel.cpp
     ${CMAKE_CURRENT_LIST_DIR}/view/deletebehaviorpanelmodel.h
     ${CMAKE_CURRENT_LIST_DIR}/view/pastebehaviorpanelmodel.cpp
@@ -118,6 +126,7 @@ set(MODULE_LINK
         au3-effects
         au3-exceptions
         au3-label-track
+        au3-midi-track
         au3-math
         au3-mixer
         au3-numeric-formats

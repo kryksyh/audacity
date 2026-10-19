@@ -101,6 +101,18 @@ MenuItemList TrackContextMenuModel::makeMonoTrackItems()
     return items;
 }
 
+MenuItemList TrackContextMenuModel::makeMidiTrackItems()
+{
+    return {
+        makeItemWithArg("track-rename"),
+        makeItemWithArg("track-duplicate"),
+        makeItemWithArg("track-delete"),
+        makeSeparator(),
+        makeMenu(muse::TranslatableString("trackcontextmenu", "Move track"), makeTrackMoveItems()),
+        makeMenu(muse::TranslatableString("trackcontextmenu", "Track color"), makeTrackColorItems(), TRACK_COLOR_MENU_ID),
+    };
+}
+
 MenuItemList TrackContextMenuModel::makeLabelTrackItems()
 {
     return {
@@ -156,6 +168,9 @@ void TrackContextMenuModel::load()
         break;
     case trackedit::TrackType::Stereo:
         setItems(makeStereoTrackItems());
+        break;
+    case trackedit::TrackType::Midi:
+        setItems(makeMidiTrackItems());
         break;
     case trackedit::TrackType::Label:
         setItems(makeLabelTrackItems());

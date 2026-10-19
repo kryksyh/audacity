@@ -210,6 +210,7 @@ static const ActionCode CLIP_SPLIT_DELETE("clip-split-delete");
 static const ActionCode RANGE_SELECTION_SPLIT_CUT("split-cut-selected");
 static const ActionCode RANGE_SELECTION_SPLIT_DELETE("split-delete-selected");
 static const ActionCode NEW_MONO_TRACK("new-mono-track");
+static const ActionCode NEW_INSTRUMENT_TRACK("new-instrument-track");
 static const ActionCode NEW_STEREO_TRACK("new-stereo-track");
 static const ActionCode NEW_LABEL_TRACK("new-label-track");
 static const ActionCode TRACK_DELETE("track-delete");
@@ -314,6 +315,7 @@ static const std::vector<ActionCode> actionsDisabledDuringRecording {
     RANGE_SELECTION_SPLIT_CUT,
     RANGE_SELECTION_SPLIT_DELETE,
     NEW_MONO_TRACK,
+    NEW_INSTRUMENT_TRACK,
     NEW_STEREO_TRACK,
     NEW_LABEL_TRACK,
     TRIM_AUDIO_OUTSIDE_SELECTION,
@@ -419,6 +421,7 @@ void TrackeditActionsController::init()
     }));
     cd->onRequest(this, TRACKEDIT_TRACK_DELETE_COMMAND, [this]() { return deleteTracks(); });
 
+    cd->onRequest(this, TRACKEDIT_NEW_INSTRUMENT_TRACK_COMMAND, apply([this]() { return trackeditInteraction()->newInstrumentTrack(); }));
     cd->onRequest(this, TRACKEDIT_NEW_MONO_TRACK_COMMAND, apply([this]() { return trackeditInteraction()->newMonoTrack(); }));
     cd->onRequest(this, TRACKEDIT_NEW_STEREO_TRACK_COMMAND, apply([this]() { return trackeditInteraction()->newStereoTrack(); }));
     cd->onRequest(this, TRACKEDIT_NEW_LABEL_TRACK_COMMAND, apply([this]() { return trackeditInteraction()->newLabelTrack().ret; }));
@@ -524,6 +527,7 @@ void TrackeditActionsController::init()
         { DELETE_PER_TRACK_RIPPLE_CODE, TRACKEDIT_DELETE_PER_TRACK_RIPPLE_COMMAND, {} },
         { DELETE_ALL_TRACKS_RIPPLE_CODE, TRACKEDIT_DELETE_ALL_TRACKS_RIPPLE_COMMAND, {} },
         { NEW_MONO_TRACK, TRACKEDIT_NEW_MONO_TRACK_COMMAND, {} },
+        { NEW_INSTRUMENT_TRACK, TRACKEDIT_NEW_INSTRUMENT_TRACK_COMMAND, {} },
         { NEW_STEREO_TRACK, TRACKEDIT_NEW_STEREO_TRACK_COMMAND, {} },
         { NEW_LABEL_TRACK, TRACKEDIT_NEW_LABEL_TRACK_COMMAND, {} },
         { TRACK_DUPLICATE_CODE, TRACKEDIT_TRACK_DUPLICATE_COMMAND, {} },

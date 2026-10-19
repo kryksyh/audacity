@@ -52,6 +52,12 @@ StyledPopupView {
                     enabled: true
                 },
                 {
+                    type: TrackType.MIDI,
+                    icon: IconCode.MUSIC_NOTES,
+                    text: qsTrc("projectscene", "Instrument"),
+                    enabled: true
+                },
+                {
                     type: TrackType.LABEL,
                     icon: IconCode.LOOP_IN,
                     text: qsTrc("projectscene", "Label"),

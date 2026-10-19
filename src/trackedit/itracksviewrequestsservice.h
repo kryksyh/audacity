@@ -7,6 +7,7 @@
 
 #include "modularity/imoduleinterface.h"
 #include "async/channel.h"
+#include "async/notification.h"
 
 #include "trackedittypes.h"
 
@@ -17,6 +18,18 @@ class ITracksViewRequestsService : MODULE_EXPORT_INTERFACE
 
 public:
     virtual ~ITracksViewRequestsService() = default;
+
+    virtual void requestFinishInstrumentEditing() = 0;
+    virtual muse::async::Notification finishInstrumentEditingRequested() const = 0;
+
+    virtual void requestRouting(TrackId trackId) = 0;
+    virtual muse::async::Channel<TrackId> routingRequested() const = 0;
+
+    virtual void requestAutomation(TrackId trackId) = 0;
+    virtual muse::async::Channel<TrackId> automationRequested() const = 0;
+
+    virtual void requestPianoRoll(TrackId trackId, int64_t clipId) = 0;
+    virtual muse::async::Channel<TrackId, int64_t> pianoRollRequested() const = 0;
 
     virtual void requestItemMove(secs_t timeOffset, int trackOffset) = 0;
     virtual muse::async::Channel<secs_t, int> itemMoveRequested() const = 0;

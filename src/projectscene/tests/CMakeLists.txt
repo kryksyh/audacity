@@ -15,6 +15,7 @@ set(MODULE_TEST_SRC
     ${CMAKE_CURRENT_LIST_DIR}/findguideline_tests.cpp
     ${CMAKE_CURRENT_LIST_DIR}/playcursorcontroller_tests.cpp
     ${CMAKE_CURRENT_LIST_DIR}/playpositionactioncontroller_tests.cpp
+    ${PROJECT_SOURCE_DIR}/src/spectrogram/tests/frequencyselectioncontroller_tests.cpp
 
     ${CMAKE_CURRENT_LIST_DIR}/snaptestaccess.h
     ${CMAKE_CURRENT_LIST_DIR}/mocks/globalcontextmock.h
@@ -29,6 +30,7 @@ set(MODULE_TEST_LINK
     playback
     record
     context
+    spectrogram
     au3wrap
 
     muse::ui
@@ -36,7 +38,7 @@ set(MODULE_TEST_LINK
     muse::workspace
 )
 
-set(MODULE_TEST_INCLUDE ${CMAKE_CURRENT_LIST_DIR}/..)
+set(MODULE_TEST_INCLUDE ${CMAKE_CURRENT_LIST_DIR}/.. ${PROJECT_SOURCE_DIR}/src/spectrogram)
 
 set(MODULE_TEST_DATA_ROOT ${CMAKE_CURRENT_LIST_DIR})
 

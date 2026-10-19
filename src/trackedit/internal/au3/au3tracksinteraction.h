@@ -60,6 +60,7 @@ public:
     bool splitDeleteSelectedOnTracks(const TrackIdList tracksIds, secs_t begin, secs_t end) override;
 
     bool newMonoTrack() override;
+    bool newInstrumentTrack() override;
     bool newStereoTrack() override;
     muse::RetVal<TrackId> newLabelTrack(const muse::String& title = muse::String()) override;
 

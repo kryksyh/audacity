@@ -33,6 +33,7 @@ set(MODULE_TEST_LINK
         au3wrap
         effects_base
         au3-label-track
+        au3-midi-track
         au3-project-file-io
         au3-project-history
         au3-realtime-effects

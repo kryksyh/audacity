@@ -98,6 +98,7 @@ public:
     muse::Ret makeRoomForClip(const trackedit::ClipKey& clipKey) override;
 
     bool newMonoTrack() override;
+    bool newInstrumentTrack() override;
     bool newStereoTrack() override;
     muse::RetVal<TrackId> newLabelTrack(const muse::String& title = muse::String()) override;
 

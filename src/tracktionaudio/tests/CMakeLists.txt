@@ -8,6 +8,7 @@ set(MODULE_TEST tracktionaudio_tests)
 set(MODULE_TEST_SRC
     ${PROJECT_SOURCE_DIR}/src/projectscene/types/projectscenetypes.h
     ${CMAKE_CURRENT_LIST_DIR}/audiocallbacks_tests.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/miditrack_tests.cpp
     ${CMAKE_CURRENT_LIST_DIR}/graphlatency_tests.cpp
     ${CMAKE_CURRENT_LIST_DIR}/timestretcher_tests.cpp
     ${CMAKE_CURRENT_LIST_DIR}/asyncplugin_tests.cpp

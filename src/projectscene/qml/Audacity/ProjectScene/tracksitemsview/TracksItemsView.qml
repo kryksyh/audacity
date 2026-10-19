@@ -878,10 +878,29 @@ Rectangle {
 
                     width: tracksItemsView.width
 
-                    sourceComponent: trackType === TrackType.LABEL ? trackLabelsContainer : trackClipsContainerComp
+                    sourceComponent: trackType === TrackType.LABEL ? trackLabelsContainer : trackType === TrackType.MIDI ? trackMidiContainer : trackClipsContainerComp
 
                     onLoaded: {
                         trackItemLoader.item.init()
+                    }
+
+                    Component {
+                        id: trackMidiContainer
+
+                        TrackMidiContainer {
+                            trackId: trackItemLoader.itemData.trackId
+                            trackTitle: trackItemLoader.itemData.trackTitle
+                            width: trackItemLoader.width
+                            context: timeline.context
+                            canvas: content
+                            container: tracksItemsView
+                            navigationPanel: navPanels && navPanels[trackItemLoader.index] ? navPanels[trackItemLoader.index] : null
+                            isTrackSelected: trackItemLoader.itemData.isTrackSelected
+                            isTrackFocused: trackItemLoader.itemData.isTrackFocused
+                            selectionInProgress: selectionViewController.selectionInProgress
+                            selectionEditInProgress: selectionViewController.selectionEditInProgress
+                            verticalSelectionEditInProgress: selectionViewController.verticalSelectionEditInProgress
+                        }
                     }
 
                     Component {

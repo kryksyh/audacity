@@ -2,6 +2,7 @@
  * Audacity: A Digital Audio Editor
  */
 #include <gtest/gtest.h>
+#include <iterator>
 
 #include "../internal/au3/au3tracksinteraction.h"
 #include "../internal/au3/au3trackdata.h"
@@ -18,6 +19,9 @@
 #include "interactive/tests/mocks/interactivemock.h"
 
 #include "au3wrap/internal/trackcolor.h"
+#include "au3wrap/internal/domconverter.h"
+#include "au3-midi-track/MidiTrack.h"
+#include "au3-playable-track/TrackRouting.h"
 #include "au3-realtime-effects/RealtimeEffectList.h"
 #include "au3-realtime-effects/RealtimeEffectState.h"
 #include "project/tests/mocks/dummyeffectinstancefactory.h"
@@ -756,6 +760,84 @@ TEST_F(Au3TracksInteractionTests, DuplicateTracks)
     removeTrack(trackId);
     const TrackId newTrackId = (*projectTracks.begin())->GetId();
     removeTrack(newTrackId);
+}
+
+TEST_F(Au3TracksInteractionTests, DuplicateTracksKeepsCopiedAndExistingBusRoutes)
+{
+    auto& tracks = Au3TrackList::Get(projectRef());
+    const TrackId audioId = createTrack(TestTrackID::TRACK_TWO_CLIPS);
+    auto* audio = DomAccessor::findWaveTrack(projectRef(), Au3TrackId(audioId));
+    auto midi = MidiTrack::Create();
+    tracks.Add(midi);
+    auto copiedBus = WaveTrackFactory::Get(projectRef()).Create(2, floatSample, DEFAULT_SAMPLE_RATE);
+    auto existingBus = WaveTrackFactory::Get(projectRef()).Create(2, floatSample, DEFAULT_SAMPLE_RATE);
+    tracks.Add(copiedBus);
+    tracks.Add(existingBus);
+    TrackRouting::Get(*copiedBus).busId = "copied-bus";
+    TrackRouting::Get(*existingBus).busId = "existing-bus";
+    auto& audioRouting = TrackRouting::Get(*audio);
+    audioRouting.output = "copied-bus";
+    audioRouting.sends = { { "existing-bus", 0.25, true } };
+    auto& midiRouting = TrackRouting::Get(*midi);
+    midiRouting.output = "existing-bus";
+    midiRouting.sends = { { "copied-bus", 0.5, false } };
+    ASSERT_TRUE(TrackRouting::Validate(tracks));
+
+    ASSERT_TRUE(m_tracksInteraction->duplicateTracks({ audioId, midi->GetId(), copiedBus->GetId() }));
+    ASSERT_EQ(tracks.Size(), 7u);
+    auto copied = tracks.begin();
+    std::advance(copied, 4);
+    auto* audioCopy = *copied++;
+    auto* midiCopy = *copied++;
+    auto* busCopy = *copied;
+    ASSERT_NE(dynamic_cast<Au3WaveTrack*>(audioCopy), nullptr);
+    ASSERT_NE(dynamic_cast<MidiTrack*>(midiCopy), nullptr);
+    const auto& newBusId = TrackRouting::Get(*busCopy).busId;
+    EXPECT_FALSE(newBusId.empty());
+    EXPECT_NE(newBusId, "copied-bus");
+    EXPECT_NE(newBusId, "existing-bus");
+    EXPECT_NE(busCopy->GetId(), copiedBus->GetId());
+    EXPECT_EQ(TrackRouting::Get(*audioCopy).output, newBusId);
+    EXPECT_EQ(TrackRouting::Get(*audioCopy).sends, audioRouting.sends);
+    EXPECT_EQ(TrackRouting::Get(*midiCopy).output, "existing-bus");
+    ASSERT_EQ(TrackRouting::Get(*midiCopy).sends.size(), 1u);
+    EXPECT_EQ(TrackRouting::Get(*midiCopy).sends.front(), (TrackSendData { newBusId, 0.5, false }));
+    EXPECT_EQ(audioRouting.output, "copied-bus");
+    EXPECT_EQ(midiRouting.sends.front().bus, "copied-bus");
+    EXPECT_TRUE(TrackRouting::Validate(tracks));
+}
+
+TEST_F(Au3TracksInteractionTests, DeletingABusKeepsRoutesToOtherBuses)
+{
+    auto& tracks = Au3TrackList::Get(projectRef());
+    auto midi = MidiTrack::Create();
+    auto removedBus = WaveTrackFactory::Get(projectRef()).Create(2, floatSample, DEFAULT_SAMPLE_RATE);
+    auto remainingBus = WaveTrackFactory::Get(projectRef()).Create(2, floatSample, DEFAULT_SAMPLE_RATE);
+    tracks.Add(midi);
+    tracks.Add(removedBus);
+    tracks.Add(remainingBus);
+    TrackRouting::Get(*removedBus).busId = "removed-bus";
+    TrackRouting::Get(*remainingBus).busId = "remaining-bus";
+    auto& midiRouting = TrackRouting::Get(*midi);
+    midiRouting.output = "removed-bus";
+    midiRouting.sends = { { "remaining-bus", 0.75, true }, { "removed-bus", 0.25, false } };
+    TrackRouting::Get(*remainingBus).sends = { { "removed-bus", 0.5, false } };
+    ASSERT_TRUE(TrackRouting::Validate(tracks));
+    EXPECT_CALL(*m_trackEditProject, notifyAboutTrackChanged(Truly([&](const Track& track) {
+        return track.id == midi->GetId();
+    }))).Times(1);
+    EXPECT_CALL(*m_trackEditProject, notifyAboutTrackChanged(Truly([&](const Track& track) {
+        return track.id == remainingBus->GetId();
+    }))).Times(1);
+
+    ASSERT_TRUE(m_tracksInteraction->deleteTracks({ removedBus->GetId() }));
+    ASSERT_EQ(tracks.Size(), 2u);
+    EXPECT_TRUE(midiRouting.output.empty());
+    ASSERT_EQ(midiRouting.sends.size(), 1u);
+    EXPECT_EQ(midiRouting.sends.front(), (TrackSendData { "remaining-bus", 0.75, true }));
+    EXPECT_EQ(TrackRouting::Get(*remainingBus).busId, "remaining-bus");
+    EXPECT_TRUE(TrackRouting::Get(*remainingBus).sends.empty());
+    EXPECT_TRUE(TrackRouting::Validate(tracks));
 }
 
 TEST_F(Au3TracksInteractionTests, DuplicateTracksCopiesEffectStates)
@@ -1649,6 +1731,49 @@ TEST_F(Au3TracksInteractionTests, PasteLabelTrackCreatesNewTrack)
     removeTrack(sourceLabelTrackId);
     removeTrack(waveTrack2Id);
     removeTrack(newLabelTrackId);
+}
+
+TEST_F(Au3TracksInteractionTests, AddNewInstrumentTrack)
+{
+    auto& tracks = Au3TrackList::Get(projectRef());
+    EXPECT_CALL(*m_trackEditProject, notifyAboutTrackAdded(_)).Times(1);
+    EXPECT_CALL(*m_selectionController, setSelectedTracks(_, true)).Times(1);
+    ASSERT_TRUE(m_tracksInteraction->newInstrumentTrack());
+    ASSERT_EQ(tracks.Size(), 1u);
+    auto* track = dynamic_cast<MidiTrack*>(*tracks.begin());
+    ASSERT_NE(track, nullptr);
+    EXPECT_EQ(DomConverter::track(track).type, TrackType::Midi);
+    EXPECT_FALSE(track->GetName().empty());
+    tracks.Remove(*track);
+}
+
+TEST_F(Au3TracksInteractionTests, MidiRangeCopyPasteAndCutKeepOtherClips)
+{
+    ASSERT_TRUE(m_tracksInteraction->newInstrumentTrack());
+    auto& tracks = Au3TrackList::Get(projectRef());
+    auto* track = *tracks.Any<MidiTrack>().begin();
+    MidiClipData clip;
+    clip.id = 1;
+    clip.notes = { { 1, 0.25, 0.5, 67, 110 } };
+    ASSERT_TRUE(track->SetClips({ clip }));
+    const TrackId id = track->GetId();
+    ON_CALL(*m_selectionController, selectedTracks()).WillByDefault(Return(TrackIdList { id }));
+    ON_CALL(*m_trackEditProject, trackList()).WillByDefault(Return(std::vector<Track> { DomConverter::track(track) }));
+    const auto copied = m_tracksInteraction->copyContinuousTrackData(id, 0.0, 0.5);
+    ASSERT_NE(copied, nullptr);
+    bool modified = false;
+    ASSERT_TRUE(m_tracksInteraction->paste({ copied }, 2.0, false, false, false, modified));
+    EXPECT_TRUE(modified);
+    ASSERT_EQ(track->GetClips().size(), 2u);
+    EXPECT_DOUBLE_EQ(track->GetClips()[1].start, 4.0);
+    ASSERT_EQ(track->GetClips()[1].notes.size(), 1u);
+    EXPECT_EQ(track->GetClips()[1].notes[0].velocity, 110);
+    ASSERT_NE(m_tracksInteraction->cutTrackData(id, 0.0, 0.5, false), nullptr);
+    ASSERT_EQ(track->GetClips().size(), 2u);
+    EXPECT_DOUBLE_EQ(track->GetClips()[1].start, 4.0);
+    ASSERT_EQ(track->GetClips()[1].notes.size(), 1u);
+    EXPECT_EQ(track->GetClips()[1].notes[0].pitch, 67);
+    tracks.Remove(*track);
 }
 
 TEST_F(Au3TracksInteractionTests, AddNewMonoTrack)

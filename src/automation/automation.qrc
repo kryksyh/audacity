@@ -1,0 +1,6 @@
+<RCC>
+    <qresource prefix="/">
+        <file>qml/Audacity/Automation/qmldir</file>
+        <file>qml/Audacity/Automation/TrackAutomationPanel.qml</file>
+    </qresource>
+</RCC>

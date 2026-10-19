@@ -9,11 +9,28 @@ import Muse.Ui
 import Muse.UiComponents
 
 import Audacity.ProjectScene
+import Audacity.TrackEdit
+import Audacity.Automation
 
 import "audio"
 
 TrackItem {
     id: root
+
+    TrackRoutingModel {
+        id: routing
+        trackId: root.item ? root.item.trackId : -1
+    }
+
+    TrackAutomationModel {
+        id: automation
+        trackId: root.item ? root.item.trackId : -1
+    }
+
+    PianoRollModel {
+        id: midi
+        trackId: root.item ? root.item.trackId : -1
+    }
 
     headerTrailingControlsComponent: Component {
         RowLayout {
@@ -97,12 +114,9 @@ TrackItem {
                 }
             }
 
-            FlatButton {
+            RowLayout {
                 Layout.fillWidth: true
-                Layout.preferredHeight: 24
-
-                text: qsTrc("projectscene", "Effects")
-                toolTipDescription: qsTrc("projectscene", "Opens effects panel")
+                spacing: 4
 
                 opacity: topRow.visible && root.height > root.mapFromItem(this, 0, height + bottomSeparatorHeight).y ? 1 : 0
                 visible: opacity !== 0
@@ -112,12 +126,59 @@ TrackItem {
                     }
                 }
 
-                navigation.panel: root.headerNavigationPanel
-                navigation.order: root.headerTrailingControlsNavigationEnd + 1
-                navigation.enabled: topRow.visible
+                FlatButton {
+                    id: effectsButton
+                    Layout.fillWidth: true
+                    Layout.preferredHeight: 24
+                    minWidth: 50
+                    text: qsTrc("projectscene", "Effects")
+                    toolTipDescription: qsTrc("projectscene", "Opens effects panel")
+                    navigation.panel: root.headerNavigationPanel
+                    navigation.order: root.headerTrailingControlsNavigationEnd + 1
+                    navigation.enabled: topRow.visible
+                    onClicked: root.openEffectsRequested()
+                }
 
-                onClicked: {
-                    root.openEffectsRequested()
+                FlatButton {
+                    Layout.preferredHeight: 24
+                    minWidth: 48
+                    text: qsTrc("routing", "Route")
+                    navigation.panel: root.headerNavigationPanel
+                    navigation.order: effectsButton.navigation.order + 1
+                    navigation.enabled: topRow.visible
+                    onClicked: routing.openEditor()
+                }
+
+                FlatButton {
+                    Layout.preferredWidth: 28
+                    Layout.preferredHeight: 24
+                    minWidth: 24
+                    icon: IconCode.AUTOMATION
+                    toolTipTitle: qsTrc("automation", "Automation")
+                    navigation.panel: root.headerNavigationPanel
+                    navigation.order: effectsButton.navigation.order + 2
+                    navigation.enabled: topRow.visible
+                    onClicked: automation.openEditor()
+                }
+
+                FlatButton {
+                    Layout.fillWidth: true
+                    Layout.preferredHeight: 24
+                    minWidth: 60
+                    visible: root.item && root.item.trackType === TrackType.MIDI
+                    text: qsTrc("pianoroll", "Piano roll")
+                    toolTipDescription: qsTrc("pianoroll", "Edit MIDI notes and instrument settings")
+                    navigation.panel: root.headerNavigationPanel
+                    navigation.order: effectsButton.navigation.order + 3
+                    navigation.enabled: topRow.visible && visible
+                    onClicked: {
+                        midi.init()
+                        const clips = midi.clips
+                        const id = clips.length > 0 ? clips[0].id : midi.addClip(0)
+                        if (id > 0) {
+                            midi.openEditor(id)
+                        }
+                    }
                 }
             }
         }

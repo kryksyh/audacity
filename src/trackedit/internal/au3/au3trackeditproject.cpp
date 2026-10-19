@@ -3,6 +3,7 @@
 #include <algorithm>
 
 #include "au3-label-track/LabelTrack.h"
+#include "au3-midi-track/MidiTrack.h"
 #include "au3-track/Track.h"
 #include "au3-wave-track/WaveTrack.h"
 #include "au3-time-track/TimeTrack.h"
@@ -121,6 +122,9 @@ void Au3TrackeditProject::updateHasAudioContent()
         }
     }
 
+    for (const auto* track : m_impl->trackList->Any<const MidiTrack>()) {
+        has |= !track->GetClips().empty();
+    }
     setHasAudioContent(has);
 }
 

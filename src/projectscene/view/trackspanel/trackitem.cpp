@@ -13,6 +13,8 @@ using namespace au::trackedit;
 static muse::ui::IconCode::Code iconFromTrackType(au::trackedit::TrackType type)
 {
     switch (type) {
+    case au::trackedit::TrackType::Midi:
+        return muse::ui::IconCode::Code::MUSIC_NOTES;
     case au::trackedit::TrackType::Label:
         return muse::ui::IconCode::Code::LOOP_IN;
     case au::trackedit::TrackType::Mono:

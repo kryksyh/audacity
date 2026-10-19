@@ -430,6 +430,12 @@ UiActionList STATIC_ACTIONS = {
              //: Action description: shown as a tooltip; can be a full sentence
              TranslatableString("action_description", "Reset pitch and speed")
              ),
+    UiAction("new-instrument-track",
+             au::context::UiCtxProjectOpened,
+             au::context::CTX_ANY,
+             TranslatableString("action", "New instrument track"),
+             TranslatableString("action_description", "Add a MIDI track with an instrument")
+             ),
     UiAction("new-mono-track",
              au::context::UiCtxAny,
              au::context::CTX_ANY,

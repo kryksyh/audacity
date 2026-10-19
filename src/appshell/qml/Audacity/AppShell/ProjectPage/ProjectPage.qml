@@ -30,6 +30,7 @@ import Audacity.AppShell
 import Audacity.ProjectScene
 import Audacity.Playback
 import Audacity.TrackEdit
+import Audacity.Automation
 
 DockPage {
     id: root
@@ -44,6 +45,39 @@ DockPage {
     signal externalDropAreaEntered(var drop)
     signal externalDropAreaExited
     signal externalDropAreaDropped(var drop)
+
+    TrackRoutingModel {
+        id: routingModel
+        Component.onCompleted: initPanel()
+        onEditorRequested: routingPanel.open()
+    }
+
+    TrackAutomationModel {
+        id: automationModel
+        Component.onCompleted: initPanel()
+        onEditorRequested: automationPanel.open()
+    }
+
+    PianoRollModel {
+        id: pianoRollModel
+        Component.onCompleted: initPanel()
+        onEditorRequested: pianoRollPanel.open()
+        onTrackIdChanged: instrumentEditorDialog.close()
+        onInstrumentEditorCloseRequested: instrumentEditorDialog.close()
+        onInstrumentEditorRequested: {
+            if (instrumentEditorDialog.isOpened) {
+                instrumentEditorDialog.raise()
+            } else {
+                instrumentEditorDialog.open()
+            }
+        }
+    }
+
+    InstrumentEditorDialog {
+        id: instrumentEditorDialog
+        midi: pianoRollModel
+        pianoRollVisible: pianoRollPanel.visible
+    }
 
     TrackNavigationModel {
         id: tracksNavModel
@@ -289,6 +323,69 @@ DockPage {
     ]
 
     panels: [
+        DockPanel {
+            id: routingPanel
+            objectName: "trackRoutingPanel"
+            title: qsTrc("routing", "Routing")
+            location: Location.Bottom
+            groupName: root.horizontalPanelsGroup
+            dropDestinations: [root.panelBottomDropDestination]
+            floatable: false
+            closable: true
+            visible: false
+            height: 260
+            minimumHeight: 200
+            maximumHeight: root.horizontalPanelMaxHeight
+            navigationSection: root.keynavBottomPanelSec
+            TrackRoutingPanel {
+                routing: routingModel
+                navigationSection: routingPanel.navigationSection
+                navigationOrderStart: routingPanel.contentNavigationPanelOrderStart
+            }
+        },
+        DockPanel {
+            id: automationPanel
+            objectName: "trackAutomationPanel"
+            title: qsTrc("appshell", "Automation")
+            location: Location.Bottom
+            groupName: root.horizontalPanelsGroup
+            dropDestinations: [root.panelBottomDropDestination]
+            floatable: false
+            closable: true
+            visible: false
+            height: 310
+            minimumHeight: 230
+            maximumHeight: root.horizontalPanelMaxHeight
+            navigationSection: root.keynavBottomPanelSec
+
+            TrackAutomationPanel {
+                automation: automationModel
+                navigationSection: automationPanel.navigationSection
+                navigationOrderStart: automationPanel.contentNavigationPanelOrderStart
+            }
+        },
+        DockPanel {
+            id: pianoRollPanel
+            objectName: "pianoRollPanel"
+            dropDestinations: [root.panelBottomDropDestination]
+            title: qsTrc("appshell", "Piano roll")
+            location: Location.Bottom
+            groupName: root.horizontalPanelsGroup
+            floatable: false
+            closable: true
+            visible: false
+            height: 340
+            minimumHeight: 230
+            maximumHeight: root.horizontalPanelMaxHeight
+            navigationSection: root.keynavBottomPanelSec
+
+            PianoRollPanel {
+                midi: pianoRollModel
+                instrumentEditorVisible: instrumentEditorDialog.isOpened
+                navigationSection: pianoRollPanel.navigationSection
+                navigationOrderStart: pianoRollPanel.contentNavigationPanelOrderStart
+            }
+        },
         DockPanel {
             id: tracksPanel
 

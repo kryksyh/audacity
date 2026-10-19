@@ -710,6 +710,15 @@ muse::Ret TrackeditOperationController::makeRoomForClip(const ClipKey& clipKey)
     return clipsInteraction()->makeRoomForClip(clipKey);
 }
 
+bool TrackeditOperationController::newInstrumentTrack()
+{
+    if (!tracksInteraction()->newInstrumentTrack()) {
+        return false;
+    }
+    projectHistory()->pushHistoryState(muse::trc("trackedit", "Added instrument track"), muse::trc("trackedit", "New instrument track"));
+    return true;
+}
+
 bool TrackeditOperationController::newMonoTrack()
 {
     if (tracksInteraction()->newMonoTrack()) {

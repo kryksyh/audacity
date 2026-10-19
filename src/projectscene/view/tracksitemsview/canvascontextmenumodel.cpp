@@ -36,6 +36,7 @@ MenuItemList CanvasContextMenuModel::makeItems()
         makeSeparator(),
         makeMenuItem("new-mono-track"),
         makeMenuItem("new-stereo-track"),
+        makeMenuItem("new-instrument-track"),
         makeMenuItem("new-label-track"),
         makeSeparator(),
         makeMenuItem("select-all"),

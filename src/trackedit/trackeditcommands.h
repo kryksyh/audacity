@@ -29,6 +29,7 @@ inline static const muse::rcommand::Command TRACKEDIT_STRETCH_CLIP_TO_MATCH_TEMP
 inline static const muse::rcommand::Command TRACKEDIT_TRACK_SPLIT_AT_COMMAND("command://trackedit/track-split-at");
 
 inline static const muse::rcommand::Command TRACKEDIT_NEW_MONO_TRACK_COMMAND("command://trackedit/new-mono-track");
+inline static const muse::rcommand::Command TRACKEDIT_NEW_INSTRUMENT_TRACK_COMMAND("command://trackedit/new-instrument-track");
 inline static const muse::rcommand::Command TRACKEDIT_NEW_STEREO_TRACK_COMMAND("command://trackedit/new-stereo-track");
 inline static const muse::rcommand::Command TRACKEDIT_NEW_LABEL_TRACK_COMMAND("command://trackedit/new-label-track");
 
