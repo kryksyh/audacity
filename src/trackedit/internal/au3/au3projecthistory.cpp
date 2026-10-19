@@ -31,6 +31,7 @@ bool au::trackedit::Au3ProjectHistory::undoAvailable() const
 
 void au::trackedit::Au3ProjectHistory::undo()
 {
+    m_aboutToRestoreState.notify();
     doUndo();
 
     m_interactionOngoing = false;
@@ -49,6 +50,7 @@ bool au::trackedit::Au3ProjectHistory::redoAvailable() const
 
 void au::trackedit::Au3ProjectHistory::redo()
 {
+    m_aboutToRestoreState.notify();
     doRedo();
 
     m_interactionOngoing = false;
@@ -134,6 +136,7 @@ void Au3ProjectHistory::markUnsaved()
 
 void Au3ProjectHistory::undoRedoToIndex(size_t index)
 {
+    m_aboutToRestoreState.notify();
     if (currentStateIndex() == index) {
         return;
     }

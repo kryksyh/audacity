@@ -49,6 +49,7 @@ public:
     virtual bool hasUnsavedChanges() = 0;
 
     virtual muse::async::Notification needSaveChanged() const { return muse::async::Notification(); }
+    virtual muse::async::Notification aboutSaveBegin() const { return {}; }
     virtual muse::Ret save(const muse::io::path_t& path = muse::io::path_t(), SaveMode saveMode = SaveMode::Save) = 0;
 
     virtual const au::trackedit::ITrackeditProjectPtr trackeditProject() const = 0;

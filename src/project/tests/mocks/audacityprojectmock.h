@@ -24,6 +24,7 @@ public:
     MOCK_METHOD(void, close, (), (override));
     MOCK_METHOD(muse::async::Notification, aboutCloseBegin, (), (const, override));
     MOCK_METHOD(muse::async::Notification, aboutCloseEnd, (), (const, override));
+    MOCK_METHOD(muse::async::Notification, aboutSaveBegin, (), (const, override));
 
     MOCK_METHOD(bool, isNewlyCreated, (), (const, override));
     MOCK_METHOD(bool, isImported, (), (const, override));

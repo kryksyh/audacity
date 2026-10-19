@@ -692,7 +692,7 @@ class InputTestEditor final : public audio::IInstrumentEditor
 public:
     std::vector<audio::InstrumentParameter> parameters() const override { return {}; }
     bool setParameter(const std::string&, double) override { return false; }
-    std::string state() const override { return savedState; }
+    std::string state() const override { ++stateReads; return savedState; }
     bool takeChanges() override { return std::exchange(dirty, false); }
     bool active() const override { return m_active; }
     void close() override { m_active = false; }
@@ -704,6 +704,7 @@ public:
     std::vector<audio::InstrumentMidiMessage> messages;
     bool m_active = true;
     bool dirty = false;
+    mutable int stateReads = 0;
     std::string savedState;
 };
 
@@ -1299,6 +1300,87 @@ TEST_F(PianoRollTests, InstrumentEditorRequestsAWindowAndKeepsLiveInputWhenTheWi
     EXPECT_EQ(closeRequests, 1);
     EXPECT_FALSE(editor->active());
     EXPECT_TRUE((*TrackList::Get(project()).Any<MidiTrack>().begin())->GetInstrumentState().empty());
+}
+
+TEST_F(PianoRollTests, ContinuousInstrumentChangesCaptureOneStateAfterTheAdjustmentStops)
+{
+    ASSERT_TRUE(m_model->enableInput());
+    const auto editor = m_inputs->editor;
+    const auto initialIndex = m_history->currentStateIndex();
+    const auto pump = [](int milliseconds) {
+        QEventLoop events;
+        QTimer::singleShot(milliseconds, &events, &QEventLoop::quit);
+        events.exec();
+    };
+    for (int update = 0; update < 6; ++update) {
+        editor->savedState = "<PLUGIN type=\"4osc\" adjustment=\"" + std::to_string(update) + "\"/>";
+        editor->dirty = true;
+        pump(60);
+        EXPECT_EQ(editor->stateReads, 0);
+        EXPECT_EQ(m_history->currentStateIndex(), initialIndex);
+    }
+    pump(350);
+    EXPECT_EQ(editor->stateReads, 1);
+    EXPECT_EQ(m_history->currentStateIndex(), initialIndex + 1);
+    const auto finalState = editor->savedState;
+    EXPECT_EQ((*TrackList::Get(project()).Any<MidiTrack>().begin())->GetInstrumentState().utf8_string(), finalState);
+    pump(350);
+    EXPECT_EQ(editor->stateReads, 1);
+    EXPECT_EQ(m_history->currentStateIndex(), initialIndex + 1);
+    m_history->undo();
+    EXPECT_TRUE((*TrackList::Get(project()).Any<MidiTrack>().begin())->GetInstrumentState().empty());
+    m_history->redo();
+    EXPECT_EQ((*TrackList::Get(project()).Any<MidiTrack>().begin())->GetInstrumentState().utf8_string(), finalState);
+}
+
+TEST_F(PianoRollTests, ClosingInputCommitsPendingInstrumentChangesWithoutWaiting)
+{
+    ASSERT_TRUE(m_model->enableInput());
+    const auto editor = m_inputs->editor;
+    editor->savedState = "<PLUGIN type=\"4osc\" pendingClose=\"1\"/>";
+    editor->dirty = true;
+    QEventLoop events;
+    QTimer::singleShot(40, &events, &QEventLoop::quit);
+    events.exec();
+    m_model->disableInput();
+    EXPECT_EQ(editor->stateReads, 1);
+    EXPECT_EQ((*TrackList::Get(project()).Any<MidiTrack>().begin())->GetInstrumentState().utf8_string(), editor->savedState);
+    EXPECT_FALSE(editor->active());
+}
+
+TEST_F(PianoRollTests, UndoCommitsThePendingInstrumentAdjustmentBeforeRestoringThePreviousState)
+{
+    ASSERT_TRUE(m_model->enableInput());
+    const auto editor = m_inputs->editor;
+    const auto initialIndex = m_history->currentStateIndex();
+    editor->savedState = "<PLUGIN type=\"4osc\" pendingUndo=\"1\"/>";
+    editor->dirty = true;
+    m_history->undo();
+    EXPECT_EQ(editor->stateReads, 1);
+    EXPECT_EQ(m_history->currentStateIndex(), initialIndex);
+    EXPECT_TRUE((*TrackList::Get(project()).Any<MidiTrack>().begin())->GetInstrumentState().empty());
+    m_history->redo();
+    EXPECT_EQ((*TrackList::Get(project()).Any<MidiTrack>().begin())->GetInstrumentState().utf8_string(), editor->savedState);
+}
+
+TEST_F(PianoRollTests, SaveCommitsPendingInstrumentChangesAndKeepsTheEditorOpen)
+{
+    muse::async::Notification aboutSave;
+    ON_CALL(*m_projectMock, aboutSaveBegin()).WillByDefault(testing::Return(aboutSave));
+    ASSERT_TRUE(m_model->enableInput());
+    const auto editor = m_inputs->editor;
+    editor->savedState = "<PLUGIN type=\"4osc\" pendingSave=\"1\"/>";
+    editor->dirty = true;
+    aboutSave.notify();
+    EXPECT_EQ(editor->stateReads, 1);
+    EXPECT_TRUE(editor->active());
+    EXPECT_EQ((*TrackList::Get(project()).Any<MidiTrack>().begin())->GetInstrumentState().utf8_string(), editor->savedState);
+    ASSERT_TRUE(m_project->save(m_path));
+    m_model->disableInput();
+    m_project->clearSavedState();
+    m_project->close();
+    ASSERT_TRUE(m_project->load(m_path, false));
+    EXPECT_EQ((*TrackList::Get(project()).Any<MidiTrack>().begin())->GetInstrumentState().utf8_string(), editor->savedState);
 }
 
 TEST_F(PianoRollTests, LiveInstrumentParametersDoNotStopTheAudioStream)

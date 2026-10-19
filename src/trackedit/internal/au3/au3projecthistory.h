@@ -48,6 +48,7 @@ public:
     const muse::TranslatableString lastActionNameAtIdx(size_t idx) const override;
 
     muse::async::Channel<HistoryEvent> historyChanged() const override;
+    muse::async::Notification aboutToRestoreState() const override { return m_aboutToRestoreState; }
 
 private:
     au3::Au3Project& projectRef() const;
@@ -56,6 +57,7 @@ private:
     void doRedo();
 
     muse::async::Channel<HistoryEvent> m_historyChanged;
+    muse::async::Notification m_aboutToRestoreState;
 
     bool m_interactionOngoing = false;
 };

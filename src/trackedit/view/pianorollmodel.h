@@ -141,6 +141,7 @@ private:
     void receiveMidi(const audio::InstrumentMidiMessage& message);
     void finishNote(int key, double time);
     void saveInstrumentChanges();
+    void savePendingInstrumentChanges();
 
     long m_trackId = -1;
     int64_t m_clipId = -1;
@@ -153,6 +154,8 @@ private:
     double m_recordStart = 0.0;
     double m_recordTempo = 120.0;
     double m_lastInputUpdate = 0.0;
+    double m_lastInstrumentChange = 0.0;
+    bool m_instrumentChangesPending = false;
     QTimer m_inputTimer;
     QVariantList m_midiInputs;
     std::map<int, audio::InstrumentMidiMessage> m_held;

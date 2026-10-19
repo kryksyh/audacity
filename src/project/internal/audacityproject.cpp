@@ -415,6 +415,8 @@ Ret Audacity4Project::doSave(const muse::io::path_t& savePath, bool generateBack
         return make_ret(io::Err::FSNotExist);
     }
 
+    m_aboutSaveBegin.notify();
+
     if (createThumbnail) {
         std::optional<std::vector<uint8_t> > pngData = thumbnailCreator()->createThumbnail();
         if (!pngData.has_value()) {

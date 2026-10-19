@@ -71,6 +71,7 @@ void PianoRollModel::init()
     globalContext()->currentTrackeditProjectChanged().onNotify(this, [this] { reload(); });
     globalContext()->isRecordingChanged().onNotify(this, [this] { emit dataChanged(); });
     history()->historyChanged().onReceive(this, [this](auto) { reload(); });
+    history()->aboutToRestoreState().onNotify(this, [this] { savePendingInstrumentChanges(); });
     knownPlugins()->pluginInfoListChanged().onNotify(this, [this] { reloadInstruments(); });
     reloadInstruments();
     reload();
@@ -526,6 +527,8 @@ bool PianoRollModel::enableInput()
     m_liveInput = true;
     m_inputEnabled = true;
     m_inputProject = project.shared_from_this();
+    globalContext()->currentProject()->aboutSaveBegin().onNotify(this, [this] { savePendingInstrumentChanges(); },
+                                                                 muse::async::Asyncable::Mode::SetReplace);
     m_editorDescription = track()->GetInstrumentDescription().utf8_string();
     m_editorState = track()->GetInstrumentState().utf8_string();
     refreshMidiInputs();
@@ -557,7 +560,7 @@ void PianoRollModel::closeInput(bool save)
     }
     m_inputTimer.stop();
     if (m_liveInput && m_editor) {
-        if (save && m_editor->takeChanges()) {
+        if (save && (m_instrumentChangesPending || m_editor->takeChanges())) {
             saveInstrumentChanges();
         }
         instrumentPlayback()->closeInstrument(m_editor);
@@ -567,6 +570,7 @@ void PianoRollModel::closeInput(bool save)
         emit instrumentEditorChanged();
     }
     m_liveInput = false;
+    m_instrumentChangesPending = false;
     m_inputProject.reset();
 }
 
@@ -789,12 +793,20 @@ void PianoRollModel::saveInstrumentChanges()
     if (!m_editor || !m_editor->active() || !track() || !sameProject) {
         return;
     }
+    m_instrumentChangesPending = false;
     const auto state = m_editor->state();
     if (state != m_editorState) {
         m_editorState = state;
         track()->SetInstrument(wxString::FromUTF8(m_editorDescription), wxString::FromUTF8(state));
         changed("Changed instrument settings");
         emit parametersChanged();
+    }
+}
+
+void PianoRollModel::savePendingInstrumentChanges()
+{
+    if (m_liveInput && m_editor && m_editor->active() && (m_instrumentChangesPending || m_editor->takeChanges())) {
+        saveInstrumentChanges();
     }
 }
 
@@ -817,6 +829,14 @@ void PianoRollModel::pollInput()
         emit inputProgressChanged();
     }
     if (!m_inputRecording && m_editor->takeChanges()) {
+        if (!m_instrumentChangesPending) {
+            history()->markUnsaved();
+        }
+        m_instrumentChangesPending = true;
+        m_lastInstrumentChange = time;
+    }
+    // MIDI controllers can send many changes without a plug-in edit gesture.
+    if (!m_inputRecording && m_instrumentChangesPending && time - m_lastInstrumentChange >= 0.25) {
         saveInstrumentChanges();
     }
 }

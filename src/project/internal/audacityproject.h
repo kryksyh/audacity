@@ -72,6 +72,7 @@ public:
     void close() override;
     muse::async::Notification aboutCloseBegin() const override;
     muse::async::Notification aboutCloseEnd() const override;
+    muse::async::Notification aboutSaveBegin() const override { return m_aboutSaveBegin; }
 
     QString displayName() const override;
     muse::async::Notification displayNameChanged() const override;
@@ -122,6 +123,7 @@ private:
 
     muse::async::Notification m_aboutCloseBegin;
     muse::async::Notification m_aboutCloseEnd;
+    muse::async::Notification m_aboutSaveBegin;
 
     muse::io::path_t m_path;
     muse::async::Notification m_pathChanged;
