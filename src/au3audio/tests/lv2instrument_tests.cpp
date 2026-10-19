@@ -17,6 +17,7 @@
 #include <QSlider>
 #include <QPushButton>
 #include <QWindow>
+#include <wx/log.h>
 
 #include "../internal/instrumentprocessor.h"
 #include "../internal/midiplayablesequence.h"
@@ -668,6 +669,34 @@ TEST(NativeLv2Tests, DiscoveryKeepsAndClassifiesMidiInstruments)
     EXPECT_EQ(effect.GetType(), EffectTypeInstrument);
     const auto paths = provider.FindModulePaths(PluginManager::Get());
     EXPECT_NE(std::find(paths.begin(), paths.end(), wxString::FromUTF8(fixturePath())), paths.end());
+}
+
+TEST(NativeLv2Tests, FormatProbingDeclinesVstPathsWithoutUserVisibleErrors)
+{
+    class CaptureLog final : public wxLog
+    {
+    public:
+        std::vector<wxString> messages;
+    protected:
+        void DoLogText(const wxString& text) override { messages.push_back(text); }
+    } log;
+    LV2EffectsModule provider;
+    // These are ordinary candidates in a mixed-format scan, including Windows
+    // VST3 paths and names containing '@'. They must not open wx error dialogs.
+    auto* previous = wxLog::SetActiveTarget(&log);
+    for (const auto* path : { "C:/Program Files/Common Files/VST3/Fasttracker II.vst3",
+                              "C:/Program Files/Common Files/VST3/MeldaProduction/Modulation/MRingModulator.vst3",
+                              "C:/Program Files/Common Files/VST3/Synth@Home.vst3",
+                              "/Library/Audio/Plug-Ins/VST3/Analog Lab V.vst3", "appl/aumu/dls /DLSMusicDevice" }) {
+        EXPECT_FALSE(provider.LoadBundle(wxString::FromUTF8(path)));
+        EXPECT_FALSE(provider.CheckPluginExist(wxString::FromUTF8(path)));
+    }
+    log.Flush();
+    wxLog::SetActiveTarget(previous);
+    EXPECT_TRUE(log.messages.empty());
+    auto instrument = createLv2Instrument(fixturePath(), {});
+    EXPECT_TRUE(provider.LoadBundle(wxString::FromUTF8(fixturePath())));
+    EXPECT_TRUE(provider.CheckPluginExist(wxString::FromUTF8(fixturePath())));
 }
 
 TEST(NativeLv2Tests, RegistrationValidatesInstrumentOwnedStatePathsBeforeOfferingTheInstrumentInTheApp)

@@ -26,7 +26,6 @@ void Lv2PluginMetaReader::doInit()
 bool Lv2PluginMetaReader::canReadMeta(const muse::io::path_t& path) const
 {
     const wxString wxPath{ path.c_str() };
-    m_module.LoadBundle(wxPath);
-    return m_module.CheckPluginExist(wxPath);
+    return m_module.LoadBundle(wxPath) && m_module.CheckPluginExist(wxPath);
 }
 }

@@ -41,7 +41,9 @@ public:
     LV2EffectsModule();
     virtual ~LV2EffectsModule();
 
-    void LoadBundle(const PluginPath&) const;
+    // Format probing also visits paths owned by other providers. Those paths
+    // are declined without logging a user-visible plugin error.
+    bool LoadBundle(const PluginPath&) const;
 
     // ComponentInterface implementation
 

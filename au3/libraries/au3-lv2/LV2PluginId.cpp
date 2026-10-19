@@ -18,8 +18,12 @@ std::string LV2PluginId::Serialize() const
 
 std::optional<LV2PluginId> LV2PluginId::Deserialize(const std::string& str)
 {
-    const size_t pos = str.find('@');
-    if (pos == std::string::npos) {
+    // The serialized ID contains a plugin URI and a local bundle file URI.
+    // An '@' in a VST filename or URI is not sufficient to identify LV2.
+    const size_t pos = str.find("@file://");
+    const size_t scheme = str.find(':');
+    if (pos == std::string::npos || pos == 0 || pos + 8 >= str.size()
+        || scheme == std::string::npos || scheme >= pos) {
         return std::nullopt;
     }
     return LV2PluginId{ str.substr(0, pos), str.substr(pos + 1) };

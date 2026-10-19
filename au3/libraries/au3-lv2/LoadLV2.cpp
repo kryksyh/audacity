@@ -120,16 +120,19 @@ bool LV2EffectsModule::Initialize()
     return true;
 }
 
-void LV2EffectsModule::LoadBundle(const PluginPath& path) const
+bool LV2EffectsModule::LoadBundle(const PluginPath& path) const
 {
     const std::optional<LV2PluginId> id = LV2PluginId::Deserialize(path.ToStdString());
     if (!id) {
-        wxLogError(_("Invalid LV2 plugin path: %s"), path);
-        return;
+        return false;
     }
 
     LilvNodePtr node{ lilv_new_uri(LV2Symbols::gWorld, id->bundleUri.c_str()) };
+    if (!node) {
+        return false;
+    }
     lilv_world_load_bundle(LV2Symbols::gWorld, node.get());
+    return true;
 }
 
 void LV2EffectsModule::Terminate()
