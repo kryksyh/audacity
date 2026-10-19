@@ -4,8 +4,7 @@
 #include "vstviewmodel.h"
 
 #include "au3-components/EffectInterface.h"
-#include "au3-vst3/VST3Instance.h"
-#include "au3-vst3/VST3Wrapper.h"
+#include "tracktionaudio/internal/tracktioneffectinstance.h"
 
 #include "effects/effects_base/effectstypes.h"
 
@@ -20,17 +19,9 @@ VstViewModel::VstViewModel(QObject* parent, int instanceId)
 VstViewModel::~VstViewModel()
 {
     m_settingUpdateTimer.stop();
-    QObject::disconnect(&m_settingUpdateTimer, &QTimer::timeout, this, &VstViewModel::checkSettingChangesFromUiWhileIdle);
-
-    // The wrapper is owned by the effect instance and outlives this view model
-    // (e.g. when the vendor UI is swapped for the fallback UI). Clear the
-    // handler so a later endEdit doesn't invoke a lambda capturing a freed this.
-    if (m_auVst3Instance) {
-        m_auVst3Instance->GetWrapper().EndParameterEdit();
-        m_auVst3Instance->GetWrapper().ParamChangedHandler = nullptr;
+    if (m_instance && m_settingsAccess) {
+        checkSettingChangesFromUi(true);
     }
-
-    checkSettingChangesFromUi(true);
 }
 
 void VstViewModel::doInit()
@@ -41,8 +32,8 @@ void VstViewModel::doInit()
     }
 
     std::shared_ptr<EffectInstance> instance = instancesRegister()->instanceById(this->instanceId());
-    m_auVst3Instance = std::dynamic_pointer_cast<VST3Instance>(instance);
-    IF_ASSERT_FAILED(m_auVst3Instance) {
+    m_instance = std::dynamic_pointer_cast<tracktionaudio::TracktionHostedEffectInstance>(instance);
+    IF_ASSERT_FAILED(m_instance) {
         return;
     }
 
@@ -50,8 +41,6 @@ void VstViewModel::doInit()
     IF_ASSERT_FAILED(m_settingsAccess) {
         return;
     }
-
-    m_auVst3Instance->GetWrapper().BeginParameterEdit(*m_settingsAccess);
 
     instancesRegister()->settingsChanged(id).onNotify(this, [this]() {
         settingsToView();
@@ -65,71 +54,57 @@ void VstViewModel::doInit()
         settingsToView();
     });
 
-    m_auVst3Instance->GetWrapper().ParamChangedHandler = [this](Steinberg::Vst::ParamID) {
-        projectHistory()->modifyState();
-        projectHistory()->markUnsaved();
-    };
-
     settingsToView();
 
     QObject::connect(&m_settingUpdateTimer, &QTimer::timeout, this, &VstViewModel::checkSettingChangesFromUiWhileIdle);
 
-    // When playback is idle (see VstViewModel::event), no need for setting updates to be low-latency. Every 100ms is plenty.
-    m_settingUpdateTimer.start(std::chrono::milliseconds { 100 });
+    m_settingUpdateTimer.start(20);
 }
 
 void VstViewModel::checkSettingChangesFromUiWhileIdle()
 {
-    if (m_auVst3Instance->GetWrapper().IsActive()) {
-        // While playback is active, setting updates are taken care of by AU3 backend.
-        return;
-    }
     checkSettingChangesFromUi(false);
 }
 
 void VstViewModel::checkSettingChangesFromUi(bool forceCommitting)
 {
-    bool hasChanges { false };
-    m_settingsAccess->ModifySettings([&](EffectSettings& settings)
-    {
-        auto& wrapper = m_auVst3Instance->GetWrapper();
-        wrapper.FlushParameters(settings, &hasChanges);
-        if (hasChanges || forceCommitting) {
-            wrapper.StoreSettings(settings);
-        }
-        return nullptr;
-    });
-
-    if (hasChanges || forceCommitting) {
+    if (!m_instance || !m_settingsAccess || !m_settingsLoaded) {
+        return;
+    }
+    const bool hasChanges = m_instance->takeSettingsChanges();
+    if ((hasChanges || forceCommitting) && settingsFromView(forceCommitting)) {
         m_settingsAccess->Flush();
+        if (hasChanges) {
+            projectHistory()->modifyState();
+            projectHistory()->markUnsaved();
+        }
     }
 }
 
 void VstViewModel::settingsToView()
 {
-    IF_ASSERT_FAILED(m_auVst3Instance && m_settingsAccess) {
+    IF_ASSERT_FAILED(m_instance && m_settingsAccess) {
         return;
     }
 
-    VST3Wrapper& w = m_auVst3Instance->GetWrapper();
-    m_settingsAccess->ModifySettings([&w](EffectSettings& settings) {
-        constexpr auto fallbackOnDefaults = true;
-        w.FetchSettings(settings, fallbackOnDefaults);
-        return nullptr;
-    });
+    m_settingsLoaded = m_instance->loadSettings(m_settingsAccess->Get(), true);
+    if (!m_settingsLoaded) {
+        LOGE() << "Cannot restore VST3 effect settings.";
+    }
 }
 
-void VstViewModel::settingsFromView()
+bool VstViewModel::settingsFromView(bool complete)
 {
-    IF_ASSERT_FAILED(m_auVst3Instance && m_settingsAccess) {
-        return;
+    if (!m_instance || !m_settingsAccess || !m_settingsLoaded) {
+        return false;
     }
 
-    VST3Wrapper& w = m_auVst3Instance->GetWrapper();
-    m_settingsAccess->ModifySettings([&w](EffectSettings& settings) {
-        w.StoreSettings(settings);
+    bool saved = false;
+    m_settingsAccess->ModifySettings([this, complete, &saved](EffectSettings& settings) {
+        saved = complete ? m_instance->saveSettings(settings) : m_instance->savePlaybackSettings(settings);
         return nullptr;
     });
+    return saved;
 }
 
 void VstViewModel::doStartPreview()
@@ -138,7 +113,9 @@ void VstViewModel::doStartPreview()
         return;
     }
 
-    settingsFromView();
+    if (!settingsFromView()) {
+        return;
+    }
 
     m_settingsAccess->ModifySettings([this](EffectSettings& settings) {
         executionScenario()->previewEffect(instanceId(), settings);

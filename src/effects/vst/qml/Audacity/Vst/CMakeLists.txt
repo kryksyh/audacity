@@ -15,4 +15,4 @@ qt_add_qml_module(effects_vst_qml
 
 fixup_qml_module_dependencies(effects_vst_qml)
 
-target_link_libraries(effects_vst_qml PRIVATE au3wrap au3-components au3-realtime-effects au3-vst3)
+target_link_libraries(effects_vst_qml PRIVATE tracktionaudio au3wrap au3-components au3-realtime-effects)

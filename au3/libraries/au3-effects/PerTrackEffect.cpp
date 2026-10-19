@@ -282,7 +282,7 @@ bool PerTrackEffect::DoProcess(TrackList& outputs,
             if (index < recycledInstances.size()) {
                 return recycledInstances[index];
             } else {
-                return recycledInstances.emplace_back(MakeInstance());
+                return recycledInstances.emplace_back(MakeProcessingInstance());
             }
         };
         bGoodResult = ProcessTrack(channel, factory, settings, source, sink,

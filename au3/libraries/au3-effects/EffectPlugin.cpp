@@ -11,6 +11,15 @@
 
 EffectPlugin::~EffectPlugin() = default;
 
+std::shared_ptr<EffectInstance> EffectPlugin::MakeProcessingInstance(std::shared_ptr<EffectInstance> current) const
+{
+    auto instance = ProcessingInstanceFactory::Call(*this);
+    if (instance) {
+        return instance;
+    }
+    return current ? current : MakeInstance();
+}
+
 const wxString EffectPlugin::kUserPresetIdent = wxT("User Preset:");
 const wxString EffectPlugin::kFactoryPresetIdent = wxT("Factory Preset:");
 const wxString EffectPlugin::kCurrentSettingsIdent = wxT("<Current Settings>");

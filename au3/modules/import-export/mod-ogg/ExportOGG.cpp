@@ -58,7 +58,7 @@ class OGGExportProcessor final : public ExportProcessor
         double t0;
         double t1;
         unsigned numChannels;
-        std::unique_ptr<Mixer> mixer;
+        std::unique_ptr<AudioRenderSource> mixer;
         std::unique_ptr<FileIO> outFile;
         wxFileNameWrapper fName;
 

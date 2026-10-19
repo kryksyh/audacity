@@ -3,8 +3,7 @@
 */
 #include "musevstplugininstance.h"
 
-#include "au3-vst3/VST3Instance.h"
-#include "au3-vst3/VST3Wrapper.h"
+#include "tracktionaudio/internal/tracktioneffectinstance.h"
 
 // from muse
 #include "vst/vsttypes.h"
@@ -15,25 +14,21 @@ using namespace au::effects;
 
 MuseVstPluginInstance::MuseVstPluginInstance(const EffectId& effectId,
                                              const EffectInstanceId& instanceId,
-                                             std::shared_ptr<VST3Instance> auVstInstance)
-    : m_effectId(effectId),
+                                             std::shared_ptr<tracktionaudio::TracktionHostedEffectInstance> instance)
+    : m_resourceId(effectId.toStdString()),
     m_instanceId(instanceId),
-    m_auVstInstance(auVstInstance)
+    m_instance(std::move(instance))
 {
 }
 
 const muse::audio::AudioResourceId& MuseVstPluginInstance::resourceId() const
 {
-    static muse::audio::AudioResourceId id;
-    if (id.empty()) {
-        id = m_effectId.toStdString();
-    }
-    return id;
+    return m_resourceId;
 }
 
 const std::string& MuseVstPluginInstance::name() const
 {
-    return m_auVstInstance->GetWrapper().GetModule().getName();
+    return m_instance->name();
 }
 
 muse::vst::VstPluginInstanceId MuseVstPluginInstance::id() const
@@ -43,7 +38,7 @@ muse::vst::VstPluginInstanceId MuseVstPluginInstance::id() const
 
 bool MuseVstPluginInstance::isLoaded() const
 {
-    return true;
+    return m_instance->vstController() && m_instance->vstComponent();
 }
 
 muse::async::Notification MuseVstPluginInstance::loadingCompleted() const
@@ -64,12 +59,12 @@ muse::vst::PluginViewPtr MuseVstPluginInstance::createView() const
 
 muse::vst::PluginControllerPtr MuseVstPluginInstance::controller() const
 {
-    return m_auVstInstance->vstEditController();
+    return m_instance->vstController();
 }
 
 muse::vst::PluginComponentPtr MuseVstPluginInstance::component() const
 {
-    return m_auVstInstance->effectComponent();
+    return m_instance->vstComponent();
 }
 
 muse::vst::PluginMidiMappingPtr MuseVstPluginInstance::midiMapping() const

@@ -175,7 +175,7 @@ class OpusExportProcessor final : public ExportProcessor
         unsigned numChannels {};
         wxFileNameWrapper fName;
         wxFile outFile;
-        std::unique_ptr<Mixer> mixer;
+        std::unique_ptr<AudioRenderSource> mixer;
         std::unique_ptr<Tags> metadata;
 
         // Encoder properties

@@ -63,18 +63,9 @@ void VstEffectsModule::resolveImports()
     }
 }
 
-void VstEffectsModule::onInit(const muse::IApplication::RunMode& mode)
-{
-    m_vstMetaReader->init();
-    m_effectLoader->init();
-    m_pluginsScanner->init(mode);
-}
-
 void VstEffectsModule::onDeinit()
 {
     m_effectLoader->deinit();
-    m_pluginsScanner->deinit();
-    m_vstMetaReader->deinit();
 }
 
 muse::modularity::IContextSetup* VstEffectsModule::newContext(const muse::modularity::ContextPtr& ctx) const

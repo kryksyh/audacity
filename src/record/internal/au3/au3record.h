@@ -66,6 +66,7 @@ private:
         au3::Au3ClipId pendingClipId;        // clip ID on pending track (for callback lookup)
         bool linkedToPendingClip;
         bool deferredClipCreation = false;   // true for lead-in-recording: clip on pending only, not on original yet
+        bool newTrack = false;
     };
 
     au3::Au3Project& projectRef() const;

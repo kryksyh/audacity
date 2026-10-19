@@ -10,6 +10,7 @@
 #include "au3-time-frequency-selection/SelectedRegion.h"
 #include "au3-track/Track.h"
 #include "au3-wave-track/WaveTrack.h"
+#include "au3-midi-track/MidiTrack.h"
 #include "au3-stretching-sequence/StretchingSequence.h"
 #include "au3-audio-devices/AudioIOBase.h"
 #include "au3-audio-io/ProjectAudioIO.h"
@@ -142,7 +143,7 @@ void Au3Player::play(std::optional<muse::secs_t> startTime)
     if (nonWaveToo) {
         hasaudio = !tracks.Any<PlayableTrack>().empty();
     } else {
-        hasaudio = !tracks.Any<Au3WaveTrack>().empty();
+        hasaudio = !tracks.Any<Au3WaveTrack>().empty() || !tracks.Any<MidiTrack>().empty();
     }
 
     double latestEnd = tracks.GetEndTime();
@@ -634,6 +635,11 @@ TransportSequences Au3Player::makeTransportTracks(Au3TrackList& trackList, bool 
         for (auto pTrack : range) {
             result.playbackSequences.push_back(
                 StretchingSequence::Create(*pTrack, pTrack->GetClipInterfaces()));
+        }
+    }
+    for (const auto* track : trackList.Any<MidiTrack>()) {
+        if (!selectedOnly || track->IsSelected()) {
+            result.otherPlayableSequences.push_back(std::static_pointer_cast<const MidiTrack>(track->shared_from_this()));
         }
     }
     return result;

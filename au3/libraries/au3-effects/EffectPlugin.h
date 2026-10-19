@@ -12,6 +12,7 @@
 #define __AUDACITY_EFFECTPLUGIN_H__
 
 #include "au3-components/EffectInterface.h"
+#include "au3-utility/GlobalVariable.h"
 
 #include <functional>
 #include <memory>
@@ -43,6 +44,11 @@ public:
 
     EffectPlugin& operator=(EffectPlugin&) = delete;
     virtual ~EffectPlugin();
+
+    struct EFFECTS_API ProcessingInstanceFactory : GlobalHook<ProcessingInstanceFactory,
+        std::shared_ptr<EffectInstance>(const EffectPlugin&)> {};
+
+    std::shared_ptr<EffectInstance> MakeProcessingInstance(std::shared_ptr<EffectInstance> current = {}) const;
 
     //! Whether there are preferences applying to the effect's family, for which
     //! a UI may be needed to change them

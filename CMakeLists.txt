@@ -85,15 +85,13 @@ option(AU_BUILD_RECORD_MODULE "Build record module" ON)
 option(AU_BUILD_RECORD_TESTS "Build record tests" ${MUSE_ENABLE_UNIT_TESTS})
 option(AU_BUILD_SHARED_TESTS "Build shared tests" ${MUSE_ENABLE_UNIT_TESTS})
 option(AU_BUILD_TRACKEDIT_TESTS "Build trackedit tests" ${MUSE_ENABLE_UNIT_TESTS})
+option(AU_BUILD_TRACKTIONAUDIO_TESTS "Build Tracktion audio tests" ${MUSE_ENABLE_UNIT_TESTS})
 option(AU_BUILD_UICOMPONENTS_TESTS "Build uicomponents tests" ${MUSE_ENABLE_UNIT_TESTS})
 option(AU_BUILD_USAGEINFO_MODULE "Build usage info module" ON)
 
 option(AU_MODULE_EFFECTS_VST "Build audacity vst module" ON)
 option(AU_MODULE_EFFECTS_NYQUIST "Build audacity nyquist module" ON)
-
-if (OS_IS_LIN)
-    option(AU_MODULE_EFFECTS_LV2 "Build audacity lv2 module" ON)
-endif(OS_IS_LIN)
+option(AU_MODULE_EFFECTS_LV2 "Build audacity lv2 module" ON)
 
 if( CMAKE_SYSTEM_NAME MATCHES "Darwin" )
     option(AU_MODULE_EFFECTS_AUDIO_UNIT "Build Audacity Audio Unit module" ON)

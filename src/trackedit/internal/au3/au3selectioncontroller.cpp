@@ -7,6 +7,7 @@
 #include "global/realfn.h"
 
 #include "au3-track/Track.h"
+#include "au3-midi-track/MidiTrack.h"
 #include "au3-time-frequency-selection/ViewInfo.h"
 
 #include "au3wrap/internal/domconverter.h"
@@ -886,12 +887,18 @@ bool au::trackedit::Au3SelectionController::timeSelectionHasAudioData() const
     }
 
     for (const auto& trackId : m_selectedTracks.val) {
-        WaveTrack* waveTrack = au3::DomAccessor::findWaveTrack(projectRef(), ::TrackId(trackId));
-        IF_ASSERT_FAILED(waveTrack) {
-            return false;
-        }
-
-        if (!waveTrack->IsEmpty(m_selectedStartTime.val, m_selectedEndTime.val)) {
+        const auto* track = au3::DomAccessor::findTrack(projectRef(), ::TrackId(trackId));
+        const auto* midi = dynamic_cast<const MidiTrack*>(track);
+        const auto* wave = dynamic_cast<const WaveTrack*>(track);
+        if (midi) {
+            for (const auto& clip : midi->GetClips()) {
+                const double start = clip.start * 60.0 / midi->GetTempo();
+                const double end = (clip.start + clip.length) * 60.0 / midi->GetTempo();
+                if (start < m_selectedEndTime.val && end > m_selectedStartTime.val) {
+                    return true;
+                }
+            }
+        } else if (wave && !wave->IsEmpty(m_selectedStartTime.val, m_selectedEndTime.val)) {
             return true;
         }
     }

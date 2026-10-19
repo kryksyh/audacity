@@ -12,6 +12,13 @@ using TimePoint = std::chrono::steady_clock::time_point;
 class AUDIO_DEVICES_API IMeterSender
 {
 public:
+    struct LevelData {
+        float peak;
+        float rms;
+        size_t frames;
+        TimePoint dacTime;
+    };
+
     struct InterleavedSampleData
     {
         InterleavedSampleData(
@@ -42,6 +49,7 @@ public:
 
     virtual ~IMeterSender() = default;
     virtual void push(uint8_t channel, const InterleavedSampleData& sampleData, const std::optional<TrackId>& = std::nullopt) = 0;
+    virtual void pushLevels(uint8_t channel, const LevelData& levels, const std::optional<TrackId>& = std::nullopt) = 0;
     virtual void start(double sampleRate) = 0;
     virtual void stop() = 0;
 };

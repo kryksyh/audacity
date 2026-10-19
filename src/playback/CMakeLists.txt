@@ -89,6 +89,7 @@ set(MODULE_LINK
         au3-track
         au3-utility
         au3-wave-track
+        au3-midi-track
         uicomponents
         uicomponents_qml
         Qt::Quick

@@ -143,6 +143,9 @@ void EffectsCommandsRegister::reload()
     m_commandInfos.insert(m_commandInfos.end(), s_commandInfos.begin(), s_commandInfos.end());
 
     for (const EffectMeta& meta : effects) {
+        if (meta.type == EffectType::Instrument) {
+            continue;
+        }
         const muse::String title = utils::effectDisplayTitle(meta);
 
         m_commandInfos.push_back(CommandInfo {

@@ -15,7 +15,9 @@
 #include "effects/effects_base/effectstypes.h"
 #include "effects/effects_base/view/abstracteffectviewmodel.h"
 
-class VST3Instance;
+namespace au::tracktionaudio {
+class TracktionHostedEffectInstance;
+}
 class EffectSettingsAccess;
 namespace au::effects {
 class VstViewModel : public AbstractEffectViewModel
@@ -40,12 +42,13 @@ private:
 
     std::shared_ptr<EffectSettingsAccess> settingsAccess() const;
     void settingsToView();
-    void settingsFromView();
+    bool settingsFromView(bool complete = true);
     void checkSettingChangesFromUiWhileIdle();
     void checkSettingChangesFromUi(bool forceCommitting);
 
-    std::shared_ptr<VST3Instance> m_auVst3Instance;
+    std::shared_ptr<tracktionaudio::TracktionHostedEffectInstance> m_instance;
     std::shared_ptr<EffectSettingsAccess> m_settingsAccess;
+    bool m_settingsLoaded = false;
     QTimer m_settingUpdateTimer;
 };
 

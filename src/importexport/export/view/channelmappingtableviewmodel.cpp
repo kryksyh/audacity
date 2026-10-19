@@ -7,6 +7,10 @@
 #include "framework/global/log.h"
 
 #include "importexport/export/exportutils.h"
+#include "au3-playable-track/PlayableTrack.h"
+#include "au3-playable-track/TrackRouting.h"
+#include "au3wrap/internal/domaccessor.h"
+#include "project/iaudacityproject.h"
 
 using namespace muse;
 using namespace muse::uicomponents;
@@ -177,8 +181,16 @@ void ChannelMappingTableViewModel::rebuildChannelRows()
             continue;
         }
 
+        const auto owner = globalContext()->currentProject();
+        if (owner) {
+            auto& au3 = *reinterpret_cast<AudacityProject*>(owner->au3ProjectPtr());
+            const auto* source = dynamic_cast<const PlayableTrack*>(au::au3::DomAccessor::findTrack(au3, ::TrackId(track.id)));
+            if (source && !TrackRouting::HasDirectOutput(::TrackList::Get(au3), *source)) {
+                continue;
+            }
+        }
         const QString baseName = track.title.toQString();
-        const bool isStereo = (track.type == trackedit::TrackType::Stereo);
+        const bool isStereo = (track.type == trackedit::TrackType::Stereo || track.type == trackedit::TrackType::Midi);
 
         if (!isStereo) {
             ChannelRow m;

@@ -175,12 +175,18 @@ bool EffectBase::DoEffect(EffectSettings& settings,
         // Path that skipped the dialog factory -- effect may be non-interactive
         // or this is batch mode processing or repeat of last effect with stored
         // settings.
-        pInstanceEx = std::dynamic_pointer_cast<EffectInstanceEx>(MakeInstance());
+        pInstanceEx = std::dynamic_pointer_cast<EffectInstanceEx>(MakeEditorInstance());
         // Note: Init may read parameters from preferences
         if (!pInstanceEx || !pInstanceEx->Init()) {
             return false;
         }
     }
+
+    auto processingInstance = std::dynamic_pointer_cast<EffectInstanceEx>(MakeProcessingInstance(pInstanceEx));
+    if (processingInstance != pInstanceEx && (!processingInstance || !processingInstance->Init())) {
+        return false;
+    }
+    pInstanceEx = std::move(processingInstance);
 
     // If the dialog was shown, then it has been closed without errors or
     // cancellation, and any change of duration has been saved in the config file
@@ -243,7 +249,7 @@ std::any EffectBase::BeginPreview(const EffectSettings&)
 auto EffectBase::FindInstance(EffectPlugin& plugin)
 -> std::optional<InstancePointer>
 {
-    auto result = plugin.MakeInstance();
+    auto result = plugin.MakeEditorInstance();
     if (auto pInstanceEx = std::dynamic_pointer_cast<EffectInstanceEx>(result)
         ; pInstanceEx && pInstanceEx->Init()) {
         return { pInstanceEx };

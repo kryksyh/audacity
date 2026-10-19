@@ -101,10 +101,6 @@ if (AU_MODULE_EFFECTS_VST)
    list( APPEND LIBRARIES au3-vst3)
 endif()
 
-if (AU_MODULE_EFFECTS_LV2)
-   list( APPEND LIBRARIES au3-lv2)
-endif()
-
 if (AU_MODULE_EFFECTS_AUDIO_UNIT)
    list( APPEND LIBRARIES au3-audio-unit)
 endif()

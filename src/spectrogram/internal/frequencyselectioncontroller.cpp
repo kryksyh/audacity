@@ -242,6 +242,10 @@ void FrequencySelectionController::setCenterFrequency(double newCenterFrequency,
 
 void FrequencySelectionController::resetFrequencySelection()
 {
+    const FrequencySelection empty;
+    if (m_frequencySelection == empty) {
+        return;
+    }
     m_frequencySelection = FrequencySelection{};
     m_frequencySelectionChanged.send(true);
 }

@@ -15,9 +15,8 @@
 #include "au3-audio-graph/AudioGraphSource.h"
 #include "au3-audio-graph/AudioGraphTask.h"
 #include "au3-math/SampleFormat.h"
-#include "au3-mixer/Mix.h"
+#include "au3-mixer/AudioRenderSource.h"
 #include "au3-mixer/WideSampleSource.h"
-#include "au3-stretching-sequence/StretchingSequence.h"
 #include "au3-track/Track.h"
 #include "au3-wave-track/TimeStretching.h"
 #include "au3-wave-track/WaveClip.h"
@@ -167,11 +166,14 @@ AudioReaderObject::AudioReaderObject(std::shared_ptr<EditState> state, std::shar
         m_position = m_source->TimeToLongSamples(start);
         m_end = m_source->TimeToLongSamples(end);
     } else {
-        Mixer::Inputs inputs;
-        inputs.emplace_back(StretchingSequence::Create(*m_source, m_source->GetClipInterfaces()), Mixer::Stages {});
-        m_mixer = std::make_unique<Mixer>(
-            std::move(inputs), std::nullopt, true, Mixer::WarpOptions { m_state->project.get() }, start, end, format.channelCount,
-            AUDIO_CHUNK_SAMPLES, false, format.sampleRate, floatSample, true, nullptr, Mixer::ApplyVolume::Mixdown);
+        AudioRenderSource::Options options {
+            start, end, format.channelCount, AUDIO_CHUNK_SAMPLES, false, format.sampleRate, floatSample
+        };
+        options.channelMode = AudioRenderSource::ChannelMode::Mixdown;
+        options.trackEffects = false;
+        options.trackAutomation = false;
+        options.trackRouting = false;
+        m_renderer = AudioRenderSource::Create(*m_state->project, { m_source }, options);
     }
 }
 
@@ -210,8 +212,8 @@ QObject* AudioReaderObject::read(qulonglong requested)
     try {
         const size_t limit = static_cast<size_t>(std::min<qulonglong>(requested, AUDIO_CHUNK_SAMPLES));
         size_t count = 0;
-        if (m_mixer) {
-            count = m_mixer->Process(limit);
+        if (m_renderer) {
+            count = m_renderer->Process(limit);
         } else {
             count = limitSampleBufferSize(limit, m_end - m_position);
         }
@@ -225,9 +227,9 @@ QObject* AudioReaderObject::read(qulonglong requested)
         } else {
             m_chunk->reuse();
         }
-        if (m_mixer) {
+        if (m_renderer) {
             for (uint32_t channel = 0; channel < m_format.channelCount; ++channel) {
-                std::memcpy(m_chunk->buffer(channel)->data(), m_mixer->GetBuffer(channel), count * sizeof(float));
+                std::memcpy(m_chunk->buffer(channel)->data(), m_renderer->GetBuffer(channel), count * sizeof(float));
             }
         } else {
             float* buffers[2]{};

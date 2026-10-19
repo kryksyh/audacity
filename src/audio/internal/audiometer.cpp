@@ -110,22 +110,39 @@ AudioMeter::QueueSample AudioMeter::getSamplesMaxValue(const float* buffer, size
     return AudioMeter::QueueSample{ std::min(peak, 1.0f), std::min(rms, 1.0f) };
 }
 
-void AudioMeter::push(uint8_t channel, const InterleavedSampleData& sampleData, const std::optional<TrackId>& trackId)
+bool AudioMeter::preparePush(size_t frames)
 {
     if (!m_running.load()) {
         if (!m_warningIssued) {
             m_warningIssued = true;
             LOGW() << "AudioMeter::push called while not running";
         }
-        return;
+        return false;
     }
-    if (static_cast<int>(sampleData.frames) > m_maxFramesPerPush) {
-        m_maxFramesPerPush = static_cast<int>(sampleData.frames);
+    if (static_cast<int>(frames) > m_maxFramesPerPush) {
+        m_maxFramesPerPush = static_cast<int>(frames);
         const auto hangoverTime = m_maxFramesPerPush / m_sampleRate;
         m_hangoverCount.store(std::ceil(hangoverTime / updatePeriod));
     }
+    return true;
+}
+
+void AudioMeter::push(uint8_t channel, const InterleavedSampleData& sampleData, const std::optional<TrackId>& trackId)
+{
+    if (!preparePush(sampleData.frames)) {
+        return;
+    }
     const QueueSample value = getSamplesMaxValue(sampleData.buffer, sampleData.frames, sampleData.nChannels);
     m_lockFreeQueue.Put(QueueItem { trackId.value_or(TrackId { MASTER_TRACK_ID }), channel, value, sampleData.dacTime });
+}
+
+void AudioMeter::pushLevels(uint8_t channel, const LevelData& levels, const std::optional<TrackId>& trackId)
+{
+    if (!preparePush(levels.frames)) {
+        return;
+    }
+    const QueueSample value { std::min(levels.peak, 1.0f), std::min(levels.rms, 1.0f) };
+    m_lockFreeQueue.Put(QueueItem { trackId.value_or(TrackId { MASTER_TRACK_ID }), channel, value, levels.dacTime });
 }
 
 void AudioMeter::start(double sampleRate)

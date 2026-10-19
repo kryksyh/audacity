@@ -16,6 +16,8 @@
 #include "trackedit/iselectioncontroller.h"
 #include "playback/iplaybackcontroller.h"
 
+class PlayableTrack;
+
 namespace au::importexport {
 using OptionsEditorUPtr = std::unique_ptr<ExportOptionsEditor>;
 
@@ -63,7 +65,7 @@ private:
         std::string name;
         std::string title;
         int number = 0;
-        ::WaveTrack* track = nullptr;
+        ::PlayableTrack* track = nullptr;
         double t0 = 0.0;
         double t1 = 0.0;
     };

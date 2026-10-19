@@ -90,6 +90,6 @@ private:
         }
     };
 
-    std::map<Key, muse::vst::IVstPluginInstancePtr> m_instances;
+    std::multimap<Key, muse::vst::IVstPluginInstancePtr> m_instances;
 };
 }

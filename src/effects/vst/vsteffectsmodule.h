@@ -22,7 +22,6 @@ public:
     std::string moduleName() const override;
     void registerExports() override;
     void resolveImports() override;
-    void onInit(const muse::IApplication::RunMode& mode) override;
     void onDeinit() override;
 
     muse::modularity::IContextSetup* newContext(const muse::modularity::ContextPtr& ctx) const override;

@@ -13,13 +13,8 @@ set(MODULE_SRC
     ${CMAKE_CURRENT_LIST_DIR}/isystemaudiodeviceslistener.h
 
     # AU3
-    ${CMAKE_CURRENT_LIST_DIR}/internal/au3audioengine.cpp
-    ${CMAKE_CURRENT_LIST_DIR}/internal/au3audioengine.h
     ${CMAKE_CURRENT_LIST_DIR}/internal/au3audiodrivercontroller.cpp
     ${CMAKE_CURRENT_LIST_DIR}/internal/au3audiodrivercontroller.h
-    ${CMAKE_CURRENT_LIST_DIR}/internal/au3audioiolistener.h
-    ${CMAKE_CURRENT_LIST_DIR}/internal/defaultplaybackpolicy.cpp
-    ${CMAKE_CURRENT_LIST_DIR}/internal/defaultplaybackpolicy.h
     )
 
 if (OS_IS_MAC)
@@ -63,13 +58,10 @@ else()
 endif()
 
 set(MODULE_LINK
-        au3-audio-io
+        tracktionaudio
         au3wrap
         au3-audio-devices
-        au3-math
         au3-project-rate
-        au3-time-frequency-selection
-        au3-track
         au3-utility
 )
 

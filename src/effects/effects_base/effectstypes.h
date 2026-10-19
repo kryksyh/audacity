@@ -197,9 +197,7 @@ public:
         Unknown = -1,
         Builtin,
         VST3,
-#ifdef Q_OS_LINUX
         LV2,
-#endif
 #ifdef Q_OS_MACOS
         AudioUnit,
 #endif
@@ -233,6 +231,7 @@ enum class EffectType {
     Generator,
     Processor,
     Tool,
+    Instrument,
     _count
 };
 
@@ -249,6 +248,8 @@ struct EffectMeta {
     muse::io::path_t path;
 
     muse::String category;
+
+    muse::String nativePluginDescription;
 
     bool isRealtimeCapable = false;
     bool paramsAreInputAgnostic = true;

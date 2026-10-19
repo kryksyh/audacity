@@ -7,7 +7,7 @@
 
 #include "au3-components/EffectInterface.h"
 #include "au3-realtime-effects/RealtimeEffectState.h"
-#include "au3-vst3/VST3Instance.h"
+#include "tracktionaudio/internal/tracktioneffectinstance.h"
 
 #include "au3wrap/internal/wxtypes_convert.h"
 #include "framework/global/log.h"
@@ -25,7 +25,7 @@ void Vst3ViewLauncher::registerFxPlugin(const EffectInstanceId& instanceId) cons
         return;
     }
 
-    std::shared_ptr<VST3Instance> auVst3Instance = std::dynamic_pointer_cast<VST3Instance>(instance);
+    const auto auVst3Instance = std::dynamic_pointer_cast<tracktionaudio::TracktionHostedEffectInstance>(instance);
     IF_ASSERT_FAILED(auVst3Instance) {
         return;
     }

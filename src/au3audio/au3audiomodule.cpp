@@ -5,7 +5,8 @@
 
 #include "framework/global/modularity/ioc.h"
 
-#include "internal/au3audioengine.h"
+#include "tracktionaudio/internal/tracktionaudioengine.h"
+#include "tracktionaudio/internal/tracktioninstrumenteditor.h"
 #include "internal/au3audiodrivercontroller.h"
 
 #if defined(Q_OS_MAC)
@@ -30,7 +31,7 @@ std::string Au3AudioModule::moduleName() const
 
 void Au3AudioModule::registerExports()
 {
-    m_audioEngine = std::make_shared<Au3AudioEngine>();
+    m_audioEngine = std::make_shared<tracktionaudio::TracktionAudioEngine>();
     m_audioDriverController = std::make_shared<Au3AudioDriverController>();
 
 #if defined(Q_OS_MAC)
@@ -44,6 +45,10 @@ void Au3AudioModule::registerExports()
 #endif
 
     globalIoc()->registerExport<audio::IAudioEngine>(mname, m_audioEngine);
+    globalIoc()->registerExport<audio::IInstrumentPlayback>(mname, m_audioEngine);
+    auto instrumentFactory = std::make_shared<tracktionaudio::TracktionInstrumentEditorFactory>();
+    globalIoc()->registerExport<audio::IInstrumentEditorFactory>(mname, instrumentFactory);
+    globalIoc()->registerExport<audio::IPluginAutomation>(mname, instrumentFactory);
     globalIoc()->registerExport<audio::IAudioDriverController>(mname, m_audioDriverController);
     globalIoc()->registerExport<ISystemAudioDevicesListener>(mname, m_systemAudioDevicesListener);
 }
@@ -52,6 +57,7 @@ void Au3AudioModule::onInit(const muse::IApplication::RunMode&)
 {
     m_audioEngine->init();
     m_audioDriverController->init();
+    m_audioEngine->handleDeviceChange();
     m_systemAudioDevicesListener->startListening();
 }
 

@@ -34,9 +34,7 @@ muse::String utils::effectFamilyToString(EffectFamily family)
     switch (family) {
     case EffectFamily::Builtin: return u"Audacity";
     case EffectFamily::VST3: return u"VST3";
-#ifdef Q_OS_LINUX
     case EffectFamily::LV2: return u"LV2";
-#endif
 #ifdef Q_OS_MACOS
     case EffectFamily::AudioUnit: return u"AudioUnit";
 #endif
@@ -64,10 +62,8 @@ EffectFamily utils::effectFamilyFromString(const muse::String& family)
         return EffectFamily::Builtin;
     } else if (family == u"VST3") {
         return EffectFamily::VST3;
-#ifdef Q_OS_LINUX
     } else if (family == u"LV2") {
         return EffectFamily::LV2;
-#endif
 #ifdef Q_OS_MACOS
     } else if (family == u"AudioUnit") {
         return EffectFamily::AudioUnit;
@@ -88,9 +84,7 @@ std::string utils::effectFamilyToCacheType(EffectFamily family)
 #ifdef Q_OS_MACOS
     case EffectFamily::AudioUnit: return std::string(audio_unit::AUDIO_RESOURCE_TYPE_NAME);
 #endif
-#ifdef Q_OS_LINUX
     case EffectFamily::LV2:       return std::string(lv2::AUDIO_RESOURCE_TYPE_NAME);
-#endif
     case EffectFamily::Nyquist:   return std::string(nyquist::AUDIO_RESOURCE_TYPE_NAME);
     case EffectFamily::Builtin:   return std::string(builtin::AUDIO_RESOURCE_TYPE_NAME);
     case EffectFamily::Extension: return std::string(extensions::AUDIO_RESOURCE_TYPE_NAME);
@@ -111,11 +105,9 @@ EffectFamily utils::effectFamilyFromCacheType(const std::string& cacheType)
         return EffectFamily::AudioUnit;
     }
 #endif
-#ifdef Q_OS_LINUX
     if (cacheType == lv2::AUDIO_RESOURCE_TYPE_NAME) {
         return EffectFamily::LV2;
     }
-#endif
     if (cacheType == nyquist::AUDIO_RESOURCE_TYPE_NAME) {
         return EffectFamily::Nyquist;
     }
@@ -150,8 +142,13 @@ static const muse::String legacyEffectCategoryString{ "Legacy" };
 
 EffectId utils::effectId(const EffectDefinitionInterface* effect)
 {
+    return effectId(au3::wxToString(effect->GetFamily().Internal()), au3::wxToString(effect->GetVendor().Internal()),
+                    au3::wxToString(effect->GetSymbol().Internal()), au3::wxToStdString(effect->GetPath()));
+}
+
+EffectId utils::effectId(const muse::String& family, const muse::String& vendor, const muse::String& title, const muse::io::path_t& rawPath)
+{
     static muse::GlobalInject<muse::IGlobalConfiguration> globalConfiguration;
-    const muse::io::path_t rawPath = au3::wxToStdString(effect->GetPath());
     const muse::io::path_t portablePath = globalConfiguration()->isBundledWithApp(rawPath)
                                           ? globalConfiguration()->toBundledPath(rawPath)
                                           : rawPath;
@@ -161,9 +158,9 @@ EffectId utils::effectId(const EffectDefinitionInterface* effect)
     // TODO add defense in muse::strings utils.
     return au3::wxToString(wxJoin(wxArrayStringEx {
             wxString { "Effect" },
-            effect->GetFamily().Internal(),
-            effect->GetVendor().Internal(),
-            effect->GetSymbol().Internal(),
+            au3::wxFromString(family),
+            au3::wxFromString(vendor),
+            au3::wxFromString(title),
             au3::wxFromStdString(portablePath.toStdString())
         }, '_'));
 }
@@ -372,6 +369,7 @@ muse::String utils::effectTypeToString(EffectType type)
     case EffectType::Generator: return u"Generator";
     case EffectType::Processor: return u"Effect";
     case EffectType::Tool: return u"Tool";
+    case EffectType::Instrument: return u"Instrument";
     default:
         assert(false);
         return u"Unknown";
@@ -386,6 +384,7 @@ muse::String utils::effectTypeLabel(EffectType type)
     case EffectType::Generator: return muse::mtrc("effects", "Generator");
     case EffectType::Processor: return muse::mtrc("effects", "Effect");
     case EffectType::Tool: return muse::mtrc("effects", "Tool");
+    case EffectType::Instrument: return muse::mtrc("effects", "Instrument");
     default:
         return effectTypeToString(type);
     }
@@ -399,6 +398,8 @@ EffectType utils::effectTypeFromString(const muse::String& type)
         return EffectType::Generator;
     } else if (type == "Effect") {
         return EffectType::Processor;
+    } else if (type == "Instrument") {
+        return EffectType::Instrument;
     } else if (type == "Tool") {
         return EffectType::Tool;
     } else if (type.isEmpty() || type == "Unknown") {
@@ -413,6 +414,9 @@ muse::audioplugins::PluginMeta utils::auToMuseEffectMeta(const EffectMeta& meta)
     muse::audioplugins::PluginMeta museMeta;
     // Use the AU3 plugin ID (same as Audio Unit does)
     // This is necessary for looking up the plugin in PluginManager later
+    if (!meta.nativePluginDescription.empty()) {
+        museMeta.attributes.emplace(u"tracktionDescription", meta.nativePluginDescription);
+    }
     museMeta.id = meta.id.toStdString();
     museMeta.type = utils::effectFamilyToCacheType(meta.family);
     museMeta.vendor = meta.vendor.toStdString();
@@ -497,6 +501,7 @@ EffectMeta utils::museToAuEffectMeta(const muse::io::path_t& path, const muse::a
     const bool isLoadable = (state == muse::audioplugins::AudioPluginState::Validated);
 
     EffectMeta effectMeta;
+    effectMeta.nativePluginDescription = meta.attributeVal(u"tracktionDescription");
     effectMeta.path = path;
     effectMeta.id = muse::String::fromStdString(meta.id);
     effectMeta.family = utils::effectFamilyFromCacheType(meta.type);

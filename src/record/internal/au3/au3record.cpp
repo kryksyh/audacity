@@ -5,6 +5,7 @@
 #include "au3record.h"
 
 #include <cfloat>
+#include <utility>
 
 #include "au3-strings/TranslatableString.h"
 
@@ -277,13 +278,9 @@ void Au3Record::init()
             }
 
             origClip->LinkToOtherSource(*pendingClip.get());
+            origClip->MarkChanged();
             recordedClip->linkedToPendingClip = true;
         }
-
-        // Invalidate waveform cache on the original clip so new audio data gets painted.
-        // MarkChanged() is only called on the pendingClip by the audio engine; the origClip
-        // shares data via LinkToOtherSource but its WaveformPainter cache is never notified.
-        origClip->MarkChanged();
 
         trackedit::ITrackeditProjectPtr prj = globalContext()->currentTrackeditProject();
         prj->notifyAboutClipChanged(DomConverter::clip(origWaveTrack, origClip.get()));
@@ -925,7 +922,8 @@ Ret Au3Record::doRecord(Au3Project& project,
             }
             transportSequences.captureSequences.push_back(pending->SharedPointer<Au3WaveTrack>());
 
-            m_recordData.push_back(RecordData { trackedit::ClipKey(newTrack->GetId(), newClip->GetId()), newClip->GetId(), false, false });
+            m_recordData.push_back(RecordData { trackedit::ClipKey(newTrack->GetId(), newClip->GetId()),
+                                                newClip->GetId(), false, false, true });
             rebuildRecordingClipKeys();
 
             trackedit::ITrackeditProjectPtr prj = globalContext()->currentTrackeditProject();
@@ -960,6 +958,29 @@ Ret Au3Record::doRecord(Au3Project& project,
 void Au3Record::cancelRecording()
 {
     Au3Project& project = projectRef();
+    const auto cancelled = std::exchange(m_recordData, {});
+    rebuildRecordingClipKeys();
+    const auto prj = globalContext()->currentTrackeditProject();
+    for (const auto& entry : cancelled) {
+        if (entry.deferredClipCreation) {
+            continue;
+        }
+        auto* track = DomAccessor::findWaveTrack(project, Au3TrackId(entry.clipKey.trackId));
+        if (!track) {
+            continue;
+        }
+        const auto clip = DomAccessor::findWaveClip(track, entry.clipKey.itemId);
+        if (clip) {
+            const auto clipInfo = DomConverter::clip(track, clip.get());
+            track->RemoveInterval(clip);
+            prj->notifyAboutClipRemoved(clipInfo);
+        }
+        if (entry.newTrack) {
+            const auto trackInfo = DomConverter::track(track);
+            Au3TrackList::Get(project).Remove(*track);
+            prj->notifyAboutTrackRemoved(trackInfo);
+        }
+    }
     PendingTracks::Get(project).ClearPendingTracks();
 }
 

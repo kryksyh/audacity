@@ -323,7 +323,7 @@ muse::Ret EffectExecutionScenario::doPerformEffect(au3::Au3Project& project, con
     //! ============================================================================
     std::shared_ptr<EffectInstanceEx> pInstanceEx;
     {
-        pInstanceEx = std::dynamic_pointer_cast<EffectInstanceEx>(effect->MakeInstance());
+        pInstanceEx = std::dynamic_pointer_cast<EffectInstanceEx>(effect->MakeEditorInstance());
         if (!pInstanceEx || !pInstanceEx->Init()) {
             return pInstanceEx
                    && !pInstanceEx->GetLastError().empty() ? make_ret(Err::EffectProcessFailed, pInstanceEx->GetLastError()) : make_ret(
@@ -355,6 +355,12 @@ muse::Ret EffectExecutionScenario::doPerformEffect(au3::Au3Project& project, con
     //! ============================================================================
     //! NOTE Step 6 - perform effect
     //! ============================================================================
+    const auto processingInstance = std::dynamic_pointer_cast<EffectInstanceEx>(effect->MakeProcessingInstance(pInstanceEx));
+    if (processingInstance != pInstanceEx && (!processingInstance || !processingInstance->Init())) {
+        return make_ret(Err::EffectProcessFailed, processingInstance ? processingInstance->GetLastError() : std::string());
+    }
+    pInstanceEx = processingInstance;
+
     // common things used below
     Ret success;
     if (numSelectedClips == 0) {
@@ -711,7 +717,7 @@ void EffectExecutionScenario::restoreEffectStateHack(EffectBase& effect, const E
     // Init() again so that it is the way it was before the preview.
     // Called from destructors, so it must not throw.
     GuardedCall([&] {
-        if (auto pInstance = std::dynamic_pointer_cast<EffectInstanceEx>(effect.MakeInstance())) {
+        if (auto pInstance = std::dynamic_pointer_cast<EffectInstanceEx>(effect.MakeEditorInstance())) {
             pInstance->Init();
         }
     });
@@ -867,7 +873,7 @@ muse::Ret EffectExecutionScenario::doPreviewEffect(const EffectId& effectId, Eff
 
         // Apply effect to new tracks
 
-        auto pInstance = std::dynamic_pointer_cast<EffectInstanceEx>(effect.MakeInstance());
+        auto pInstance = std::dynamic_pointer_cast<EffectInstanceEx>(effect.MakeProcessingInstance());
         IF_ASSERT_FAILED(pInstance) {
             return muse::make_ret(muse::Ret::Code::InternalError);
         }

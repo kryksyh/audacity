@@ -21,8 +21,6 @@
 
 #include "log.h"
 
-#include "au3-lv2/LoadLV2.h"
-
 using namespace muse;
 using namespace au::effects;
 
@@ -86,18 +84,9 @@ void Lv2EffectsModule::registerUiTypes()
     REGISTER_AUDACITY_EFFECTS_SINGLETON_TYPE(Lv2ViewModelFactory);
 }
 
-void Lv2EffectsModule::onInit(const muse::IApplication::RunMode& mode)
-{
-    m_metaReader->init();
-    m_effectLoader->init();
-    m_pluginsScanner->init(mode);
-}
-
 void Lv2EffectsModule::onDeinit()
 {
     m_effectLoader->deinit();
-    m_pluginsScanner->deinit();
-    m_metaReader->deinit();
 }
 
 muse::modularity::IContextSetup* Lv2EffectsModule::newContext(const muse::modularity::ContextPtr& ctx) const

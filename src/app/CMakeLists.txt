@@ -176,8 +176,11 @@ if (MUSE_MODULE_TESTFLOW)
 endif()
 
 if (OS_IS_WIN)
+    set(WINDOWS_APP_MANIFEST "${CMAKE_CURRENT_BINARY_DIR}/audacity.manifest")
+    configure_file(windows_app.manifest.in "${WINDOWS_APP_MANIFEST}" @ONLY)
     list(APPEND AUDACITY_APPEND_SRC ${WINDOWS_ICONS_RC})
     list(APPEND AUDACITY_APPEND_SRC ${WINDOWS_VERSION_RC})
+    list(APPEND AUDACITY_APPEND_SRC "${WINDOWS_APP_MANIFEST}")
 endif()
 
 ###########################################

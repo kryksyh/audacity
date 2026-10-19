@@ -340,7 +340,7 @@ class MP3ExportProcessor final : public ExportProcessor
         wxFileOffset infoTagPos;
         size_t bufferSize;
         int inSamples;
-        std::unique_ptr<Mixer> mixer;
+        std::unique_ptr<AudioRenderSource> mixer;
     } context;
 
 public:

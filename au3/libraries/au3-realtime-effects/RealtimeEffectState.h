@@ -12,6 +12,7 @@
 #define __AUDACITY_REALTIMEEFFECTSTATE_H__
 
 #include <atomic>
+#include "au3-automation-data/AutomationData.h"
 #include <cstddef>
 #include <optional>
 #include <unordered_map>
@@ -112,6 +113,9 @@ public:
     //! Main thread cleans up playback
     bool Finalize() noexcept;
 
+    AutomationData& Automation() { return mAutomation; }
+    const AutomationData& Automation() const { return mAutomation; }
+
     static const std::string& XMLTag();
     bool HandleXMLTag(
         const std::string_view& tag, const AttributesList& attrs) override;
@@ -127,6 +131,7 @@ public:
     std::shared_ptr<EffectSettingsAccess> GetAccess();
 
 private:
+    AutomationData mAutomation;
 
     std::shared_ptr<EffectInstance> MakeInstance();
     std::shared_ptr<EffectInstance> EnsureInstance(double rate, size_t audioThreadBufferSize);

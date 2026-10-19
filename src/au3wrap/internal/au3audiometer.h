@@ -17,6 +17,7 @@ public:
     Au3AudioMeter(std::unique_ptr<audio::IAudioMeter> audioMeter);
 
     void push(uint8_t channel, const InterleavedSampleData& sampleData, const std::optional<TrackId>&) override;
+    void pushLevels(uint8_t channel, const LevelData& levels, const std::optional<TrackId>&) override;
     void start(double sampleRate) override;
     void stop() override;
 

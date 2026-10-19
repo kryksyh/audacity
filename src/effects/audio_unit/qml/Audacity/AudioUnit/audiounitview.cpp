@@ -7,7 +7,7 @@
 
 #include "framework/global/log.h"
 
-#include "au3-audio-unit/AudioUnitInstance.h"
+#include "tracktionaudio/internal/tracktioneffectinstance.h"
 #include "audiounitcontrol.h"
 
 namespace au::effects {
@@ -37,8 +37,9 @@ void AudioUnitView::setInstanceId(int newInstanceId)
 
 void AudioUnitView::init()
 {
-    const auto instance = std::dynamic_pointer_cast<AudioUnitInstance>(instancesRegister()->instanceById(m_instanceId));
-    if (!instance) {
+    m_instance = std::dynamic_pointer_cast<tracktionaudio::TracktionHostedEffectInstance>(
+        instancesRegister()->instanceById(m_instanceId));
+    if (!m_instance || !m_instance->audioUnit()) {
         LOGE() << "no AudioUnit instance for instanceId: " << m_instanceId;
         return;
     }
@@ -46,17 +47,18 @@ void AudioUnitView::init()
     const EffectId effectId = instancesRegister()->effectIdByInstanceId(m_instanceId);
     const bool isGraphical = (configuration()->effectUIMode(effectId) == EffectUIMode::VendorUI);
 
-    if (!instance->Initialize()) {
+    if (!m_instance->Init() || !m_instance->openAudioUnitEditor()) {
         LOGE() << "failed to pre-initialize AU instance for editor, instanceId: " << m_instanceId;
         return;
     }
 
     m_auControl = std::make_unique<AUControl>(window());
-    if (!m_auControl->create(instance->GetComponent(),
-                             instance->GetAudioUnit(), isGraphical)) {
+    const auto unit = m_instance->audioUnit();
+    if (!m_auControl->create(AudioComponentInstanceGetComponent(unit), unit, isGraphical)) {
         LOGE() << "failed to create AU control for effect " << effectId.toStdString()
                << ", instanceId: " << m_instanceId << ", graphical: " << isGraphical;
         m_auControl.reset();
+        m_instance->closeAudioUnitEditor();
         return;
     }
 
@@ -72,6 +74,10 @@ void AudioUnitView::init()
 void AudioUnitView::deinit()
 {
     m_auControl.reset();
+    if (m_instance) {
+        m_instance->closeAudioUnitEditor();
+    }
+    m_instance.reset();
 }
 
 void AudioUnitView::reload()

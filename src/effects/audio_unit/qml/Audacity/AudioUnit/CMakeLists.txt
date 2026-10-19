@@ -26,6 +26,7 @@ fixup_qml_module_dependencies(effects_audio_unit_qml)
 
 # AudioUnitView is a QQuickItem: link Qt::Quick explicitly instead of relying on the PCH
 target_link_libraries(effects_audio_unit_qml PRIVATE
+    tracktionaudio
     Qt::Quick
     au3wrap
     au3-effects

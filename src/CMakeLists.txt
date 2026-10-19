@@ -28,6 +28,7 @@ add_subdirectory(shared)
 add_subdirectory(au3wrap)
 
 add_subdirectory(audio)
+add_subdirectory(tracktionaudio)
 if (AU_BUILD_CLOUD_AUDIOCOM)
     add_subdirectory(au3cloud)
 endif()

@@ -40,12 +40,12 @@ PUBLIC
    au3-file-formats
    au3-files
    au3-math
+   au3-mixer
    au3-registries
    au3-strings
    au3-track
 PRIVATE
    au3-effects
-   au3-mixer
    au3-preferences
    au3-project
    au3-project-rate
@@ -53,6 +53,7 @@ PRIVATE
    au3-tags
    au3-time-frequency-selection
    au3-wave-track
+   au3-midi-track
    au3-xml
    rapidjson::rapidjson
    wxBase

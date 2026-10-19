@@ -31,6 +31,7 @@ public:
     AudioMeter(std::unique_ptr<ITimer> playingTimer, std::unique_ptr<ITimer> stoppingTimer);
 
     void push(uint8_t channel, const IAudioMeter::InterleavedSampleData& sampleData, const std::optional<TrackId>& trackId) override;
+    void pushLevels(uint8_t channel, const LevelData& levels, const std::optional<TrackId>& trackId) override;
     void start(double sampleRate) override;
     void stop() override;
 
@@ -72,6 +73,7 @@ private:
     };
 
     static QueueSample getSamplesMaxValue(const float* buffer, size_t frames, size_t step);
+    bool preparePush(size_t frames);
     static void decay(LevelState&);
     static void maybeBumpUp(LevelState&, float newLinValue, int hangover);
 

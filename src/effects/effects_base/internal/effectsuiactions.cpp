@@ -127,6 +127,9 @@ void EffectsUiActions::makeActions(EffectMetaList effects)
     utils::replaceIdenticalTitlesWithPaths(effects);
 
     for (const EffectMeta& e : effects) {
+        if (e.type == EffectType::Instrument) {
+            continue;
+        }
         m_actions.push_back(makeUiAction(EFFECT_OPEN_ACTION, e));
         if (e.isRealtimeCapable) {
             for (const auto& uri : { REALTIME_EFFECT_ADD_ACTION, REALTIME_EFFECT_REPLACE_ACTION }) {

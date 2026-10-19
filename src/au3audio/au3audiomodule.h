@@ -7,8 +7,11 @@
 
 #include "framework/global/modularity/imodulesetup.h"
 
+namespace au::tracktionaudio {
+class TracktionAudioEngine;
+}
+
 namespace au::au3audio {
-class Au3AudioEngine;
 class Au3AudioDriverController;
 class ISystemAudioDevicesListener;
 
@@ -22,7 +25,7 @@ public:
     void onDeinit() override;
 
 private:
-    std::shared_ptr<Au3AudioEngine> m_audioEngine;
+    std::shared_ptr<tracktionaudio::TracktionAudioEngine> m_audioEngine;
     std::shared_ptr<Au3AudioDriverController> m_audioDriverController;
     std::shared_ptr<ISystemAudioDevicesListener> m_systemAudioDevicesListener;
 };

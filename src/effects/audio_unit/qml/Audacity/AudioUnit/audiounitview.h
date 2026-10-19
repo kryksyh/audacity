@@ -12,6 +12,10 @@
 
 class AUControl;
 
+namespace au::tracktionaudio {
+class TracktionHostedEffectInstance;
+}
+
 namespace au::effects {
 class AudioUnitView : public QQuickItem, public muse::Contextable
 {
@@ -63,6 +67,7 @@ private:
 
     int m_instanceId = -1;
 
+    std::shared_ptr<tracktionaudio::TracktionHostedEffectInstance> m_instance;
     std::unique_ptr<AUControl> m_auControl;
 
     int m_sidePadding = 0;

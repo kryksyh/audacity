@@ -69,11 +69,6 @@ add_subdirectory(${CMAKE_SOURCE_DIR}/thirdparty/portmixer au3-portmixer)
 tft_add_to_build()
 
 # Conditional third-party SDKs (must be set up before AU3 libraries)
-# lv2sdk target may be already provided by the system, then skip it
-if (AU_MODULE_EFFECTS_LV2 AND NOT TARGET lv2sdk)
-    add_subdirectory(${CMAKE_SOURCE_DIR}/thirdparty/lv2sdk lv2sdk)
-endif()
-
 if(AU_MODULE_EFFECTS_VST)
     add_subdirectory(${CMAKE_SOURCE_DIR}/thirdparty/vst3 vst3)
 endif()
@@ -114,6 +109,7 @@ set(MODULE_LINK_PUBLIC
         au3-audio-devices
         au3-basic-ui
         au3-label-track
+        au3-midi-track
         au3-project
         au3-registries
         au3-track

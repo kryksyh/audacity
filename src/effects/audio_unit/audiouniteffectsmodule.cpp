@@ -49,18 +49,9 @@ void au::effects::AudioUnitEffectsModule::resolveImports()
     }
 }
 
-void au::effects::AudioUnitEffectsModule::onInit(const muse::IApplication::RunMode& mode)
-{
-    m_metaReader->init();
-    m_effectLoader->init();
-    m_pluginsScanner->init(mode);
-}
-
 void au::effects::AudioUnitEffectsModule::onDeinit()
 {
     m_effectLoader->deinit();
-    m_pluginsScanner->deinit();
-    m_metaReader->deinit();
 }
 
 muse::modularity::IContextSetup* au::effects::AudioUnitEffectsModule::newContext(const muse::modularity::ContextPtr& ctx) const

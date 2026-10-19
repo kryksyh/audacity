@@ -107,3 +107,4 @@ foreach( source ${RUNTIME_FILES} )
 endforeach()
 
 add_custom_target( ${TARGET} ALL DEPENDS ${OUTPUTS} SOURCES ${SOURCES} )
+set_property(TARGET ${TARGET} PROPERTY NYQUIST_RUNTIME_DIR "${NYQUIST_BUILD_DEST}${TARGET}")

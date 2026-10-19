@@ -26,6 +26,12 @@ void Au3AudioMeter::start(double sampleRate)
     m_audioMeter->start(sampleRate);
 }
 
+void Au3AudioMeter::pushLevels(uint8_t channel, const LevelData& levels, const std::optional<TrackId>& trackId)
+{
+    m_audioMeter->pushLevels(channel, { levels.peak, levels.rms, levels.frames, levels.dacTime },
+                             trackId ? std::make_optional<audio::IAudioMeter::TrackId>(trackId->value) : std::nullopt);
+}
+
 void Au3AudioMeter::stop()
 {
     m_audioMeter->stop();

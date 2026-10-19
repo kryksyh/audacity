@@ -258,6 +258,7 @@ bool AudioUnitEffectBase::CopySettingsContents(
 }
 
 constexpr auto PresetStr = "_PRESET";
+constexpr auto StateKey = "AudioUnitState";
 
 RegistryPath AudioUnitEffectBase::ChoosePresetKey(
     const EffectSettings& settings)
@@ -300,6 +301,9 @@ bool AudioUnitEffectBase::SaveSettings(
     const EffectSettings& settings, CommandParameters& parms) const
 {
     const auto& mySettings = GetSettings(settings);
+    if (mySettings.mState) {
+        parms.Write(StateKey, wxBase64Encode(mySettings.mState->data(), mySettings.mState->size()));
+    }
     if (mySettings.mPresetNumber) {
         const auto key = ChoosePresetKey(settings);
         parms.Write(key, *mySettings.mPresetNumber);
@@ -319,16 +323,34 @@ bool AudioUnitEffectBase::SaveSettings(
 bool AudioUnitEffectBase::LoadSettings(
     const CommandParameters& parms, EffectSettings& settings) const
 {
+    std::shared_ptr<const AudioUnitEffectSettings::State> state;
+    if (parms.HasEntry(StateKey)) {
+        const auto decoded = wxBase64Decode(parms.Read(StateKey));
+        if (decoded.GetDataLen() == 0) {
+            return false;
+        }
+        const auto* bytes = static_cast<const unsigned char*>(decoded.GetData());
+        state = std::make_shared<const AudioUnitEffectSettings::State>(bytes, bytes + decoded.GetDataLen());
+    }
+
     // First clean all settings, in case any are not defined in parms
     auto& mySettings = GetSettings(settings);
     mySettings.ResetValues();
+    mySettings.mState.reset();
+    if (state) {
+        mySettings.mPresetNumber.reset();
+    }
     auto& map = mySettings.values;
 
     // Reload preset first
     if (auto presetKey = FindPresetKey(parms); !presetKey.empty()) {
         SInt32 value = 0;
         if (parms.Read(presetKey, &value)) {
-            AudioUnitWrapper::LoadFactoryPreset(*this, value, &settings);
+            if (state) {
+                mySettings.mPresetNumber = value;
+            } else {
+                AudioUnitWrapper::LoadFactoryPreset(*this, value, &settings);
+            }
         }
     }
 
@@ -346,6 +368,7 @@ bool AudioUnitEffectBase::LoadSettings(
             }
         } while (parms.GetNextEntry(key, index));
     }
+    mySettings.mState = std::move(state);
     return true;
 }
 
@@ -410,6 +433,7 @@ AudioUnitEffectBase::LoadFactoryDefaults(EffectSettings& settings) const
 
     auto& mySettings = GetSettings(settings);
     mySettings.mPresetNumber = {};
+    mySettings.mState.reset();
     ForEachParameter([&mySettings](const ParameterInfo& pi, AudioUnitParameterID ID) {
         auto& slot = mySettings.values[ID];
         slot.reset();
@@ -511,19 +535,19 @@ bool AudioUnitEffectBase::SavePreset(
 TranslatableString AudioUnitEffectBase::Export(
     const AudioUnitEffectSettings& settings, const wxString& path) const
 {
-    // Create the file
-    wxFFile f(path, wxT("wb"));
-    if (!f.IsOpened()) {
-        //: %1 is the preset file path
-        return TranslatableString("audio-unit", "Couldn’t open “%1”").arg(path);
-    }
-
     // First set the name of the preset
     wxCFStringRef cfname(wxFileName(path).GetName());
 
     const auto&[data, message] = MakeBlob(*this, settings, cfname, false);
     if (!data || !message.empty()) {
         return message;
+    }
+
+    // Create the file
+    wxFFile f(path, wxT("wb"));
+    if (!f.IsOpened()) {
+        //: %1 is the preset file path
+        return TranslatableString("audio-unit", "Couldn’t open “%1”").arg(path);
     }
 
     // Write XML data

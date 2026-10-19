@@ -19,12 +19,15 @@
 #include "au3audio/tests/mocks/audioenginemock.h"
 #include "audio/tests/mocks/audiodrivercontrollermock.h"
 #include "mocks/recordconfigurationmock.h"
+#include "testing/testcontext.h"
 
 #include "au3wrap/internal/au3project.h"
 #include "au3wrap/au3types.h"
 
 #include "au3-track/PendingTracks.h"
 #include "au3-wave-track/WaveTrack.h"
+#include "au3-wave-track/WaveClip.h"
+#include "au3-wave-track-paint/waveform/WaveDataCache.h"
 
 using ::testing::_;
 using ::testing::DoAll;
@@ -40,12 +43,28 @@ using namespace au::au3;
 namespace au::record {
 constexpr static double TEST_SAMPLE_RATE = 44100.0;
 
+namespace {
+class RecordingClipChanges : public WaveClipListener
+{
+public:
+    void MarkChanged() noexcept override { ++changes; }
+    void Invalidate() override {}
+    std::unique_ptr<WaveClipListener> Clone() const override { return std::make_unique<RecordingClipChanges>(); }
+    int changes = 0;
+};
+
+const WaveClip::Attachments::RegisteredFactory recordingChangesKey {
+    [](WaveClip&) { return std::make_unique<RecordingClipChanges>(); }
+};
+}
+
 class Au3RecordTests : public ::testing::Test
 {
 public:
     void SetUp() override
     {
-        m_record = std::make_shared<Au3Record>(muse::modularity::globalCtx());
+        m_context = testutils::makeTestContext();
+        m_record = std::make_shared<Au3Record>(m_context);
 
         m_globalContext = std::make_shared<NiceMock<context::GlobalContextMock> >();
         m_dispatcher = std::make_shared<NiceMock<muse::actions::ActionsDispatcherMock> >();
@@ -56,6 +75,7 @@ public:
         m_audioDriverController = std::make_shared<NiceMock<audio::AudioDriverControllerMock> >();
         m_trackeditProject = std::make_shared<NiceMock<trackedit::TrackeditProjectMock> >();
         m_currentProject = std::make_shared<NiceMock<project::AudacityProjectMock> >();
+        muse::modularity::ioc(m_context)->registerExport<context::IGlobalContext>("utests", m_globalContext);
 
         m_record->globalContext.set(m_globalContext);
         m_record->dispatcher.set(m_dispatcher);
@@ -113,6 +133,8 @@ public:
         }
 
         testtools::removeProjectIfExists(m_workingProjectPath);
+        m_record.reset();
+        muse::modularity::ioc(m_context)->unregister<context::IGlobalContext>("utests");
     }
 
     void initTestProject()
@@ -149,6 +171,7 @@ public:
     }
 
     std::shared_ptr<Au3Record> m_record;
+    muse::modularity::ContextPtr m_context;
 
     std::shared_ptr<context::GlobalContextMock> m_globalContext;
     std::shared_ptr<muse::actions::ActionsDispatcherMock> m_dispatcher;
@@ -266,5 +289,103 @@ TEST_F(Au3RecordTests, RecordingWithBusyEngineStartsUnpausedAtPlayhead)
 
     //! [THEN] Recording starts at the playhead position
     EXPECT_DOUBLE_EQ(startedAt, 8.0);
+}
+
+TEST_F(Au3RecordTests, FailedStartRemovesTheRecordingClipBeforeAnotherAttempt)
+{
+    auto* track = addSelectedMonoTrack();
+    const std::vector<float> samples(44100, 0.25f);
+    track->Append(0, reinterpret_cast<constSamplePtr>(samples.data()), floatSample, samples.size());
+    track->Flush();
+    const auto original = *track->Intervals().begin();
+    ON_CALL(*m_playbackState, playbackPosition()).WillByDefault(Return(muse::secs_t(0.25)));
+    EXPECT_CALL(*m_audioEngine, startStream(_, _, _, _, _, _))
+    .WillOnce(Return(0))
+    .WillOnce(Return(1));
+
+    EXPECT_FALSE(m_record->start());
+    EXPECT_TRUE(m_record->recordingClipKeys().empty());
+    EXPECT_EQ(track->NIntervals(), 1u);
+    EXPECT_TRUE(track->NoPlayRegionsOverlap());
+    EXPECT_DOUBLE_EQ(original->GetPlayEndTime(), 1.0);
+
+    EXPECT_TRUE(m_record->start());
+    EXPECT_EQ(m_record->recordingClipKeys().size(), 1u);
+}
+
+TEST_F(Au3RecordTests, FailedStartRemovesANewRecordingTrack)
+{
+    EXPECT_CALL(*m_audioEngine, startStream(_, _, _, _, _, _)).WillOnce(Return(0));
+
+    EXPECT_FALSE(m_record->start());
+    EXPECT_TRUE(m_record->recordingClipKeys().empty());
+    EXPECT_TRUE(Au3TrackList::Get(projectRef()).empty());
+}
+
+TEST_F(Au3RecordTests, FailedLeadInStartKeepsTheOriginalTrack)
+{
+    auto* track = addSelectedMonoTrack();
+    ON_CALL(*m_playbackState, playbackPosition()).WillByDefault(Return(muse::secs_t(8.0)));
+    EXPECT_CALL(*m_audioEngine, startStream(_, _, _, _, _, _)).WillOnce(Return(0));
+
+    EXPECT_FALSE(m_record->leadInRecording());
+    EXPECT_TRUE(m_record->recordingClipKeys().empty());
+    EXPECT_EQ(Au3TrackList::Get(projectRef()).Any<Au3WaveTrack>().size(), 1u);
+    EXPECT_EQ(track->NIntervals(), 0u);
+}
+
+TEST_F(Au3RecordTests, RecordingAppendsKeepCompletedWaveformCacheEntries)
+{
+    m_record->init();
+    TransportSequences sequences;
+    EXPECT_CALL(*m_audioEngine, startStream(_, _, _, _, _, _))
+    .WillOnce(DoAll(SaveArg<0>(&sequences), Return(1)));
+    ASSERT_TRUE(m_record->start());
+    ASSERT_EQ(sequences.captureSequences.size(), 1u);
+    const auto tracks = Au3TrackList::Get(projectRef()).Any<Au3WaveTrack>();
+    ASSERT_EQ(tracks.size(), 1u);
+    const auto track = *tracks.begin();
+    ASSERT_EQ(track->NIntervals(), 1u);
+    const auto visible = *track->Intervals().begin();
+    auto& changes = visible->Attachments::Get<RecordingClipChanges>(recordingChangesKey);
+    changes.changes = 0;
+    const auto pending = sequences.captureSequences.front();
+    const auto append = [&](float value, size_t count) {
+        const std::vector<float> samples(count, value);
+        for (size_t channel = 0; channel < pending->NChannels(); ++channel) {
+            pending->Append(channel, reinterpret_cast<constSamplePtr>(samples.data()), floatSample, count, 1, floatSample);
+        }
+        PendingTracks::Get(projectRef()).UpdatePendingTracks();
+    };
+    append(0.25f, 300);
+    const int initialChanges = changes.changes;
+    WaveDataCache cache(*visible, 0);
+    const auto first = cache.PerformLookup({ TEST_SAMPLE_RATE, 0 });
+    ASSERT_NE(first, nullptr);
+    ASSERT_TRUE(first->IsComplete);
+    const auto firstUpdate = first->LastUpdate;
+    const auto tail = cache.PerformLookup({ TEST_SAMPLE_RATE, 256 });
+    ASSERT_NE(tail, nullptr);
+    ASSERT_FALSE(tail->IsComplete);
+    append(0.75f, 300);
+    EXPECT_EQ(changes.changes, initialChanges);
+    EXPECT_EQ(cache.PerformLookup({ TEST_SAMPLE_RATE, 0 }), first);
+    EXPECT_EQ(first->LastUpdate, firstUpdate);
+    const auto updatedTail = cache.PerformLookup({ TEST_SAMPLE_RATE, 256 });
+    ASSERT_NE(updatedTail, nullptr);
+    ASSERT_TRUE(updatedTail->IsComplete);
+    EXPECT_FLOAT_EQ(updatedTail->Data[80].min, 0.75f);
+    EXPECT_FLOAT_EQ(updatedTail->Data[80].max, 0.75f);
+    EXPECT_DOUBLE_EQ(visible->GetPlayEndTime(), 600.0 / TEST_SAMPLE_RATE);
+    pending->Flush();
+    append(0.5f, 300);
+    const auto nextTail = cache.PerformLookup({ TEST_SAMPLE_RATE, 512 });
+    ASSERT_NE(nextTail, nullptr);
+    ASSERT_TRUE(nextTail->IsComplete);
+    EXPECT_FLOAT_EQ(nextTail->Data[100].min, 0.5f);
+    EXPECT_FLOAT_EQ(nextTail->Data[100].max, 0.5f);
+    EXPECT_EQ(changes.changes, initialChanges);
+    EXPECT_EQ(cache.PerformLookup({ TEST_SAMPLE_RATE, 0 }), first);
+    EXPECT_EQ(first->LastUpdate, firstUpdate);
 }
 }

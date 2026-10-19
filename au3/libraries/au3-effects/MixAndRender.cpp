@@ -11,16 +11,15 @@ Paul Licameli split from Mix.cpp
 #include "MixAndRender.h"
 
 #include "au3-basic-ui/BasicUI.h"
-#include "au3-mixer/Mix.h"
+#include "au3-mixer/AudioRenderSource.h"
 #include "au3-realtime-effects/RealtimeEffectList.h"
-#include "au3-stretching-sequence/StretchingSequence.h"
 #include "au3-wave-track/WaveTrack.h"
 
 using WaveTrackConstArray = std::vector < std::shared_ptr < const WaveTrack > >;
 
 //TODO-MB: wouldn't it make more sense to DELETE the time track after 'mix and render'?
 Track::Holder MixAndRender(const TrackIterRange<const WaveTrack>& trackRange,
-                           const Mixer::WarpOptions& warpOptions,
+                           const Mixer::WarpOptions&,
                            const wxString& newTrackName,
                            WaveTrackFactory* trackFactory,
                            double rate, sampleFormat format,
@@ -66,12 +65,10 @@ Track::Holder MixAndRender(const TrackIterRange<const WaveTrack>& trackRange,
     double mixEndTime = 0.0;  /* end time of last track to end */
     double tstart, tend;   // start and end times for one track.
 
-    Mixer::Inputs waveArray;
+    AudioRenderSource::Tracks sources;
 
     for (auto wt : trackRange) {
-        const auto stretchingSequence
-            =StretchingSequence::Create(*wt, wt->GetClipInterfaces());
-        waveArray.emplace_back(stretchingSequence, GetEffectStages(*wt));
+        sources.push_back(std::static_pointer_cast<const WaveTrack>(wt->shared_from_this()));
         tstart = wt->GetStartTime();
         tend = wt->GetEndTime();
         if (tend > mixEndTime) {
@@ -119,33 +116,35 @@ Track::Holder MixAndRender(const TrackIterRange<const WaveTrack>& trackRange,
         endTime = mixEndTime;
     }
 
-    Mixer mixer(
-        std::move(waveArray), std::nullopt,
-        // Throw to abort mix-and-render if read fails:
-        true, warpOptions, startTime, endTime, mono ? 1 : 2, maxBlockLen, false,
-        rate, format);
+    const auto owner = first->GetOwner();
+    if (!owner || !owner->GetOwner()) {
+        return {};
+    }
+    auto mixer = AudioRenderSource::Create(*owner->GetOwner(), sources, AudioRenderSource::Options {
+        startTime, endTime, mono ? 1u : 2u, maxBlockLen, false, rate, format
+    });
 
     using namespace BasicUI;
     auto updateResult = ProgressResult::Success;
     {
-        auto effectiveFormat = mixer.EffectiveFormat();
+        auto effectiveFormat = mixer->EffectiveFormat();
         auto pProgress = MakeProgress(TranslatableString("effects", "Mix and Render"),
                                       TranslatableString("effects", "Mixing and rendering tracks"));
 
         while (updateResult == ProgressResult::Success) {
-            auto blockLen = mixer.Process();
+            auto blockLen = mixer->Process();
 
             if (blockLen == 0) {
                 break;
             }
 
             for (auto channel : mix->Channels()) {
-                auto buffer = mixer.GetBuffer(channel->GetChannelIndex());
+                auto buffer = mixer->GetBuffer(channel->GetChannelIndex());
                 channel->AppendBuffer(buffer, format, blockLen, 1, effectiveFormat);
             }
 
             updateResult = pProgress->Poll(
-                mixer.MixGetCurrentTime() - startTime, endTime - startTime);
+                mixer->MixGetCurrentTime() - startTime, endTime - startTime);
         }
     }
     mix->Flush();

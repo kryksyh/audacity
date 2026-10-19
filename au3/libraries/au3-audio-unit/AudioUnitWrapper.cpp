@@ -158,22 +158,36 @@ AudioUnitWrapper::ParameterInfo::ParseKey(const wxString& key)
 bool AudioUnitWrapper::FetchSettings(
     AudioUnitEffectSettings& settings, bool fetchValues, bool fetchPreset) const
 {
+    return FetchSettings(mUnit.get(), mParameters, settings, fetchValues, fetchPreset);
+}
+
+bool AudioUnitWrapper::FetchSettings(
+    AudioUnit unit, const Parameters& parameters, AudioUnitEffectSettings& settings, bool fetchValues, bool fetchPreset)
+{
+    if (fetchValues) {
+        settings.mState.reset();
+    }
     settings.mPresetNumber = {};
     if (fetchPreset) {
         AUPreset preset{};
-        if (!GetFixedSizeProperty(kAudioUnitProperty_PresentPreset, preset)) {
+        if (!AudioUnitUtils::GetFixedSizeProperty(unit, kAudioUnitProperty_PresentPreset, preset)) {
             // Only want factory preset number, not a user preset (<0)
             if (preset.presetNumber >= 0) {
                 settings.mPresetNumber = { preset.presetNumber };
+            }
+            if (preset.presetName) {
+                CFRelease(preset.presetName);
             }
         }
     }
 
     // Fetch values from the AudioUnit into AudioUnitEffectSettings,
     // keeping the cache up-to-date after state changes in the AudioUnit
-    ForEachParameter(
-        [this, &settings, fetchValues]
-        (const ParameterInfo& pi, AudioUnitParameterID ID) {
+    if (!parameters) {
+        return true;
+    }
+    for (const auto ID : parameters) {
+        const ParameterInfo pi { unit, ID };
         // Always make a slot, even for parameter IDs that are known but
         // not gettable from the instance now.  Example:  AUGraphicEQ when
         // you choose 10 bands; the values for bands 10 ... 30 are undefined
@@ -184,7 +198,7 @@ bool AudioUnitWrapper::FetchSettings(
             AudioUnitParameterValue value;
             if (!pi.mName
                 || AudioUnitGetParameter(
-                    mUnit.get(), ID, kAudioUnitScope_Global, 0, &value)) {
+                    unit, ID, kAudioUnitScope_Global, 0, &value)) {
                 // Probably failed because of invalid parameter which can happen
                 // if a plug-in is in a certain mode that doesn't contain the
                 // parameter.  In any case, just ignore it.
@@ -192,8 +206,7 @@ bool AudioUnitWrapper::FetchSettings(
                 slot.emplace(settings.Intern(*pi.mName), value);
             }
         }
-        return true;
-    });
+    }
     return true;
 }
 
@@ -208,8 +221,14 @@ bool AudioUnitWrapper::StoreSettings(const EffectDefinitionInterface& effect,
     // So consider mUnit a mutable scratch pad object.  This doesn't really make
     // the AudioUnitEffect stateful.
 
-    // First restore factory preset if it applies
-    if (settings.mPresetNumber) {
+    if (settings.mState) {
+        wxMemoryBuffer data;
+        data.AppendData(settings.mState->data(), settings.mState->size());
+        AudioUnitEffectSettings restored;
+        if (!InterpretBlob(restored, {}, data).empty()) {
+            return false;
+        }
+    } else if (settings.mPresetNumber) {
         // Mutate the scratch AudioUnit, don't pass settings
         LoadFactoryPreset(effect, *settings.mPresetNumber, nullptr);
         // Then go on to reapply some slider changes that might have been done
@@ -252,6 +271,9 @@ bool AudioUnitWrapper::MoveSettingsContents(
 {
     // Do an in-place rewrite of dst, avoiding allocations
     auto& dstMap = dst.values;
+    if (src.mState || !merge) {
+        dst.mState = std::move(src.mState);
+    }
     auto dstIter = dstMap.begin(), dstEnd = dstMap.end();
     auto& srcMap = src.values;
     for (auto&[key, oValue] : srcMap) {
@@ -369,7 +391,7 @@ TranslatableString AudioUnitWrapper::InterpretBlob(
                                      // TODO might retrieve more error information
                                      nullptr)
     };
-    if (!content) {
+    if (!content || CFGetTypeID(content.get()) != CFDictionaryGetTypeID()) {
         return TranslatableString("audio-unit", "Failed to create property list for “%1” preset")
                .Format(group);
     }
@@ -382,6 +404,7 @@ TranslatableString AudioUnitWrapper::InterpretBlob(
     // Repopulate the AudioUnitEffectSettings from the change of state in
     // the AudioUnit, and include the preset
     FetchSettings(settings, true, true);
+    settings.mState = std::make_shared<const AudioUnitEffectSettings::State>(bufPtr, bufPtr + bufLen);
     return {};
 }
 
@@ -473,7 +496,9 @@ AudioUnitWrapper::MakeBlob(const EffectDefinitionInterface& effect,
     // should be the "scratchpad" unit only, not real instance state.
 
     // Update state of the unit from settings
-    StoreSettings(effect, settings);
+    if (!StoreSettings(effect, settings)) {
+        return { CF_ptr<CFDataRef> {}, TranslatableString("audio-unit", "Failed to restore effect state") };
+    }
 
     CF_ptr<CFDataRef> data;
     TranslatableString message;

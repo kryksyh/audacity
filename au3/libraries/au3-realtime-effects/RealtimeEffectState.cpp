@@ -361,6 +361,7 @@ RealtimeEffectState::RealtimeEffectState(const PluginID& id)
 
 RealtimeEffectState& RealtimeEffectState::operator=(const RealtimeEffectState& other)
 {
+    mAutomation = other.mAutomation;
     assert(other.mID == mID);
     SetActive(other.IsActive());
     if (!mPlugin || !other.mPlugin) {
@@ -382,6 +383,7 @@ RealtimeEffectState::~RealtimeEffectState()
 std::shared_ptr<RealtimeEffectState> RealtimeEffectState::Clone() const
 {
     auto pNewState{ RealtimeEffectState::make_shared(PluginID {}) };
+    pNewState->mAutomation = mAutomation;
     pNewState->mID = mID;
     pNewState->mPlugin = mPlugin;
     if (mPlugin) {
@@ -430,7 +432,7 @@ std::shared_ptr<EffectInstance> RealtimeEffectState::MakeInstance()
 {
     mMovedMessage.reset();
     mMessage.reset();
-    auto result = mPlugin->MakeInstance();
+    auto result = mPlugin->MakeEditorInstance();
     if (result) {
         // Allocate presized containers in messages, so later
         // copies of contents might avoid free store operations
@@ -855,6 +857,7 @@ bool RealtimeEffectState::HandleXMLTag(
     const std::string_view& tag, const AttributesList& attrs)
 {
     if (tag == XMLTag()) {
+        mAutomation.Clear();
         mParameters.clear();
         mPlugin = nullptr;
         mID.clear();
@@ -903,6 +906,9 @@ void RealtimeEffectState::HandleXMLEndTag(const std::string_view& tag)
 
 XMLTagHandler* RealtimeEffectState::HandleXMLChild(const std::string_view& tag)
 {
+    if (tag == AutomationData::XMLTag) {
+        return &mAutomation;
+    }
     // Tag may be for the state, or the list of parameters, or for one parameter.
     // See the writing method below.  All are handled by this
     return this;
@@ -938,6 +944,7 @@ void RealtimeEffectState::WriteXML(XMLWriter& xmlFile)
         xmlFile.EndTag(parametersAttribute);
     }
 
+    mAutomation.WriteXML(xmlFile);
     xmlFile.EndTag(XMLTag());
 }
 

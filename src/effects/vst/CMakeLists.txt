@@ -7,13 +7,12 @@ target_sources(effects_vst PRIVATE
     vsteffectsmodule.cpp
     vsteffectsmodule.h
 
+    internal/vst3effectloader.cpp
     internal/vst3effectloader.h
     internal/vst3pluginsscanner.h
-    internal/vst3pluginsmetareader.cpp
     internal/vst3pluginsmetareader.h
     internal/vst3viewlauncher.cpp
     internal/vst3viewlauncher.h
-    internal/vstparameterextractorservice.cpp
     internal/vstparameterextractorservice.h
     internal/vsttypes.h
 
@@ -25,6 +24,9 @@ target_sources(effects_vst PRIVATE
 )
 
 target_link_libraries(effects_vst PRIVATE
+    tracktionaudio
+    au_tracktion_engine
+    vst3sdk
     au3wrap
     au3-components
     au3-realtime-effects

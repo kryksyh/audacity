@@ -57,6 +57,7 @@ set(MODULE_LINK
         au3-tags
         au3-track
         au3-wave-track
+        au3-midi-track
 )
 
 set(MODULE_USE_UNITY OFF)

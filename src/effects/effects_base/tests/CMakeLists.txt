@@ -26,6 +26,11 @@ set(MODULE_TEST_LINK
     Qt::Qml
 )
 
+if(MUSE_MODULE_EXTENSIONS)
+    list(APPEND MODULE_TEST_SRC ${PROJECT_SOURCE_DIR}/src/effects/extensions/tests/extensioneffectsscanner_tests.cpp)
+    list(APPEND MODULE_TEST_LINK effects_extensions muse::ui muse::ui_qml)
+endif()
+
 set(MODULE_TEST_INCLUDE
     ${PROJECT_SOURCE_DIR}/src/effects/effects_base # for internal headers included relatively (e.g. realtimeeffectservice.h)
 )

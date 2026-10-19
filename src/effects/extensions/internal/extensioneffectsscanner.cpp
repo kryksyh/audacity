@@ -34,12 +34,14 @@ void ExtensionEffectsScanner::refreshPlugins(
     muse::audioplugins::IRegisterAudioPluginsScenario& registerAudioPluginsScenario) const
 {
     const muse::io::paths_t paths = updateRepository();
+    bool changed = false;
     for (const auto& path : paths) {
         if (!knownPlugins()->exists(path)) {
             const muse::Ret result = registerAudioPluginsScenario.registerPlugin(path);
             if (!result) {
                 LOGE() << "failed to register extension effects: " << path << ", error: " << result.toString();
             }
+            changed = true;
         }
     }
     for (const auto& plugin : knownPlugins()->pluginInfoList()) {
@@ -49,7 +51,11 @@ void ExtensionEffectsScanner::refreshPlugins(
             if (!result) {
                 LOGE() << "failed to remove obsolete extension effects: " << plugin.path << ", error: " << result.toString();
             }
+            changed = true;
         }
+    }
+    if (!changed) {
+        return;
     }
     const muse::Ret result = knownPlugins()->load();
     if (!result) {

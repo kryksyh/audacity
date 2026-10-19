@@ -5,27 +5,22 @@
 
 #include "modularity/ioc.h"
 
-#include "effects/effects_base/internal/au3/au3audiopluginscanner.h"
+#include "tracktionaudio/internal/tracktionpluginscanner.h"
 #include "effects/effects_base/ieffectsconfiguration.h"
 
-#include "au3-vst3/VST3EffectsModule.h"
-
 namespace au::effects {
-class Vst3PluginsScanner : public Au3AudioPluginScanner
+class Vst3PluginsScanner : public tracktionaudio::TracktionPluginsScanner
 {
     muse::GlobalInject<effects::IEffectsConfiguration> effectsConfiguration;
 
 public:
     Vst3PluginsScanner()
-        : Au3AudioPluginScanner(m_vst3Module) {}
+        : TracktionPluginsScanner(tracktionaudio::PluginFormat::VST3) {}
 
 protected:
     muse::io::paths_t customPaths() const override
     {
         return effectsConfiguration()->vst3CustomPaths();
     }
-
-private:
-    ::VST3EffectsModule m_vst3Module;
 };
 }

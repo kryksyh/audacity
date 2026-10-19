@@ -204,7 +204,7 @@ IEffectLoaderPtr EffectsProvider::loader(const EffectId& effectId) const
     const auto it = std::find_if(m_effects.begin(), m_effects.end(), [&](const EffectMeta& meta) {
         return meta.id == effectId;
     });
-    if (it == m_effects.end()) {
+    if (it == m_effects.end() || it->type == EffectType::Instrument) {
         return nullptr;
     }
     return effectLoadersRegister()->loader(it->family);

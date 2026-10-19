@@ -3,18 +3,13 @@
 */
 #pragma once
 
-#include "effects/effects_base/internal/au3/au3audiopluginmetareader.h"
-#include "au3-vst3/VST3EffectsModule.h"
+#include "tracktionaudio/internal/tracktionpluginscanner.h"
 
 namespace au::effects {
-class Vst3PluginsMetaReader : public Au3AudioPluginMetaReader
+class Vst3PluginsMetaReader final : public tracktionaudio::TracktionPluginMetaReader
 {
 public:
-    Vst3PluginsMetaReader();
-    muse::audioplugins::PluginType metaType() const override;
-    bool canReadMeta(const muse::io::path_t& pluginPath) const override;
-
-private:
-    VST3EffectsModule m_module;
+    Vst3PluginsMetaReader()
+        : TracktionPluginMetaReader(tracktionaudio::PluginFormat::VST3) {}
 };
 }

@@ -42,6 +42,8 @@
 #ifndef __AUDACITY_EFFECTINTERFACE_H__
 #define __AUDACITY_EFFECTINTERFACE_H__
 
+#include "au3-utility/GlobalVariable.h"
+
 #include "ComponentInterface.h"
 #include "ComponentInterfaceSymbol.h"
 #include "EffectAutomationParameters.h"
@@ -662,6 +664,11 @@ class COMPONENTS_API EffectInstanceFactory : public EffectSettingsManager
 {
 public:
     virtual ~EffectInstanceFactory();
+
+    struct COMPONENTS_API EditorInstanceFactory : GlobalHook<EditorInstanceFactory,
+        std::shared_ptr<EffectInstance>(const EffectInstanceFactory&)> {};
+
+    std::shared_ptr<EffectInstance> MakeEditorInstance() const;
 
     //! Make an object maintaining short-term state of an Effect
     /*!

@@ -234,6 +234,12 @@ size_t EffectInstanceWithBlockSize::SetBlockSize(size_t maxBlockSize)
 
 EffectInstanceFactory::~EffectInstanceFactory() = default;
 
+std::shared_ptr<EffectInstance> EffectInstanceFactory::MakeEditorInstance() const
+{
+    auto instance = EditorInstanceFactory::Call(*this);
+    return instance ? instance : MakeInstance();
+}
+
 const RegistryPath& CurrentSettingsGroup()
 {
     static RegistryPath id{ "CurrentSettings" };

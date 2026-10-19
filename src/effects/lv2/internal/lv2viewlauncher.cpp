@@ -3,11 +3,10 @@
  */
 #include "lv2viewlauncher.h"
 
-#include "lv2uiselect.h"
+#include "lv2effectloader.h"
 
 #include "au3-components/EffectInterface.h"
 #include "au3-effects/Effect.h"
-#include "au3-lv2/LV2EffectBase.h"
 #include "au3-realtime-effects/RealtimeEffectState.h"
 
 using namespace au::effects;
@@ -36,12 +35,12 @@ bool Lv2ViewLauncher::vendorUiSupported(const EffectId& effectId) const
         return false;
     }
 
-    const auto* effect = dynamic_cast<const LV2EffectBase*>(effectsProvider()->effect(effectId));
+    const auto* effect = effectsProvider()->effect(effectId);
     if (!effect) {
         return false;
     }
 
-    return selectPluginUi(effect->mPlug).isValid();
+    return tracktionLv2VendorUiSupported(*effect);
 }
 
 void Lv2ViewLauncher::markVendorUiFailed(const EffectId& effectId)

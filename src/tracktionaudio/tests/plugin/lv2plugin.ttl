@@ -1,0 +1,343 @@
+@prefix atom: <http://lv2plug.in/ns/ext/atom#> .
+@prefix ui: <http://lv2plug.in/ns/extensions/ui#> .
+@prefix state: <http://lv2plug.in/ns/ext/state#> .
+@prefix pset: <http://lv2plug.in/ns/ext/presets#> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+@prefix pg: <http://lv2plug.in/ns/ext/port-groups#> .
+@prefix units: <http://lv2plug.in/ns/extensions/units#> .
+@prefix props: <http://lv2plug.in/ns/ext/port-props#> .
+@prefix lv2: <http://lv2plug.in/ns/lv2core#> .
+@prefix doap: <http://usefulinc.com/ns/doap#> .
+@prefix foaf: <http://xmlns.com/foaf/0.1/> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+
+<urn:audacity:tracktion-test:gain> a lv2:AmplifierPlugin ;
+    doap:name "Tracktion LV2 Gain" ;
+    doap:maintainer [ foaf:name "Audacity" ] ;
+    lv2:port [ a lv2:AudioPort, lv2:InputPort ; lv2:index 0 ; lv2:symbol "in" ; lv2:name "Input" ],
+             [ a lv2:AudioPort, lv2:OutputPort ; lv2:index 1 ; lv2:symbol "out" ; lv2:name "Output" ],
+             [ a lv2:ControlPort, lv2:InputPort ; lv2:index 2 ; lv2:symbol "gain" ; lv2:name "Gain" ;
+               lv2:minimum 0.0 ; lv2:maximum 2.0 ; lv2:default 0.5 ] .
+
+<urn:audacity:tracktion-test:generator> a lv2:GeneratorPlugin ;
+    doap:name "Tracktion LV2 Generator" ;
+    doap:maintainer [ foaf:name "Audacity" ] ;
+    lv2:port [ a lv2:AudioPort, lv2:OutputPort ; lv2:index 0 ; lv2:symbol "out" ; lv2:name "Output" ] .
+
+<urn:audacity:tracktion-test:analyzer> a lv2:AnalyserPlugin ;
+    doap:name "Tracktion LV2 Analyzer" ;
+    doap:maintainer [ foaf:name "Audacity" ] ;
+    lv2:port [ a lv2:AudioPort, lv2:InputPort ; lv2:index 0 ; lv2:symbol "in" ; lv2:name "Input" ] .
+
+<urn:audacity:tracktion-test:tool> a lv2:UtilityPlugin ;
+    doap:name "Tracktion LV2 Tool" ;
+    doap:maintainer [ foaf:name "Audacity" ] ;
+    lv2:port [ a lv2:ControlPort, lv2:InputPort ; lv2:index 0 ; lv2:symbol "gain" ; lv2:name "Gain" ;
+               lv2:minimum 0.0 ; lv2:maximum 2.0 ; lv2:default 0.5 ] .
+
+<urn:audacity:tracktion-test:instrument> a lv2:InstrumentPlugin ;
+    doap:name "Tracktion LV2 Instrument" ;
+    doap:maintainer [ foaf:name "Audacity" ] ;
+    lv2:port [ a lv2:AudioPort, lv2:InputPort ; lv2:index 0 ; lv2:symbol "in" ; lv2:name "Input" ],
+             [ a lv2:AudioPort, lv2:OutputPort ; lv2:index 1 ; lv2:symbol "out" ; lv2:name "Output" ],
+             [ a lv2:ControlPort, lv2:InputPort ; lv2:index 2 ; lv2:symbol "gain" ; lv2:name "Gain" ;
+               lv2:minimum 0.0 ; lv2:maximum 2.0 ; lv2:default 0.5 ] .
+
+<urn:audacity:tracktion-test:midi> a lv2:MIDIPlugin ;
+    doap:name "Tracktion LV2 MIDI" ;
+    doap:maintainer [ foaf:name "Audacity" ] ;
+    lv2:port [ a lv2:AudioPort, lv2:InputPort ; lv2:index 0 ; lv2:symbol "in" ; lv2:name "Input" ],
+             [ a lv2:AudioPort, lv2:OutputPort ; lv2:index 1 ; lv2:symbol "out" ; lv2:name "Output" ],
+             [ a lv2:ControlPort, lv2:InputPort ; lv2:index 2 ; lv2:symbol "gain" ; lv2:name "Gain" ;
+               lv2:minimum 0.0 ; lv2:maximum 2.0 ; lv2:default 0.5 ] .
+
+<urn:audacity:tracktion-test:math> a <http://ll-plugins.nongnu.org/lv2/namespace#MathFunctionPlugin> ;
+    doap:name "Tracktion LV2 Math" ;
+    doap:maintainer [ foaf:name "Audacity" ] ;
+    lv2:port [ a lv2:ControlPort, lv2:InputPort ; lv2:index 0 ; lv2:symbol "gain" ; lv2:name "Gain" ;
+               lv2:minimum 0.0 ; lv2:maximum 2.0 ; lv2:default 0.5 ] .
+
+<urn:audacity:tracktion-test:empty> a lv2:Plugin ;
+    doap:name "Tracktion LV2 Empty" ;
+    doap:maintainer [ foaf:name "Audacity" ] .
+
+<urn:audacity:tracktion-test:unsupported> a lv2:AmplifierPlugin ;
+    doap:name "Tracktion LV2 Unsupported" ;
+    doap:maintainer [ foaf:name "Audacity" ] ;
+    lv2:port [ a lv2:AudioPort, lv2:InputPort ; lv2:index 0 ; lv2:symbol "in" ; lv2:name "Input" ],
+             [ a lv2:AudioPort, lv2:OutputPort ; lv2:index 1 ; lv2:symbol "out" ; lv2:name "Output" ],
+             [ a lv2:ControlPort, lv2:InputPort ; lv2:index 2 ; lv2:symbol "gain" ; lv2:name "Gain" ;
+               lv2:minimum 0.0 ; lv2:maximum 2.0 ; lv2:default 0.5 ] ;
+    lv2:requiredFeature <urn:audacity:missing-feature> .
+
+<urn:audacity:tracktion-test:no-author> a lv2:AmplifierPlugin ;
+    doap:name "Tracktion LV2 Without Author" ;
+    lv2:port [ a lv2:AudioPort, lv2:InputPort ; lv2:index 0 ; lv2:symbol "in" ; lv2:name "Input" ],
+             [ a lv2:AudioPort, lv2:OutputPort ; lv2:index 1 ; lv2:symbol "out" ; lv2:name "Output" ],
+             [ a lv2:ControlPort, lv2:InputPort ; lv2:index 2 ; lv2:symbol "gain" ; lv2:name "Gain" ;
+               lv2:minimum 0.0 ; lv2:maximum 2.0 ; lv2:default 0.5 ] .
+
+<urn:audacity:tracktion-test:unicode> a lv2:AmplifierPlugin ;
+    doap:name "Tracktion LV2 Étage" ;
+    doap:maintainer [ foaf:name "Audacity Équipe" ] ;
+    lv2:port [ a lv2:AudioPort, lv2:InputPort ; lv2:index 0 ; lv2:symbol "in" ; lv2:name "Input" ],
+             [ a lv2:AudioPort, lv2:OutputPort ; lv2:index 1 ; lv2:symbol "out" ; lv2:name "Output" ],
+             [ a lv2:ControlPort, lv2:InputPort ; lv2:index 2 ; lv2:symbol "gain" ; lv2:name "Gain" ;
+               lv2:minimum 0.0 ; lv2:maximum 2.0 ; lv2:default 0.5 ] .
+
+<urn:audacity:tracktion-test:sample-rate> a lv2:AmplifierPlugin ;
+    doap:name "Tracktion LV2 Sample Rate" ;
+    doap:maintainer [ foaf:name "Audacity" ] ;
+    lv2:port [ a lv2:AudioPort, lv2:InputPort ; lv2:index 0 ; lv2:symbol "in" ; lv2:name "Input" ],
+             [ a lv2:AudioPort, lv2:OutputPort ; lv2:index 1 ; lv2:symbol "out" ; lv2:name "Output" ],
+             [ a lv2:ControlPort, lv2:InputPort ; lv2:index 2 ; lv2:symbol "gain" ; lv2:name "Gain" ;
+               lv2:minimum 0.0 ; lv2:maximum 0.5 ; lv2:default 0.25 ; lv2:portProperty lv2:sampleRate ] .
+
+<urn:audacity:tracktion-test:bounded-default> a lv2:AmplifierPlugin ;
+    doap:name "Tracktion LV2 Bounded Default" ;
+    doap:maintainer [ foaf:name "Audacity" ] ;
+    lv2:port [ a lv2:AudioPort, lv2:InputPort ; lv2:index 0 ; lv2:symbol "in" ; lv2:name "Input" ],
+             [ a lv2:AudioPort, lv2:OutputPort ; lv2:index 1 ; lv2:symbol "out" ; lv2:name "Output" ],
+             [ a lv2:ControlPort, lv2:InputPort ; lv2:index 2 ; lv2:symbol "gain" ; lv2:name "Gain" ;
+               lv2:minimum 1.0 ; lv2:maximum 2.0 ] .
+
+<urn:audacity:tracktion-test:private> a lv2:AmplifierPlugin ;
+    doap:name "Tracktion LV2 Private State" ; doap:maintainer [ foaf:name "Audacity" ] ;
+    lv2:extensionData state:interface ;
+    lv2:port [ a lv2:AudioPort, lv2:InputPort ; lv2:index 0 ; lv2:symbol "in" ; lv2:name "Input" ],
+             [ a lv2:AudioPort, lv2:OutputPort ; lv2:index 1 ; lv2:symbol "out" ; lv2:name "Output" ],
+             [ a lv2:ControlPort, lv2:InputPort ; lv2:index 2 ; lv2:symbol "gain" ; lv2:name "Gain" ;
+               lv2:minimum 0.0 ; lv2:maximum 2.0 ; lv2:default 0.5 ] .
+
+<urn:audacity:tracktion-test:private#quiet> a pset:Preset ;
+    lv2:appliesTo <urn:audacity:tracktion-test:private> ; rdfs:label "Quiet" ;
+    lv2:port [ lv2:symbol "gain" ; pset:value 1.5 ] ;
+    state:state [ <urn:audacity:privateGain> "0.25"^^xsd:float ] .
+
+<urn:audacity:tracktion-test:private#unlabelled> a pset:Preset ;
+    lv2:appliesTo <urn:audacity:tracktion-test:private> ;
+    lv2:port [ lv2:symbol "gain" ; pset:value 1.0 ] ;
+    state:state [ <urn:audacity:privateGain> "0.75"^^xsd:float ] .
+
+<urn:audacity:tracktion-test:group> rdfs:label "Advanced Étage" .
+<urn:audacity:tracktion-test:rich> a lv2:AmplifierPlugin ;
+    doap:name "Tracktion LV2 Rich Controls" ; doap:maintainer [ foaf:name "Audacity" ] ;
+    lv2:port [ a lv2:AudioPort, lv2:InputPort ; lv2:index 0 ; lv2:symbol "in" ; lv2:name "Input" ],
+             [ a lv2:AudioPort, lv2:OutputPort ; lv2:index 1 ; lv2:symbol "out" ; lv2:name "Output" ],
+             [ a lv2:ControlPort, lv2:InputPort ; lv2:index 2 ; lv2:symbol "gain" ; lv2:name "Gain" ;
+               lv2:minimum 0.0 ; lv2:maximum 2.0 ; lv2:default 0.5 ; pg:group <urn:audacity:tracktion-test:group> ; units:unit units:db ],
+    [ a lv2:ControlPort, lv2:InputPort ; lv2:index 3 ; lv2:symbol "frequency" ; lv2:name "Frequency" ;
+      lv2:minimum 20.0 ; lv2:maximum 20000.0 ; lv2:default 440.0 ; lv2:portProperty props:logarithmic ],
+    [ a lv2:ControlPort, lv2:InputPort ; lv2:index 4 ; lv2:symbol "toggle" ; lv2:name "Toggle" ;
+      lv2:minimum 0.0 ; lv2:maximum 1.0 ; lv2:default 1.0 ; lv2:portProperty lv2:toggled ],
+    [ a lv2:ControlPort, lv2:InputPort ; lv2:index 5 ; lv2:symbol "mode" ; lv2:name "Mode" ;
+      lv2:minimum 1.0 ; lv2:maximum 4.0 ; lv2:default 1.0 ; lv2:portProperty lv2:enumeration, lv2:integer ;
+      lv2:scalePoint [ rdfs:label "Low" ; <http://www.w3.org/1999/02/22-rdf-syntax-ns#value> 1.0 ],
+                     [ rdfs:label "Élevé" ; <http://www.w3.org/1999/02/22-rdf-syntax-ns#value> 4.0 ] ],
+    [ a lv2:ControlPort, lv2:InputPort ; lv2:index 6 ; lv2:symbol "trigger" ; lv2:name "Trigger" ;
+      lv2:minimum 0.0 ; lv2:maximum 1.0 ; lv2:default 0.0 ; lv2:portProperty props:trigger ],
+    [ a lv2:ControlPort, lv2:OutputPort ; lv2:index 7 ; lv2:symbol "meter" ; lv2:name "Meter" ;
+      lv2:minimum 0.0 ; lv2:maximum 2.0 ; lv2:default 0.0 ] .
+
+<urn:audacity:tracktion-test:private#bad> a pset:Preset ;
+    lv2:appliesTo <urn:audacity:tracktion-test:private> ; rdfs:label "Bad" ;
+    lv2:port [ lv2:symbol "gain" ; pset:value 0.0 ] ;
+    state:state [ <urn:audacity:privateGain> "invalid" ] .
+
+<urn:audacity:tracktion-test:private#partial> a pset:Preset ;
+    lv2:appliesTo <urn:audacity:tracktion-test:private> ; rdfs:label "Partial" ;
+    state:state [ <urn:audacity:privateGain> "0.5"^^xsd:float ] .
+
+<urn:audacity:tracktion-test:duplicates> a lv2:AmplifierPlugin ;
+    doap:name "Tracktion LV2 Duplicate Names" ; doap:maintainer [ foaf:name "Audacity" ] ;
+    lv2:port [ a lv2:AudioPort, lv2:InputPort ; lv2:index 0 ; lv2:symbol "in" ; lv2:name "Input" ],
+             [ a lv2:AudioPort, lv2:OutputPort ; lv2:index 1 ; lv2:symbol "out" ; lv2:name "Output" ],
+             [ a lv2:ControlPort, lv2:InputPort ; lv2:index 2 ; lv2:symbol "gain" ; lv2:name "Gain " ;
+               lv2:minimum 0.0 ; lv2:maximum 2.0 ; lv2:default 0.5 ],
+             [ a lv2:ControlPort, lv2:InputPort ; lv2:index 3 ; lv2:symbol "other" ; lv2:name "Gain" ;
+               lv2:minimum 0.0 ; lv2:maximum 2.0 ; lv2:default 0.5 ],
+             [ a lv2:ControlPort, lv2:InputPort ; lv2:index 4 ; lv2:symbol "state" ; lv2:name "__LV2State " ;
+               lv2:minimum 0.0 ; lv2:maximum 2.0 ; lv2:default 0.5 ],
+             [ a lv2:ControlPort, lv2:InputPort ; lv2:index 5 ; lv2:symbol "ports" ; lv2:name "__LV2Ports " ;
+               lv2:minimum 0.0 ; lv2:maximum 2.0 ; lv2:default 0.5 ] .
+
+<urn:audacity:tracktion-test:ui-echo> a lv2:AmplifierPlugin ;
+    doap:name "Tracktion LV2 UI Echo" ; doap:maintainer [ foaf:name "Audacity" ] ;
+    lv2:port [ a lv2:AudioPort, lv2:InputPort ; lv2:index 0 ; lv2:symbol "in" ; lv2:name "Input" ],
+             [ a lv2:AudioPort, lv2:OutputPort ; lv2:index 1 ; lv2:symbol "out" ; lv2:name "Output" ],
+             [ a lv2:ControlPort, lv2:InputPort ; lv2:index 2 ; lv2:symbol "gain" ; lv2:name "Gain" ;
+               lv2:minimum 0.0 ; lv2:maximum 2.0 ; lv2:default 0.5 ; pg:group <urn:audacity:tracktion-test:group> ; units:unit units:db ],
+    [ a lv2:ControlPort, lv2:InputPort ; lv2:index 3 ; lv2:symbol "frequency" ; lv2:name "Frequency" ;
+      lv2:minimum 20.0 ; lv2:maximum 20000.0 ; lv2:default 440.0 ; lv2:portProperty props:logarithmic ],
+    [ a lv2:ControlPort, lv2:InputPort ; lv2:index 4 ; lv2:symbol "toggle" ; lv2:name "Toggle" ;
+      lv2:minimum 0.0 ; lv2:maximum 1.0 ; lv2:default 1.0 ; lv2:portProperty lv2:toggled ],
+    [ a lv2:ControlPort, lv2:InputPort ; lv2:index 5 ; lv2:symbol "mode" ; lv2:name "Mode" ;
+      lv2:minimum 1.0 ; lv2:maximum 4.0 ; lv2:default 1.0 ; lv2:portProperty lv2:enumeration, lv2:integer ;
+      lv2:scalePoint [ rdfs:label "Low" ; <http://www.w3.org/1999/02/22-rdf-syntax-ns#value> 1.0 ],
+                     [ rdfs:label "Élevé" ; <http://www.w3.org/1999/02/22-rdf-syntax-ns#value> 4.0 ] ],
+    [ a lv2:ControlPort, lv2:InputPort ; lv2:index 6 ; lv2:symbol "trigger" ; lv2:name "Trigger" ;
+      lv2:minimum 0.0 ; lv2:maximum 1.0 ; lv2:default 0.0 ; lv2:portProperty props:trigger ],
+    [ a lv2:ControlPort, lv2:OutputPort ; lv2:index 7 ; lv2:symbol "meter" ; lv2:name "Meter" ;
+      lv2:minimum 0.0 ; lv2:maximum 2.0 ; lv2:default 0.0 ],
+    [ a atom:AtomPort, lv2:InputPort ; lv2:index 8 ; lv2:symbol "events_in" ; lv2:name "Events In" ; atom:bufferType atom:Sequence ],
+    [ a atom:AtomPort, lv2:OutputPort ; lv2:index 9 ; lv2:symbol "events_out" ; lv2:name "Events Out" ; atom:bufferType atom:Sequence ] ;
+    lv2:extensionData state:interface ;
+    ui:ui <urn:audacity:tracktion-test:ui-echo#qt>, <urn:audacity:tracktion-test:ui-echo#x11>,
+          <urn:audacity:tracktion-test:ui-echo#external> .
+
+<urn:audacity:tracktion-test:ui-echo#qt> a ui:Qt6UI ; ui:binary <hosttest@CMAKE_SHARED_MODULE_SUFFIX@> ;
+    lv2:requiredFeature <http://lv2plug.in/ns/ext/instance-access> .
+<urn:audacity:tracktion-test:ui-echo#x11> a ui:X11UI ; ui:binary <hosttest@CMAKE_SHARED_MODULE_SUFFIX@> .
+<urn:audacity:tracktion-test:ui-echo#external> a <http://kxstudio.sf.net/ns/lv2ext/external-ui#Widget> ; ui:binary <hosttest@CMAKE_SHARED_MODULE_SUFFIX@> .
+
+<urn:audacity:tracktion-test:external-ui> a lv2:AmplifierPlugin ;
+    doap:name "Tracktion LV2 External UI" ; doap:maintainer [ foaf:name "Audacity" ] ;
+    lv2:port [ a lv2:AudioPort, lv2:InputPort ; lv2:index 0 ; lv2:symbol "in" ; lv2:name "Input" ],
+             [ a lv2:AudioPort, lv2:OutputPort ; lv2:index 1 ; lv2:symbol "out" ; lv2:name "Output" ],
+             [ a lv2:ControlPort, lv2:InputPort ; lv2:index 2 ; lv2:symbol "gain" ; lv2:name "Gain" ;
+               lv2:minimum 0.0 ; lv2:maximum 2.0 ; lv2:default 0.5 ; pg:group <urn:audacity:tracktion-test:group> ; units:unit units:db ],
+    [ a lv2:ControlPort, lv2:InputPort ; lv2:index 3 ; lv2:symbol "frequency" ; lv2:name "Frequency" ;
+      lv2:minimum 20.0 ; lv2:maximum 20000.0 ; lv2:default 440.0 ; lv2:portProperty props:logarithmic ],
+    [ a lv2:ControlPort, lv2:InputPort ; lv2:index 4 ; lv2:symbol "toggle" ; lv2:name "Toggle" ;
+      lv2:minimum 0.0 ; lv2:maximum 1.0 ; lv2:default 1.0 ; lv2:portProperty lv2:toggled ],
+    [ a lv2:ControlPort, lv2:InputPort ; lv2:index 5 ; lv2:symbol "mode" ; lv2:name "Mode" ;
+      lv2:minimum 1.0 ; lv2:maximum 4.0 ; lv2:default 1.0 ; lv2:portProperty lv2:enumeration, lv2:integer ;
+      lv2:scalePoint [ rdfs:label "Low" ; <http://www.w3.org/1999/02/22-rdf-syntax-ns#value> 1.0 ],
+                     [ rdfs:label "Élevé" ; <http://www.w3.org/1999/02/22-rdf-syntax-ns#value> 4.0 ] ],
+    [ a lv2:ControlPort, lv2:InputPort ; lv2:index 6 ; lv2:symbol "trigger" ; lv2:name "Trigger" ;
+      lv2:minimum 0.0 ; lv2:maximum 1.0 ; lv2:default 0.0 ; lv2:portProperty props:trigger ],
+    [ a lv2:ControlPort, lv2:OutputPort ; lv2:index 7 ; lv2:symbol "meter" ; lv2:name "Meter" ;
+      lv2:minimum 0.0 ; lv2:maximum 2.0 ; lv2:default 0.0 ],
+    [ a atom:AtomPort, lv2:InputPort ; lv2:index 8 ; lv2:symbol "events_in" ; lv2:name "Events In" ; atom:bufferType atom:Sequence ],
+    [ a atom:AtomPort, lv2:OutputPort ; lv2:index 9 ; lv2:symbol "events_out" ; lv2:name "Events Out" ; atom:bufferType atom:Sequence ] ;
+    lv2:extensionData state:interface ;
+    ui:ui <urn:audacity:tracktion-test:external-ui#external> .
+
+<urn:audacity:tracktion-test:missing-ui-feature> a lv2:AmplifierPlugin ;
+    doap:name "Tracktion LV2 Unsupported UI" ; doap:maintainer [ foaf:name "Audacity" ] ;
+    lv2:port [ a lv2:AudioPort, lv2:InputPort ; lv2:index 0 ; lv2:symbol "in" ; lv2:name "Input" ],
+             [ a lv2:AudioPort, lv2:OutputPort ; lv2:index 1 ; lv2:symbol "out" ; lv2:name "Output" ],
+             [ a lv2:ControlPort, lv2:InputPort ; lv2:index 2 ; lv2:symbol "gain" ; lv2:name "Gain" ;
+               lv2:minimum 0.0 ; lv2:maximum 2.0 ; lv2:default 0.5 ; pg:group <urn:audacity:tracktion-test:group> ; units:unit units:db ],
+    [ a lv2:ControlPort, lv2:InputPort ; lv2:index 3 ; lv2:symbol "frequency" ; lv2:name "Frequency" ;
+      lv2:minimum 20.0 ; lv2:maximum 20000.0 ; lv2:default 440.0 ; lv2:portProperty props:logarithmic ],
+    [ a lv2:ControlPort, lv2:InputPort ; lv2:index 4 ; lv2:symbol "toggle" ; lv2:name "Toggle" ;
+      lv2:minimum 0.0 ; lv2:maximum 1.0 ; lv2:default 1.0 ; lv2:portProperty lv2:toggled ],
+    [ a lv2:ControlPort, lv2:InputPort ; lv2:index 5 ; lv2:symbol "mode" ; lv2:name "Mode" ;
+      lv2:minimum 1.0 ; lv2:maximum 4.0 ; lv2:default 1.0 ; lv2:portProperty lv2:enumeration, lv2:integer ;
+      lv2:scalePoint [ rdfs:label "Low" ; <http://www.w3.org/1999/02/22-rdf-syntax-ns#value> 1.0 ],
+                     [ rdfs:label "Élevé" ; <http://www.w3.org/1999/02/22-rdf-syntax-ns#value> 4.0 ] ],
+    [ a lv2:ControlPort, lv2:InputPort ; lv2:index 6 ; lv2:symbol "trigger" ; lv2:name "Trigger" ;
+      lv2:minimum 0.0 ; lv2:maximum 1.0 ; lv2:default 0.0 ; lv2:portProperty props:trigger ],
+    [ a lv2:ControlPort, lv2:OutputPort ; lv2:index 7 ; lv2:symbol "meter" ; lv2:name "Meter" ;
+      lv2:minimum 0.0 ; lv2:maximum 2.0 ; lv2:default 0.0 ],
+    [ a atom:AtomPort, lv2:InputPort ; lv2:index 8 ; lv2:symbol "events_in" ; lv2:name "Events In" ; atom:bufferType atom:Sequence ],
+    [ a atom:AtomPort, lv2:OutputPort ; lv2:index 9 ; lv2:symbol "events_out" ; lv2:name "Events Out" ; atom:bufferType atom:Sequence ] ;
+    lv2:extensionData state:interface ;
+    ui:ui <urn:audacity:tracktion-test:missing-ui-feature#qt> .
+
+<urn:audacity:tracktion-test:external-ui#external> a <http://kxstudio.sf.net/ns/lv2ext/external-ui#Widget> ; ui:binary <hosttest@CMAKE_SHARED_MODULE_SUFFIX@> .
+<urn:audacity:tracktion-test:missing-ui-feature#qt> a ui:Qt6UI ; ui:binary <hosttest@CMAKE_SHARED_MODULE_SUFFIX@> ;
+    lv2:requiredFeature <urn:audacity:missing-ui-feature> .
+
+<urn:audacity:tracktion-test:x11-ui> a lv2:AmplifierPlugin ;
+    doap:name "Tracktion LV2 X11 UI" ; doap:maintainer [ foaf:name "Audacity" ] ;
+    lv2:port [ a lv2:AudioPort, lv2:InputPort ; lv2:index 0 ; lv2:symbol "in" ; lv2:name "Input" ],
+             [ a lv2:AudioPort, lv2:OutputPort ; lv2:index 1 ; lv2:symbol "out" ; lv2:name "Output" ],
+             [ a lv2:ControlPort, lv2:InputPort ; lv2:index 2 ; lv2:symbol "gain" ; lv2:name "Gain" ;
+               lv2:minimum 0.0 ; lv2:maximum 2.0 ; lv2:default 0.5 ; pg:group <urn:audacity:tracktion-test:group> ; units:unit units:db ],
+    [ a lv2:ControlPort, lv2:InputPort ; lv2:index 3 ; lv2:symbol "frequency" ; lv2:name "Frequency" ;
+      lv2:minimum 20.0 ; lv2:maximum 20000.0 ; lv2:default 440.0 ; lv2:portProperty props:logarithmic ],
+    [ a lv2:ControlPort, lv2:InputPort ; lv2:index 4 ; lv2:symbol "toggle" ; lv2:name "Toggle" ;
+      lv2:minimum 0.0 ; lv2:maximum 1.0 ; lv2:default 1.0 ; lv2:portProperty lv2:toggled ],
+    [ a lv2:ControlPort, lv2:InputPort ; lv2:index 5 ; lv2:symbol "mode" ; lv2:name "Mode" ;
+      lv2:minimum 1.0 ; lv2:maximum 4.0 ; lv2:default 1.0 ; lv2:portProperty lv2:enumeration, lv2:integer ;
+      lv2:scalePoint [ rdfs:label "Low" ; <http://www.w3.org/1999/02/22-rdf-syntax-ns#value> 1.0 ],
+                     [ rdfs:label "Élevé" ; <http://www.w3.org/1999/02/22-rdf-syntax-ns#value> 4.0 ] ],
+    [ a lv2:ControlPort, lv2:InputPort ; lv2:index 6 ; lv2:symbol "trigger" ; lv2:name "Trigger" ;
+      lv2:minimum 0.0 ; lv2:maximum 1.0 ; lv2:default 0.0 ; lv2:portProperty props:trigger ],
+    [ a lv2:ControlPort, lv2:OutputPort ; lv2:index 7 ; lv2:symbol "meter" ; lv2:name "Meter" ;
+      lv2:minimum 0.0 ; lv2:maximum 2.0 ; lv2:default 0.0 ],
+    [ a atom:AtomPort, lv2:InputPort ; lv2:index 8 ; lv2:symbol "events_in" ; lv2:name "Events In" ; atom:bufferType atom:Sequence ],
+    [ a atom:AtomPort, lv2:OutputPort ; lv2:index 9 ; lv2:symbol "events_out" ; lv2:name "Events Out" ; atom:bufferType atom:Sequence ] ;
+    lv2:extensionData state:interface ;
+    ui:ui <urn:audacity:tracktion-test:x11-ui#x11> .
+
+<urn:audacity:tracktion-test:x11-ui#x11> a ui:X11UI ; ui:binary <hosttest@CMAKE_SHARED_MODULE_SUFFIX@> .
+
+<urn:audacity:tracktion-test:ui-state> a lv2:AmplifierPlugin ;
+    doap:name "Tracktion LV2 UI State" ; doap:maintainer [ foaf:name "Audacity" ] ;
+    lv2:port [ a lv2:AudioPort, lv2:InputPort ; lv2:index 0 ; lv2:symbol "in" ; lv2:name "Input" ],
+             [ a lv2:AudioPort, lv2:OutputPort ; lv2:index 1 ; lv2:symbol "out" ; lv2:name "Output" ],
+             [ a lv2:ControlPort, lv2:InputPort ; lv2:index 2 ; lv2:symbol "gain" ; lv2:name "Gain" ;
+               lv2:minimum 0.0 ; lv2:maximum 2.0 ; lv2:default 0.5 ; pg:group <urn:audacity:tracktion-test:group> ; units:unit units:db ],
+    [ a lv2:ControlPort, lv2:InputPort ; lv2:index 3 ; lv2:symbol "frequency" ; lv2:name "Frequency" ;
+      lv2:minimum 20.0 ; lv2:maximum 20000.0 ; lv2:default 440.0 ; lv2:portProperty props:logarithmic ],
+    [ a lv2:ControlPort, lv2:InputPort ; lv2:index 4 ; lv2:symbol "toggle" ; lv2:name "Toggle" ;
+      lv2:minimum 0.0 ; lv2:maximum 1.0 ; lv2:default 1.0 ; lv2:portProperty lv2:toggled ],
+    [ a lv2:ControlPort, lv2:InputPort ; lv2:index 5 ; lv2:symbol "mode" ; lv2:name "Mode" ;
+      lv2:minimum 1.0 ; lv2:maximum 4.0 ; lv2:default 1.0 ; lv2:portProperty lv2:enumeration, lv2:integer ;
+      lv2:scalePoint [ rdfs:label "Low" ; <http://www.w3.org/1999/02/22-rdf-syntax-ns#value> 1.0 ],
+                     [ rdfs:label "Élevé" ; <http://www.w3.org/1999/02/22-rdf-syntax-ns#value> 4.0 ] ],
+    [ a lv2:ControlPort, lv2:InputPort ; lv2:index 6 ; lv2:symbol "trigger" ; lv2:name "Trigger" ;
+      lv2:minimum 0.0 ; lv2:maximum 1.0 ; lv2:default 0.0 ; lv2:portProperty props:trigger ],
+    [ a lv2:ControlPort, lv2:OutputPort ; lv2:index 7 ; lv2:symbol "meter" ; lv2:name "Meter" ;
+      lv2:minimum 0.0 ; lv2:maximum 2.0 ; lv2:default 0.0 ],
+    [ a atom:AtomPort, lv2:InputPort ; lv2:index 8 ; lv2:symbol "events_in" ; lv2:name "Events In" ; atom:bufferType atom:Sequence ],
+    [ a atom:AtomPort, lv2:OutputPort ; lv2:index 9 ; lv2:symbol "events_out" ; lv2:name "Events Out" ; atom:bufferType atom:Sequence ] ;
+    lv2:extensionData state:interface ;
+    ui:ui <urn:audacity:tracktion-test:ui-state#qt> .
+
+<urn:audacity:tracktion-test:ui-state#qt> a ui:Qt6UI ; ui:binary <hosttest@CMAKE_SHARED_MODULE_SUFFIX@> .
+
+<urn:audacity:tracktion-test:latency> a lv2:AmplifierPlugin ;
+    doap:name "Tracktion LV2 Latency" ; doap:maintainer [ foaf:name "Audacity" ] ;
+    lv2:port [ a lv2:AudioPort, lv2:InputPort ; lv2:index 0 ; lv2:symbol "in" ; lv2:name "Input" ],
+             [ a lv2:AudioPort, lv2:OutputPort ; lv2:index 1 ; lv2:symbol "out" ; lv2:name "Output" ],
+             [ a lv2:ControlPort, lv2:InputPort ; lv2:index 2 ; lv2:symbol "gain" ; lv2:name "Gain" ;
+               lv2:minimum 0.0 ; lv2:maximum 2.0 ; lv2:default 0.5 ],
+             [ a lv2:ControlPort, lv2:OutputPort ; lv2:index 3 ; lv2:symbol "latency" ; lv2:name "Latency" ;
+               lv2:minimum 0.0 ; lv2:maximum 4096.0 ; lv2:default 0.0 ; lv2:portProperty lv2:integer, lv2:reportsLatency ;
+               lv2:designation lv2:latency ] .
+
+<urn:audacity:tracktion-test:latency-late> a lv2:AmplifierPlugin ;
+    doap:name "Tracktion LV2 Late Latency" ; doap:maintainer [ foaf:name "Audacity" ] ;
+    lv2:port [ a lv2:AudioPort, lv2:InputPort ; lv2:index 0 ; lv2:symbol "in" ; lv2:name "Input" ],
+             [ a lv2:AudioPort, lv2:OutputPort ; lv2:index 1 ; lv2:symbol "out" ; lv2:name "Output" ],
+             [ a lv2:ControlPort, lv2:InputPort ; lv2:index 2 ; lv2:symbol "gain" ; lv2:name "Gain" ;
+               lv2:minimum 0.0 ; lv2:maximum 2.0 ; lv2:default 0.5 ],
+             [ a lv2:ControlPort, lv2:OutputPort ; lv2:index 3 ; lv2:symbol "latency" ; lv2:name "Latency" ;
+               lv2:minimum 0.0 ; lv2:maximum 4096.0 ; lv2:default 0.0 ; lv2:portProperty lv2:integer, lv2:reportsLatency ;
+               lv2:designation lv2:latency ] .
+
+<urn:audacity:tracktion-test:latency-worker> a lv2:AmplifierPlugin ;
+    doap:name "Tracktion LV2 Worker Latency" ; doap:maintainer [ foaf:name "Audacity" ] ;
+    lv2:port [ a lv2:AudioPort, lv2:InputPort ; lv2:index 0 ; lv2:symbol "in" ; lv2:name "Input" ],
+             [ a lv2:AudioPort, lv2:OutputPort ; lv2:index 1 ; lv2:symbol "out" ; lv2:name "Output" ],
+             [ a lv2:ControlPort, lv2:InputPort ; lv2:index 2 ; lv2:symbol "gain" ; lv2:name "Gain" ;
+               lv2:minimum 0.0 ; lv2:maximum 2.0 ; lv2:default 0.5 ],
+             [ a lv2:ControlPort, lv2:OutputPort ; lv2:index 3 ; lv2:symbol "latency" ; lv2:name "Latency" ;
+               lv2:minimum 0.0 ; lv2:maximum 4096.0 ; lv2:default 0.0 ; lv2:portProperty lv2:integer, lv2:reportsLatency ;
+               lv2:designation lv2:latency ] ;
+    lv2:requiredFeature <http://lv2plug.in/ns/ext/worker#schedule> ;
+    lv2:extensionData <http://lv2plug.in/ns/ext/worker#interface> .
+
+<urn:audacity:tracktion-test:worker-end> a lv2:AmplifierPlugin ;
+    doap:name "Tracktion LV2 Worker Block End" ; doap:maintainer [ foaf:name "Audacity" ] ;
+    lv2:port [ a lv2:AudioPort, lv2:InputPort ; lv2:index 0 ; lv2:symbol "in" ; lv2:name "Input" ],
+             [ a lv2:AudioPort, lv2:OutputPort ; lv2:index 1 ; lv2:symbol "out" ; lv2:name "Output" ],
+             [ a lv2:ControlPort, lv2:InputPort ; lv2:index 2 ; lv2:symbol "gain" ; lv2:name "Gain" ;
+               lv2:minimum 0.0 ; lv2:maximum 2.0 ; lv2:default 0.5 ] ;
+    lv2:requiredFeature <http://lv2plug.in/ns/ext/worker#schedule> ;
+    lv2:extensionData <http://lv2plug.in/ns/ext/worker#interface> .
+
+<urn:audacity:tracktion-test:enabled> a lv2:AmplifierPlugin ;
+    doap:name "Tracktion LV2 Enabled" ; doap:maintainer [ foaf:name "Audacity" ] ;
+    lv2:port [ a lv2:AudioPort, lv2:InputPort ; lv2:index 0 ; lv2:symbol "in" ; lv2:name "Input" ],
+             [ a lv2:AudioPort, lv2:OutputPort ; lv2:index 1 ; lv2:symbol "out" ; lv2:name "Output" ],
+             [ a lv2:ControlPort, lv2:InputPort ; lv2:index 2 ; lv2:symbol "gain" ; lv2:name "Gain" ;
+               lv2:minimum 0.0 ; lv2:maximum 2.0 ; lv2:default 0.5 ],
+             [ a lv2:ControlPort, lv2:InputPort ; lv2:index 3 ; lv2:symbol "enabled" ; lv2:name "Enabled" ;
+               lv2:minimum 0.0 ; lv2:maximum 1.0 ; lv2:default 1.0 ; lv2:portProperty lv2:toggled ; lv2:designation lv2:enabled ] ;
+    lv2:extensionData state:interface ;
+    ui:ui <urn:audacity:tracktion-test:ui-state#qt> .

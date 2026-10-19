@@ -17,6 +17,7 @@ set( SOURCES
 )
 set( LIBRARIES
 PUBLIC
+   au3-automation-data
    au3-components
    au3-registries
    au3-utility

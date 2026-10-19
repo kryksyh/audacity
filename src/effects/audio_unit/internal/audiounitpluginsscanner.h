@@ -3,18 +3,13 @@
 */
 #pragma once
 
-#include "effects/effects_base/internal/au3/au3audiopluginscanner.h"
-
-#include "au3-audio-unit/AudioUnitEffectsModule.h"
+#include "tracktionaudio/internal/tracktionpluginscanner.h"
 
 namespace au::effects {
-class AudioUnitPluginsScanner : public Au3AudioPluginScanner
+class AudioUnitPluginsScanner final : public tracktionaudio::TracktionPluginsScanner
 {
 public:
     AudioUnitPluginsScanner()
-        : Au3AudioPluginScanner(m_auModule) {}
-
-private:
-    ::AudioUnitEffectsModule m_auModule;
+        : TracktionPluginsScanner(tracktionaudio::PluginFormat::AudioUnit) {}
 };
 }

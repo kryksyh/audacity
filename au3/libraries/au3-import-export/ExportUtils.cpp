@@ -18,21 +18,37 @@
 #include "au3-track/Track.h"
 #include "au3-time-frequency-selection/ViewInfo.h"
 #include "au3-wave-track/WaveTrack.h"
+#include "au3-midi-track/MidiTrack.h"
+#include "au3-playable-track/TrackRouting.h"
 
 //TODO: used in many places in anticipation that Exporter yields same result, fix that
 TrackIterRange<const WaveTrack> ExportUtils::FindExportWaveTracks(const TrackList& tracks, bool selectedOnly)
 {
-    bool anySolo
-        =!(tracks.Any<const WaveTrack>() + &WaveTrack::GetSolo).empty();
+    const auto sources = TrackRouting::AudibleSources(tracks, selectedOnly);
+    return tracks.Any<const WaveTrack>() + [sources](const WaveTrack* track) {
+        return std::find(sources.begin(), sources.end(), track) != sources.end();
+    };
+}
 
-    return tracks.Any<const WaveTrack>()
-           + (selectedOnly ? &Track::IsSelected : &Track::Any)
-           - (anySolo ? &WaveTrack::GetNotSolo : &WaveTrack::GetMute);
+TrackIterRange<const MidiTrack> ExportUtils::FindExportMidiTracks(const TrackList& tracks, bool selectedOnly)
+{
+    const auto sources = TrackRouting::AudibleSources(tracks, selectedOnly);
+    return tracks.Any<const MidiTrack>() + [sources](const MidiTrack* track) {
+        return std::find(sources.begin(), sources.end(), track) != sources.end();
+    };
+}
+
+TrackIterRange<const PlayableTrack> ExportUtils::FindExportPlayableTracks(const TrackList& tracks, bool selectedOnly)
+{
+    const auto sources = TrackRouting::AudibleSources(tracks, selectedOnly);
+    return tracks.Any<const PlayableTrack>() + [sources](const PlayableTrack* track) {
+        return std::find(sources.begin(), sources.end(), track) != sources.end();
+    };
 }
 
 bool ExportUtils::HasSelectedAudio(const AudacityProject& project)
 {
-    return !FindExportWaveTracks(TrackList::Get(project), true).empty()
+    return !FindExportPlayableTracks(TrackList::Get(project), true).empty()
            && !ViewInfo::Get(project).selectedRegion.isPoint();
 }
 

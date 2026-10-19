@@ -1,0 +1,77 @@
+@prefix lv2: <http://lv2plug.in/ns/lv2core#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+
+<urn:audacity:tracktion-test:latency> a lv2:Plugin ;
+    lv2:binary <hosttest@CMAKE_SHARED_MODULE_SUFFIX@> ; rdfs:seeAlso <plugin.ttl> .
+<urn:audacity:tracktion-test:latency-late> a lv2:Plugin ;
+    lv2:binary <hosttest@CMAKE_SHARED_MODULE_SUFFIX@> ; rdfs:seeAlso <plugin.ttl> .
+<urn:audacity:tracktion-test:latency-worker> a lv2:Plugin ;
+    lv2:binary <hosttest@CMAKE_SHARED_MODULE_SUFFIX@> ; rdfs:seeAlso <plugin.ttl> .
+<urn:audacity:tracktion-test:worker-end> a lv2:Plugin ;
+    lv2:binary <hosttest@CMAKE_SHARED_MODULE_SUFFIX@> ; rdfs:seeAlso <plugin.ttl> .
+
+<urn:audacity:tracktion-test:enabled> a lv2:Plugin ;
+    lv2:binary <hosttest@CMAKE_SHARED_MODULE_SUFFIX@> ; rdfs:seeAlso <plugin.ttl> .
+
+<urn:audacity:tracktion-test:gain> a lv2:Plugin ;
+    lv2:binary <hosttest@CMAKE_SHARED_MODULE_SUFFIX@> ; rdfs:seeAlso <plugin.ttl> .
+<urn:audacity:tracktion-test:generator> a lv2:Plugin ;
+    lv2:binary <hosttest@CMAKE_SHARED_MODULE_SUFFIX@> ; rdfs:seeAlso <plugin.ttl> .
+<urn:audacity:tracktion-test:analyzer> a lv2:Plugin ;
+    lv2:binary <hosttest@CMAKE_SHARED_MODULE_SUFFIX@> ; rdfs:seeAlso <plugin.ttl> .
+<urn:audacity:tracktion-test:tool> a lv2:Plugin ;
+    lv2:binary <hosttest@CMAKE_SHARED_MODULE_SUFFIX@> ; rdfs:seeAlso <plugin.ttl> .
+<urn:audacity:tracktion-test:instrument> a lv2:Plugin ;
+    lv2:binary <hosttest@CMAKE_SHARED_MODULE_SUFFIX@> ; rdfs:seeAlso <plugin.ttl> .
+<urn:audacity:tracktion-test:midi> a lv2:Plugin ;
+    lv2:binary <hosttest@CMAKE_SHARED_MODULE_SUFFIX@> ; rdfs:seeAlso <plugin.ttl> .
+<urn:audacity:tracktion-test:math> a lv2:Plugin ;
+    lv2:binary <hosttest@CMAKE_SHARED_MODULE_SUFFIX@> ; rdfs:seeAlso <plugin.ttl> .
+<urn:audacity:tracktion-test:empty> a lv2:Plugin ;
+    lv2:binary <hosttest@CMAKE_SHARED_MODULE_SUFFIX@> ; rdfs:seeAlso <plugin.ttl> .
+<urn:audacity:tracktion-test:unsupported> a lv2:Plugin ;
+    lv2:binary <hosttest@CMAKE_SHARED_MODULE_SUFFIX@> ; rdfs:seeAlso <plugin.ttl> .
+<urn:audacity:tracktion-test:no-author> a lv2:Plugin ;
+    lv2:binary <hosttest@CMAKE_SHARED_MODULE_SUFFIX@> ; rdfs:seeAlso <plugin.ttl> .
+
+<urn:audacity:tracktion-test:classes> a lv2:Specification ; rdfs:seeAlso <classes.ttl> .
+
+<urn:audacity:tracktion-test:unicode> a lv2:Plugin ;
+    lv2:binary <hosttest@CMAKE_SHARED_MODULE_SUFFIX@> ; rdfs:seeAlso <plugin.ttl> .
+
+<urn:audacity:tracktion-test:sample-rate> a lv2:Plugin ;
+    lv2:binary <hosttest@CMAKE_SHARED_MODULE_SUFFIX@> ; rdfs:seeAlso <plugin.ttl> .
+<urn:audacity:tracktion-test:bounded-default> a lv2:Plugin ;
+    lv2:binary <hosttest@CMAKE_SHARED_MODULE_SUFFIX@> ; rdfs:seeAlso <plugin.ttl> .
+
+<urn:audacity:tracktion-test:private> a lv2:Plugin ;
+    lv2:binary <hosttest@CMAKE_SHARED_MODULE_SUFFIX@> ; rdfs:seeAlso <plugin.ttl> .
+<urn:audacity:tracktion-test:rich> a lv2:Plugin ;
+    lv2:binary <hosttest@CMAKE_SHARED_MODULE_SUFFIX@> ; rdfs:seeAlso <plugin.ttl> .
+<urn:audacity:tracktion-test:duplicates> a lv2:Plugin ;
+    lv2:binary <hosttest@CMAKE_SHARED_MODULE_SUFFIX@> ; rdfs:seeAlso <plugin.ttl> .
+<urn:audacity:tracktion-test:private#quiet> a <http://lv2plug.in/ns/ext/presets#Preset> ;
+    lv2:appliesTo <urn:audacity:tracktion-test:private> ; rdfs:seeAlso <plugin.ttl> .
+<urn:audacity:tracktion-test:private#unlabelled> a <http://lv2plug.in/ns/ext/presets#Preset> ;
+    lv2:appliesTo <urn:audacity:tracktion-test:private> ; rdfs:seeAlso <plugin.ttl> .
+
+<urn:audacity:tracktion-test:private#bad> a <http://lv2plug.in/ns/ext/presets#Preset> ;
+    lv2:appliesTo <urn:audacity:tracktion-test:private> ; rdfs:seeAlso <plugin.ttl> .
+
+<urn:audacity:tracktion-test:private#partial> a <http://lv2plug.in/ns/ext/presets#Preset> ;
+    lv2:appliesTo <urn:audacity:tracktion-test:private> ; rdfs:seeAlso <plugin.ttl> .
+
+<urn:audacity:tracktion-test:ui-echo> a lv2:Plugin ;
+    lv2:binary <hosttest@CMAKE_SHARED_MODULE_SUFFIX@> ; rdfs:seeAlso <plugin.ttl> .
+
+<urn:audacity:tracktion-test:external-ui> a lv2:Plugin ;
+    lv2:binary <hosttest@CMAKE_SHARED_MODULE_SUFFIX@> ; rdfs:seeAlso <plugin.ttl> .
+
+<urn:audacity:tracktion-test:missing-ui-feature> a lv2:Plugin ;
+    lv2:binary <hosttest@CMAKE_SHARED_MODULE_SUFFIX@> ; rdfs:seeAlso <plugin.ttl> .
+
+<urn:audacity:tracktion-test:x11-ui> a lv2:Plugin ;
+    lv2:binary <hosttest@CMAKE_SHARED_MODULE_SUFFIX@> ; rdfs:seeAlso <plugin.ttl> .
+
+<urn:audacity:tracktion-test:ui-state> a lv2:Plugin ;
+    lv2:binary <hosttest@CMAKE_SHARED_MODULE_SUFFIX@> ; rdfs:seeAlso <plugin.ttl> .

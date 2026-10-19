@@ -22,6 +22,7 @@ muse::uicomponents::MenuItemList realtimeEffectMenu(EffectMenuOrganization organ
                                                     const EffectFilter& filter, IEffectMenuItemFactory& effectMenu);
 
 EffectId effectId(const EffectDefinitionInterface* effect);
+EffectId effectId(const muse::String& family, const muse::String& vendor, const muse::String& title, const muse::io::path_t& path);
 EffectId findRelocatedVst3EffectId(const EffectId& effectId, const EffectMetaList& metaList);
 
 bool isEffectId(const EffectId& effectId);

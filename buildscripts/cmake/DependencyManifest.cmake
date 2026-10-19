@@ -32,9 +32,6 @@ require_dep(libpng)
 require_dep(wxwidgets)
 
 
-if (AU_MODULE_EFFECTS_LV2)
-    require_source_dep(lv2sdk)
-endif()
 require_source_dep(vst3sdk)
 require_source_dep(loop-tempo-estimator)
 require_source_dep(tft)

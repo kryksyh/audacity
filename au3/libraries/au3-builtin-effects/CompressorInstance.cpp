@@ -247,8 +247,9 @@ size_t CompressorInstance::InstanceProcess(
 EffectInstance::SampleCount CompressorInstance::GetLatency(
     const EffectSettings& settings, double sampleRate) const
 {
-    return GetDynamicRangeProcessorSettings(settings).lookaheadMs * sampleRate
-           / 1000;
+    // Match the delay value used by LookAheadGainReduction.
+    const auto delay = static_cast<float>(GetDynamicRangeProcessorSettings(settings).lookaheadMs / 1000.0);
+    return delay * sampleRate;
 }
 
 unsigned CompressorInstance::GetAudioOutCount() const

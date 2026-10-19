@@ -17,6 +17,7 @@
 #include <map>
 #include <set>
 #include <unordered_map>
+#include <vector>
 #include <wx/string.h>
 
 #include "AudioUnitUtils.h"
@@ -51,6 +52,9 @@ struct AudioUnitEffectSettings {
 
     //! Optionally store a preset
     std::optional<SInt32> mPresetNumber;
+
+    using State = std::vector<unsigned char>;
+    std::shared_ptr<const State> mState;
 
     //! Map from numerical parameter IDs (not always a small initial segment
     //! of the integers) to optional pairs of names and floating point values
@@ -168,6 +172,8 @@ struct AudioUnitWrapper
 
     //! May allocate memory, so should be called only in the main thread
     bool FetchSettings(AudioUnitEffectSettings& settings, bool fetchValues, bool fetchPreset = false) const;
+    static bool FetchSettings(AudioUnit unit, const Parameters& parameters, AudioUnitEffectSettings& settings,
+                              bool fetchValues, bool fetchPreset);
     bool StoreSettings(const EffectDefinitionInterface& effect, const AudioUnitEffectSettings& settings) const;
 
     //! Copy, then clear the optionals in src

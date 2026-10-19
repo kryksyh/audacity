@@ -8,12 +8,15 @@
 
 #include "effects/effects_base/effectstypes.h"
 
-class VST3Instance;
+namespace au::tracktionaudio {
+class TracktionHostedEffectInstance;
+}
 namespace au::effects {
 class MuseVstPluginInstance : public muse::vst::IVstPluginInstance
 {
 public:
-    MuseVstPluginInstance(const EffectId& effectId, const EffectInstanceId& instanceId, std::shared_ptr<VST3Instance> auVstInstance);
+    MuseVstPluginInstance(const EffectId& effectId, const EffectInstanceId& instanceId,
+                          std::shared_ptr<tracktionaudio::TracktionHostedEffectInstance> instance);
 
     const muse::audio::AudioResourceId& resourceId() const override;
     const std::string& name() const override;
@@ -33,8 +36,8 @@ public:
 
 private:
 
-    EffectId m_effectId;
+    muse::audio::AudioResourceId m_resourceId;
     EffectInstanceId m_instanceId;
-    std::shared_ptr<VST3Instance> m_auVstInstance;
+    std::shared_ptr<tracktionaudio::TracktionHostedEffectInstance> m_instance;
 };
 }

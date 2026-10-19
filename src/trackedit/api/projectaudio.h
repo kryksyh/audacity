@@ -17,7 +17,7 @@
 
 #include "internal/projecteditstate.h"
 
-class Mixer;
+class AudioRenderSource;
 class WaveTrack;
 
 namespace muse::extensions {
@@ -82,7 +82,7 @@ private:
     AudioFormat m_format;
     sampleCount m_position{ 0 };
     sampleCount m_end{ 0 };
-    std::unique_ptr<Mixer> m_mixer;
+    std::unique_ptr<AudioRenderSource> m_renderer;
     AudioChunkObject* m_chunk = nullptr;
 };
 

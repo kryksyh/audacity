@@ -22,6 +22,8 @@ class Curve should be extracted from it and lowered into au3-math.
 set( TARGET au3-mixer )
 
 set( SOURCES
+   AudioRenderSource.cpp
+   AudioRenderSource.h
    AudioIOSequences.cpp
    AudioIOSequences.h
    DownmixSource.cpp

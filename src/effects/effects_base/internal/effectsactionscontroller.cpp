@@ -129,6 +129,9 @@ void EffectsActionsController::registerActions()
 
     const EffectMetaList effects = effectsProvider()->effectMetaList();
     for (const EffectMeta& e : effects) {
+        if (e.type == EffectType::Instrument) {
+            continue;
+        }
         const EffectId effectId = e.id;
         cd->onRequest(this, makeEffectOpenCommand(effectId), [this, effectId]() { return openEffect(effectId); });
         cd->onRequest(this, makeEffectApplyCommand(effectId), [this, effectId](const Params& params) {

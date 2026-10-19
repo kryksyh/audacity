@@ -85,11 +85,13 @@ void AUControl::close()
          name:NSViewFrameDidChangeNotification
          object:asNSView(mView)];
 
+        [asNSView(mView) removeFromSuperview];
         [asNSView(mView) release];
         mView = nullptr;
     }
 
     if (mAUView) {
+        [asAUView(mAUView) removeFromSuperview];
         [asAUView(mAUView) release];
         mAUView = nullptr;
     }
@@ -106,14 +108,15 @@ bool AUControl::create(AudioComponent comp, AudioUnit unit, bool custom)
         return false;
     }
     [asAUView(mAUView) initWithControl: this];
-    [asAUView(mAUView) retain];
 
-    if (custom) {
-        createCocoa();
-    }
+    @autoreleasepool {
+        if (custom) {
+            createCocoa();
+        }
 
-    if (!mView) {
-        createGeneric();
+        if (!mView) {
+            createGeneric();
+        }
     }
 
     if (!mView) {
@@ -204,7 +207,7 @@ void AUControl::createGeneric()
         int flags = AUViewPropertiesDisplayFlag | AUViewParametersDisplayFlag;
         [view initWithAudioUnit:mUnit displayFlags:flags];
         [view setShowsExpertParameters:YES];
-        mView = view;
+        mView = [view autorelease];
     }
     [asNSView(mView) retain];
     setupView();

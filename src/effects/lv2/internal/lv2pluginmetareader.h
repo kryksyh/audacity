@@ -1,22 +1,15 @@
 /*
- * Audacity: A Digital Audio Editor
- */
+* Audacity: A Digital Audio Editor
+*/
 #pragma once
 
-#include "effects/effects_base/internal/au3/au3audiopluginmetareader.h"
-#include "au3-lv2/LoadLV2.h"
+#include "tracktionaudio/internal/tracktionpluginscanner.h"
 
 namespace au::effects {
-class Lv2PluginMetaReader final : public Au3AudioPluginMetaReader
+class Lv2PluginMetaReader final : public tracktionaudio::TracktionPluginMetaReader
 {
 public:
-    Lv2PluginMetaReader();
-    muse::audioplugins::PluginType metaType() const override;
-    bool canReadMeta(const muse::io::path_t& pluginPath) const override;
-
-private:
-    void doInit() override;
-
-    LV2EffectsModule m_module;
+    Lv2PluginMetaReader()
+        : TracktionPluginMetaReader(tracktionaudio::PluginFormat::LV2) {}
 };
 }

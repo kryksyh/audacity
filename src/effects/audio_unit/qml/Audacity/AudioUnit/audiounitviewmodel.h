@@ -3,15 +3,12 @@
  */
 #pragma once
 
-#include <AudioToolbox/AudioUnitUtilities.h>
-
 #include <QObject>
 #include <QTimer>
 #include <QtQml/qqmlregistration.h>
 
 #include "modularity/ioc.h"
 #include "context/iglobalcontext.h"
-#include "playback/iplayback.h"
 #include "trackedit/iprojecthistory.h"
 
 #include "effects/effects_base/view/abstracteffectviewmodel.h"
@@ -20,7 +17,11 @@
 #include "effects/effects_base/ieffectsprovider.h"
 #include "effects/effects_base/irealtimeeffectservice.h"
 
-#include "au3-audio-unit/AudioUnitInstance.h"
+class EffectSettingsAccess;
+
+namespace au::tracktionaudio {
+class TracktionHostedEffectInstance;
+}
 
 namespace au::effects {
 class AudioUnitViewModel : public AbstractEffectViewModel
@@ -34,7 +35,6 @@ class AudioUnitViewModel : public AbstractEffectViewModel
     muse::ContextInject<au::context::IGlobalContext> globalContext{ this };
     muse::ContextInject<IEffectExecutionScenario> executionScenario{ this };
     muse::ContextInject<IRealtimeEffectService> realtimeEffectService{ this };
-    muse::ContextInject<au::playback::IPlayback> playback{ this };
     muse::ContextInject<trackedit::IProjectHistory> projectHistory{ this };
 
 public:
@@ -54,34 +54,13 @@ private:
     void doStartPreview() override;
     void doStopPreview() override;
 
-    using EventListenerPtr = AudioUnitCleanup<AUEventListenerRef, AUListenerDispose>;
-
-    struct EventListenerContext {
-        AudioUnitViewModel* viewModel = nullptr;
-        std::weak_ptr<EventListenerContext> self;
-    };
-
-    static void EventListenerCallback(void* inCallbackRefCon, void* inObject, const AudioUnitEvent* inEvent, UInt64 inEventHostTime,
-                                      AudioUnitParameterValue inParameterValue);
-    static void DisposeListenerAsync(AUEventListenerRef listener, std::shared_ptr<EventListenerContext> context,
-                                     std::shared_ptr<AudioUnitInstance> instance);
-    void EventListener(const AudioUnitEvent* inEvent, AudioUnitParameterValue inParameterValue);
-    EventListenerPtr MakeListener();
-    void fetchSettingsAsync();
-
     void settingsToView();
-    void settingsFromView();
-    void checkSettingChangesFromUi();
+    bool settingsFromView(bool complete = true);
+    void checkSettingChangesFromUi(bool complete = false);
 
-    std::unordered_map<AudioUnitParameterID, AudioUnitParameterValue> m_parameterValues;
-    std::vector<std::pair<AudioUnitParameterID, AudioUnitParameterValue> > m_toUpdate;
-
-    std::shared_ptr<AudioUnitInstance> m_instance;
-    EffectSettingsAccessPtr m_settingsAccess;
-    EventListenerPtr m_eventListenerRef;
-    std::shared_ptr<EventListenerContext> m_listenerContext;
-    bool m_settingsFetchPending = false;
-    bool m_settingsFetchQueued = false;
+    std::shared_ptr<tracktionaudio::TracktionHostedEffectInstance> m_instance;
+    std::shared_ptr<EffectSettingsAccess> m_settingsAccess;
+    bool m_settingsLoaded = false;
 
     QString m_title;
     QTimer m_settingsTimer;
