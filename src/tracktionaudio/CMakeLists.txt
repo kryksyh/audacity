@@ -47,6 +47,8 @@ set_target_properties(au_tracktion_engine PROPERTIES
 )
 target_compile_definitions(au_tracktion_engine PUBLIC
     $<$<CONFIG:Debug>:DEBUG=1>
+    # On Linux, JUCE_DEBUG is derived from _DEBUG alone. It must match the engine build.
+    $<$<CONFIG:Debug>:_DEBUG=1>
     JUCE_GLOBAL_MODULE_SETTINGS_INCLUDED=1
     JUCE_USE_CURL=0
     JUCE_WEB_BROWSER=0
