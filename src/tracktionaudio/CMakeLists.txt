@@ -97,6 +97,8 @@ target_sources(tracktionaudio PRIVATE
     ${CMAKE_CURRENT_LIST_DIR}/internal/audacityplugins.h
     ${CMAKE_CURRENT_LIST_DIR}/internal/audiosourceregistry.cpp
     ${CMAKE_CURRENT_LIST_DIR}/internal/audiosourceregistry.h
+    ${CMAKE_CURRENT_LIST_DIR}/internal/audacitytrackstream.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/internal/audacitytrackstream.h
     ${CMAKE_CURRENT_LIST_DIR}/internal/portaudiodevice.cpp
     ${CMAKE_CURRENT_LIST_DIR}/internal/portaudiodevice.h
     ${CMAKE_CURRENT_LIST_DIR}/internal/tracktionaudiocallbacks.cpp

@@ -34,6 +34,7 @@
 #endif
 
 #include "../internal/audacityaudiosource.h"
+#include "../internal/audacitytrackstream.h"
 #include "../internal/tracktionruntime.h"
 #include "../internal/tracktionsession.h"
 #include "../internal/tracktionautomation.h"
@@ -4846,5 +4847,184 @@ TEST_F(AudioSourceTests, TracktionRecordingDoesNotRequireAnOutputDevice)
     std::vector<float> samples(source.sampleCount());
     ASSERT_TRUE(source.read(0, samples.data(), 0, samples.size()));
     EXPECT_EQ(samples, (std::vector<float>(input.getReadPointer(0), input.getReadPointer(0) + input.getNumSamples())));
+}
+
+namespace {
+//! Waits for the stream as a real-time thread wouldn't, to keep tests independent of the machine's speed.
+std::vector<float> readWhenReady(AudacityTrackStream& stream, int64_t position, int frames)
+{
+    // The first block may be partly read already, so `bufferedFrames` can be a block too high.
+    constexpr int largestBlock = 1024;
+    const auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(10);
+    while (stream.bufferedFrames() < frames + largestBlock && std::chrono::steady_clock::now() < deadline) {
+        std::this_thread::sleep_for(std::chrono::milliseconds(1));
+    }
+    std::vector<float> samples(frames);
+    float* destinations[] { samples.data() };
+    stream.read(position, destinations, frames);
+    return samples;
+}
+
+std::vector<float> makeRamp(size_t frames)
+{
+    std::vector<float> samples(frames);
+    for (size_t frame = 0; frame < frames; ++frame) {
+        samples[frame] = static_cast<float>(frame + 1) / frames;
+    }
+    return samples;
+}
+}
+
+TEST_F(AudioSourceTests, TrackStreamReadsAcrossBlocksInOrder)
+{
+    const auto samples = makeRamp(10000);
+    const auto track = makeTrack({ samples });
+    AudacityTrackStream stream(StretchingSequence::Create(*track, track->GetClipInterfaces()));
+    stream.prepare(48000.0);
+    ASSERT_TRUE(stream.prime(0, std::chrono::seconds(10)));
+    for (int position = 0; position + 700 <= 10000; position += 700) {
+        const auto output = readWhenReady(stream, position, 700);
+        for (int frame = 0; frame < 700; ++frame) {
+            ASSERT_FLOAT_EQ(output[frame], samples[position + frame]) << position + frame;
+        }
+    }
+    EXPECT_EQ(stream.underrunCount(), 0u);
+}
+
+TEST_F(AudioSourceTests, TrackStreamIsSilentPastTheEndOfTheTrack)
+{
+    const auto track = makeTrack({ makeRamp(1000) });
+    AudacityTrackStream stream(StretchingSequence::Create(*track, track->GetClipInterfaces()));
+    stream.prepare(48000.0);
+    ASSERT_TRUE(stream.prime(900, std::chrono::seconds(10)));
+    const auto output = readWhenReady(stream, 900, 300);
+    EXPECT_GT(output[99], 0.9f);
+    for (int frame = 100; frame < 300; ++frame) {
+        ASSERT_EQ(output[frame], 0.0f) << frame;
+    }
+}
+
+TEST_F(AudioSourceTests, TrackStreamFollowsAnUnexpectedPosition)
+{
+    const auto samples = makeRamp(48000);
+    const auto track = makeTrack({ samples });
+    AudacityTrackStream stream(StretchingSequence::Create(*track, track->GetClipInterfaces()));
+    stream.prepare(48000.0);
+    ASSERT_TRUE(stream.prime(0, std::chrono::seconds(10)));
+    readWhenReady(stream, 0, 256);
+
+    std::vector<float> ignored(256);
+    float* destinations[] { ignored.data() };
+    stream.read(30000, destinations, 256);
+    // Whatever was queued for the old position must not play at the new one.
+    EXPECT_EQ(ignored, std::vector<float>(256, 0.0f));
+
+    int64_t position = 30256;
+    std::vector<float> output;
+    const auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(10);
+    while (std::chrono::steady_clock::now() < deadline) {
+        std::this_thread::sleep_for(std::chrono::milliseconds(50));
+        output = readWhenReady(stream, position, 256);
+        if (output.back() != 0.0f) {
+            break;
+        }
+        position += 256;
+    }
+    EXPECT_FLOAT_EQ(output.back(), samples[position + 255]);
+}
+
+TEST_F(AudioSourceTests, TrackStreamReadsAheadAroundALoopWithoutRepositioning)
+{
+    const auto samples = makeRamp(48000);
+    const auto track = makeTrack({ samples });
+    AudacityTrackStream stream(StretchingSequence::Create(*track, track->GetClipInterfaces()));
+    stream.setLoop(std::make_pair<int64_t, int64_t>(10000, 12500));
+    stream.prepare(48000.0);
+    ASSERT_TRUE(stream.prime(10000, std::chrono::seconds(10)));
+    // Reading the loop three times over.
+    for (int pass = 0; pass < 3; ++pass) {
+        for (int position = 10000; position < 12500; position += 500) {
+            const auto output = readWhenReady(stream, position, 500);
+            for (int frame = 0; frame < 500; ++frame) {
+                ASSERT_FLOAT_EQ(output[frame], samples[position + frame]) << pass << ", " << position + frame;
+            }
+        }
+    }
+    EXPECT_EQ(stream.underrunCount(), 0u);
+}
+
+// To be enabled along with the clip envelope decorator.
+TEST_F(AudioSourceTests, DISABLED_TrackStreamAppliesTheClipEnvelope)
+{
+    const auto track = makeTrack({ std::vector<float>(48000, 0.5f) });
+    (*track->Intervals().begin())->GetEnvelope().InsertOrReplace(0.0, 0.5);
+    AudacityTrackStream stream(StretchingSequence::Create(*track, track->GetClipInterfaces()));
+    stream.prepare(48000.0);
+    ASSERT_TRUE(stream.prime(0, std::chrono::seconds(10)));
+    EXPECT_NEAR(readWhenReady(stream, 0, 256).back(), 0.25f, 1e-5f);
+}
+
+TEST_F(AudioSourceTests, TrackStreamResamplesToTheDeviceRate)
+{
+    const auto track = makeTrack({ std::vector<float>(48000, 0.5f) });
+    AudacityTrackStream stream(StretchingSequence::Create(*track, track->GetClipInterfaces()));
+    stream.prepare(44100.0);
+    ASSERT_TRUE(stream.prime(0, std::chrono::seconds(10)));
+    // Past the filter's transient.
+    readWhenReady(stream, 0, 4096);
+    EXPECT_NEAR(readWhenReady(stream, 4096, 256).back(), 0.5f, 1e-3f);
+}
+
+TEST_F(AudioSourceTests, TrackStreamKeepsTheTimingWhenResampling)
+{
+    const auto samples = makeRamp(48000);
+    const auto track = makeTrack({ samples });
+    AudacityTrackStream stream(StretchingSequence::Create(*track, track->GetClipInterfaces()));
+    stream.prepare(44100.0);
+    // A second of ramp takes 44100 frames at this rate, wherever the reading starts.
+    ASSERT_TRUE(stream.prime(22050, std::chrono::seconds(10)));
+    for (int position = 22050; position < 33000; position += 512) {
+        const auto output = readWhenReady(stream, position, 512);
+        ASSERT_NEAR(output[256], (position + 256) / 44100.0f, 2e-4f) << position;
+    }
+    EXPECT_EQ(stream.underrunCount(), 0u);
+}
+
+TEST_F(AudioSourceTests, TrackStreamLoopsWhenResampling)
+{
+    const auto samples = makeRamp(48000);
+    const auto track = makeTrack({ samples });
+    AudacityTrackStream stream(StretchingSequence::Create(*track, track->GetClipInterfaces()));
+    stream.setLoop(std::make_pair<int64_t, int64_t>(10000, 16000));
+    stream.prepare(44100.0);
+    ASSERT_TRUE(stream.prime(10000, std::chrono::seconds(10)));
+    for (int pass = 0; pass < 3; ++pass) {
+        for (int position = 10000; position < 16000; position += 500) {
+            const auto output = readWhenReady(stream, position, 500);
+            // Away from the loop's boundaries, where the signal jumps.
+            if (position >= 11000 && position < 15000) {
+                ASSERT_NEAR(output[250], (position + 250) / 44100.0f, 2e-4f) << pass << ", " << position;
+            }
+        }
+    }
+    EXPECT_EQ(stream.underrunCount(), 0u);
+}
+
+TEST_F(AudioSourceTests, TrackStreamUsesTheAudacityStretcher)
+{
+    const auto track = makeTrack({ makeVoiceSamples(48000) });
+    (*track->Intervals().begin())->StretchRightTo(1.5);
+    const auto expectedSequence = StretchingSequence::Create(*track, track->GetClipInterfaces());
+    std::vector<float> expected(8192);
+    float* expectedDestinations[] { expected.data() };
+    ASSERT_TRUE(expectedSequence->GetFloats(expectedDestinations, 0, expected.size(), false));
+
+    AudacityTrackStream stream(StretchingSequence::Create(*track, track->GetClipInterfaces()));
+    stream.prepare(48000.0);
+    ASSERT_TRUE(stream.prime(0, std::chrono::seconds(10)));
+    const auto output = readWhenReady(stream, 0, expected.size());
+    for (size_t frame = 0; frame < expected.size(); ++frame) {
+        ASSERT_NEAR(output[frame], expected[frame], 1e-5f) << frame;
+    }
 }
 }
