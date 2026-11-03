@@ -40,9 +40,15 @@ public:
     enum class PlaybackLoopUpdate {
         Start, RegionChanged
     };
+    //! How wave tracks get their audio.
+    enum class TrackAudio {
+        TracktionClips, //!< Clips in the Tracktion edit, which Tracktion reads and stretches
+        Streams //!< An AudacityTrackStream per track. Doesn't support recording or varying the speed yet.
+    };
 
     TracktionSession(TracktionRuntime& runtime, TrackList& tracks, Role role, Selection selection = Selection::All);
-    TracktionSession(TracktionRuntime& runtime, TrackList& tracks, const TransportSequences& sequences, Role role);
+    TracktionSession(TracktionRuntime& runtime, TrackList& tracks, const TransportSequences& sequences, Role role,
+                     TrackAudio trackAudio = TrackAudio::TracktionClips);
     TracktionSession(TracktionRuntime& runtime, TrackList& tracks, const std::vector<const WaveTrack*>& sources, Role role,
                      bool trackEffects, bool masterEffects, const std::vector<const MidiTrack*>& midiSources = {}, bool automation = true,
                      bool routing = true);

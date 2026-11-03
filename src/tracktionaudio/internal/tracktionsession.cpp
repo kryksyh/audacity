@@ -24,9 +24,13 @@
 #include "au3-realtime-effects/RealtimeEffectList.h"
 #include "au3-realtime-effects/RealtimeEffectState.h"
 
+#include "au3-stretching-sequence/StretchingSequence.h"
+
 #include "audacityaudiosource.h"
 #include "audacityplugins.h"
 #include "audacityeffectregistry.h"
+#include "audacitytracknode.h"
+#include "audacitytrackstream.h"
 #include "audiosourceregistry.h"
 #include "tracktionruntime.h"
 #include "tracktiontrackmeters.h"
@@ -72,8 +76,13 @@ struct TracktionSession::Data : private juce::Timer
         Observer::Subscription subscription;
     };
 
+    struct TrackStream {
+        tracktion::AudioTrack::Ptr track;
+        std::shared_ptr<AudacityTrackStream> stream;
+    };
+
     explicit Data(TracktionRuntime& runtime)
-        : engine(runtime.engine()), sources(runtime.sources()), effects(runtime.effects())
+        : engine(runtime.engine()), sources(runtime.sources()), effects(runtime.effects()), trackStreamRegistry(runtime.trackStreams())
     {
     }
 
@@ -90,6 +99,13 @@ struct TracktionSession::Data : private juce::Timer
             const juce::ScopedLock lock(engine.getDeviceManager().deviceManager.getAudioCallbackLock());
             trackMeters->clear();
         }
+        // Stop reading ahead only after the graph is gone, as its nodes read from the streams.
+        std::vector<std::shared_ptr<AudacityTrackStream> > streams;
+        for (const auto& entry : trackStreams) {
+            trackStreamRegistry->remove(*entry.track);
+            streams.push_back(entry.stream);
+        }
+        trackStreams.clear();
         edit.reset();
         for (const auto& id : effectIds) {
             effects->remove(id);
@@ -267,6 +283,7 @@ struct TracktionSession::Data : private juce::Timer
     tracktion::Engine& engine;
     std::shared_ptr<AudioSourceRegistry> sources;
     std::shared_ptr<AudacityEffectRegistry> effects;
+    std::shared_ptr<AudacityTrackStreams> trackStreamRegistry;
     std::shared_ptr<RealtimeEffectList> masterEffects;
     std::vector<std::shared_ptr<const WaveTrack> > effectTracks;
     std::vector<std::shared_ptr<const MidiTrack> > midiTracks;
@@ -275,6 +292,8 @@ struct TracktionSession::Data : private juce::Timer
     std::vector<std::unique_ptr<EffectChain> > effectChains;
     std::vector<juce::File> files;
     std::vector<ClipBinding> clips;
+    std::vector<TrackStream> trackStreams;
+    TrackAudio trackAudio = TrackAudio::TracktionClips;
     std::unique_ptr<tracktion::Edit> edit;
     std::shared_ptr<AudacityPlaybackControls> playbackControls;
     std::shared_ptr<TracktionTrackMeters> trackMeters;
@@ -304,9 +323,11 @@ TracktionSession::TracktionSession(TracktionRuntime& runtime, TrackList& tracks,
     initialise(runtime, tracks, role, sources, true, true, midiSources);
 }
 
-TracktionSession::TracktionSession(TracktionRuntime& runtime, TrackList& tracks, const TransportSequences& sequences, Role role)
+TracktionSession::TracktionSession(TracktionRuntime& runtime, TrackList& tracks, const TransportSequences& sequences, Role role,
+                                   TrackAudio trackAudio)
     : m_data(std::make_unique<Data>(runtime))
 {
+    m_data->trackAudio = trackAudio;
     std::vector<const WaveTrack*> sources;
     for (const auto& sequence : sequences.playbackSequences) {
         const auto* track = dynamic_cast<const WaveTrack*>(sequence->FindChannelGroup());
@@ -437,6 +458,15 @@ void TracktionSession::initialise(TracktionRuntime& runtime, TrackList& tracks, 
             auto& effectList = RealtimeEffectList::Get(const_cast<WaveTrack&>(*waveTrack));
             m_data->addEffects(effectList, waveTrack, waveTrack->NChannels(), track->pluginList, track->pluginList.indexOf(volume),
                                role == Role::Playback);
+        }
+
+        if (m_data->trackAudio == TrackAudio::Streams) {
+            if (waveTrack->GetEndTime() > 0.0) {
+                auto stream = std::make_shared<AudacityTrackStream>(StretchingSequence::Create(*waveTrack, waveTrack->GetClipInterfaces()));
+                m_data->trackStreamRegistry->add(*track, stream);
+                m_data->trackStreams.push_back({ track, std::move(stream) });
+            }
+            continue;
         }
 
         for (const auto& waveClip : waveTrack->Intervals()) {
@@ -778,6 +808,13 @@ bool TracktionSession::startPlayback()
     auto& transport = m_data->edit->getTransport();
     // Context allocation must let the audio callback advance.
     transport.ensureContextAllocated();
+    if (!transport.isPlaying()) {
+        const auto position = tracktion::toSamples(transport.getPosition(), m_data->engine.getDeviceManager().getSampleRate());
+        for (const auto& entry : m_data->trackStreams) {
+            // If this times out, playback starts with a moment of silence on this track.
+            entry.stream->prime(position, std::chrono::milliseconds(500));
+        }
+    }
     const juce::ScopedLock lock(m_data->engine.getDeviceManager().deviceManager.getAudioCallbackLock());
     transport.play(false);
     return transport.isPlaying();
@@ -807,6 +844,9 @@ bool TracktionSession::updatePlaybackLoop(bool enabled, double startTime, double
     m_data->playbackControls->silentLoopStart.store(silentLoopStart, std::memory_order_relaxed);
     if (looping && sampleRange.isEmpty()) {
         sampleRange.setEnd(sampleRange.getStart() + 1);
+    }
+    for (const auto& entry : m_data->trackStreams) {
+        entry.stream->setLoop(looping ? std::make_optional(std::make_pair(sampleRange.getStart(), sampleRange.getEnd())) : std::nullopt);
     }
     const bool changed = transport.looping != looping || (looping && transport.getLoopRange() != range);
     const bool wrapToStart = looping && changed && position >= endTime;

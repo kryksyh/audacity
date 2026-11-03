@@ -333,7 +333,9 @@ int TracktionAudioEngine::startStream(const TransportSequences& sequences, doubl
     data.rate = device->getCurrentSampleRate();
     try {
         data.session
-            = std::make_unique<TracktionSession>(data.runtime, TrackList::Get(project), sequences, TracktionSession::Role::Playback);
+            = std::make_unique<TracktionSession>(data.runtime, TrackList::Get(project), sequences, TracktionSession::Role::Playback,
+                                                 options.isDefaultPolicy && !recording && !variableSpeed
+                                                 ? TracktionSession::TrackAudio::Streams : TracktionSession::TrackAudio::TracktionClips);
         data.session->setPlaybackVolume(TracktionAudioIO::instance().playbackVolume());
         data.defaultPolicy = options.isDefaultPolicy && !recording;
         data.endTime = endTime;

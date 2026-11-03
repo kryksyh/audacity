@@ -16,6 +16,7 @@ class WaveInputDevice;
 namespace au::tracktionaudio {
 class AudioSourceRegistry;
 class AudacityEffectRegistry;
+class AudacityTrackStreams;
 class AudioDeviceCallback;
 
 class TracktionRuntime
@@ -36,6 +37,7 @@ public:
     tracktion::Engine& engine() const;
     std::shared_ptr<AudioSourceRegistry> sources() const;
     std::shared_ptr<AudacityEffectRegistry> effects() const;
+    std::shared_ptr<AudacityTrackStreams> trackStreams() const;
     std::shared_ptr<void> lifetime() const;
 
 private:

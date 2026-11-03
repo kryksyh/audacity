@@ -2,6 +2,7 @@
 * Audacity: A Digital Audio Editor
 */
 #include <tracktion_engine/tracktion_engine.h>
+#include <tracktion_graph/tracktion_graph.h>
 
 #include "tracktionruntime.h"
 
@@ -14,6 +15,7 @@
 
 #include "audiosourceregistry.h"
 #include "audacityplugins.h"
+#include "audacitytracknode.h"
 #include "audacityeffectregistry.h"
 #include "portaudiodevice.h"
 #include "au3-audio-devices/AudioIOBase.h"
@@ -28,6 +30,17 @@ namespace {
 class AudacityEngineBehaviour final : public tracktion::EngineBehaviour
 {
 public:
+    explicit AudacityEngineBehaviour(std::shared_ptr<AudacityTrackStreams> trackStreams)
+        : m_trackStreams(std::move(trackStreams))
+    {
+    }
+
+    std::unique_ptr<tracktion::graph::Node> createTrackSourceNode(tracktion::AudioTrack& track, tracktion::ProcessState& state,
+                                                                  bool forRendering) override
+    {
+        return forRendering ? nullptr : m_trackStreams->createNode(track, state);
+    }
+
     bool autoInitialiseDeviceManager() override { return false; }
     bool addSystemAudioIODeviceTypes() override { return false; }
     bool shouldProcessMutedTracks() override { return true; }
@@ -40,6 +53,9 @@ public:
         constexpr int maximum = std::numeric_limits<int>::max();
         return { maximum, maximum, maximum, maximum, maximum };
     }
+
+private:
+    const std::shared_ptr<AudacityTrackStreams> m_trackStreams;
 };
 
 class AudacityPropertyStorage final : public tracktion::PropertyStorage
@@ -118,8 +134,9 @@ struct TracktionRuntime::Data
 
     Data(const std::string& cacheDirectory, const std::string& settingsDirectory)
         : sources(std::make_shared<AudioSourceRegistry>()), effects(std::make_shared<AudacityEffectRegistry>()),
+        trackStreams(std::make_shared<AudacityTrackStreams>()),
         engine(std::make_unique<tracktion::Engine>(std::make_unique<AudacityPropertyStorage>(cacheDirectory, settingsDirectory),
-                                                   nullptr, std::make_unique<AudacityEngineBehaviour>()))
+                                                   nullptr, std::make_unique<AudacityEngineBehaviour>(trackStreams)))
     {
         engine->getAudioFileFormatManager().addFormat([registry = sources] {
             return registry->createFormat().release();
@@ -131,6 +148,7 @@ struct TracktionRuntime::Data
     juce::ScopedJuceInitialiser_GUI juceInitialiser;
     std::shared_ptr<AudioSourceRegistry> sources;
     std::shared_ptr<AudacityEffectRegistry> effects;
+    std::shared_ptr<AudacityTrackStreams> trackStreams;
     std::unique_ptr<tracktion::Engine> engine;
     bool devicesInitialised = false;
     std::optional<DeviceConfiguration> deviceConfiguration;
@@ -270,6 +288,11 @@ std::shared_ptr<AudioSourceRegistry> TracktionRuntime::sources() const
 std::shared_ptr<AudacityEffectRegistry> TracktionRuntime::effects() const
 {
     return m_data->effects;
+}
+
+std::shared_ptr<AudacityTrackStreams> TracktionRuntime::trackStreams() const
+{
+    return m_data->trackStreams;
 }
 
 std::shared_ptr<void> TracktionRuntime::lifetime() const

@@ -5027,4 +5027,67 @@ TEST_F(AudioSourceTests, TrackStreamUsesTheAudacityStretcher)
         ASSERT_NEAR(output[frame], expected[frame], 1e-5f) << frame;
     }
 }
+
+TEST_F(AudioSourceTests, TracktionPlaybackReadsTheTrackStream)
+{
+    const auto directory = m_projectFile.getSiblingFile("tracktion-stream-" + juce::Uuid().toString());
+    DEFER { directory.deleteRecursively();
+    };
+    TracktionRuntime runtime;
+    runtime.init(directory.getChildFile("cache").getFullPathName().toStdString(),
+                 directory.getChildFile("settings").getFullPathName().toStdString());
+    HostedPlayback playback(runtime.engine());
+
+    std::vector<float> samples(48000, 0.125f);
+    std::fill(samples.begin() + 24000, samples.end(), 0.25f);
+    const auto tracks = TrackList::Create(nullptr);
+    const auto track = makeTrack({ samples });
+    tracks->Add(track);
+    TransportSequences sequences;
+    sequences.playbackSequences.push_back(StretchingSequence::Create(*track, track->GetClipInterfaces()));
+    TracktionSession session(runtime, *tracks, sequences, TracktionSession::Role::Playback, TracktionSession::TrackAudio::Streams);
+    EXPECT_TRUE(tracktion::getAudioTracks(session.edit()).getFirst()->getClips().isEmpty());
+
+    ASSERT_TRUE(session.startPlayback());
+    const auto first = playback.process(24);
+    for (int frame = 0; frame < first.getNumSamples(); ++frame) {
+        ASSERT_NEAR(first.getSample(0, frame), 0.125f, 1e-5f) << frame;
+    }
+
+    session.edit().getTransport().setPosition(tracktion::TimePosition::fromSeconds(0.7));
+    const auto afterSeek = playback.process(24);
+    EXPECT_NEAR(afterSeek.getSample(0, afterSeek.getNumSamples() - 1), 0.25f, 1e-5f);
+    session.edit().getTransport().stop(false, true, false);
+}
+
+TEST_F(AudioSourceTests, TracktionPlaybackLoopsTheTrackStreamWithoutGaps)
+{
+    const auto directory = m_projectFile.getSiblingFile("tracktion-stream-loop-" + juce::Uuid().toString());
+    DEFER { directory.deleteRecursively();
+    };
+    TracktionRuntime runtime;
+    runtime.init(directory.getChildFile("cache").getFullPathName().toStdString(),
+                 directory.getChildFile("settings").getFullPathName().toStdString());
+    HostedPlayback playback(runtime.engine());
+
+    std::vector<float> samples(48000, 0.0f);
+    std::fill(samples.begin() + 4800, samples.begin() + 9600, 0.125f);
+    const auto tracks = TrackList::Create(nullptr);
+    const auto track = makeTrack({ samples });
+    tracks->Add(track);
+    TransportSequences sequences;
+    sequences.playbackSequences.push_back(StretchingSequence::Create(*track, track->GetClipInterfaces()));
+    TracktionSession session(runtime, *tracks, sequences, TracktionSession::Role::Playback, TracktionSession::TrackAudio::Streams);
+    auto& transport = session.edit().getTransport();
+    transport.setPosition(tracktion::TimePosition::fromSeconds(0.1));
+    ASSERT_TRUE(session.updatePlaybackLoop(true, 0.1, 0.2, TracktionSession::PlaybackLoopUpdate::Start));
+    ASSERT_TRUE(session.startPlayback());
+
+    const auto output = playback.process(72);
+    for (int frame = 0; frame < output.getNumSamples(); ++frame) {
+        ASSERT_NEAR(output.getSample(0, frame), 0.125f, 1e-5f) << frame;
+    }
+    EXPECT_TRUE(transport.isPlaying());
+    transport.stop(false, true, false);
+}
 }
