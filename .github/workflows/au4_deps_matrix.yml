@@ -73,6 +73,9 @@ jobs:
           arch: ${{ matrix.qt_arch }}
           modules: 'qt5compat qtnetworkauth qtshadertools qtwebsockets qtgraphs qtquick3d'
           cache: true
+          # https://github.com/miurahr/aqtinstall/pull/1000#issuecomment-4109913885
+          aqtsource: 'git+https://github.com/miurahr/aqtinstall.git'
+          py7zrversion: '@git+https://github.com/miurahr/py7zr.git'
 
       - name: Platform setup
         shell: bash
@@ -96,9 +99,13 @@ jobs:
               sudo apt-get install -y \
                 libogg-dev libvorbis-dev libflac-dev libflac++-dev libopus-dev libopusfile-dev \
                 libmp3lame-dev libmpg123-dev libwavpack-dev libsndfile1-dev libid3tag0-dev \
-                portaudio19-dev libexpat1-dev zlib1g-dev libwxgtk3.2-dev \
+                portaudio19-dev libexpat1-dev zlib1g-dev libwxgtk3.2-dev libpng-dev \
+                liblilv-dev libsuil-dev libzix-dev lv2-dev rapidjson-dev libsqlite3-dev \
+                libtwolame-dev libsoxr-dev libsoundtouch-dev libsbsms-dev \
                 pkg-config libfreetype-dev libharfbuzz-dev libpugixml-dev libutfcpp-dev
               echo "EXTDEPS_OVERRIDE_ALL=SYSTEM" >> "$GITHUB_ENV"
+              # Ubuntu ships no VST3 SDK
+              echo "EXTDEPS_OVERRIDE_VST3SDK=REBUILD" >> "$GITHUB_ENV"
               ;;
             prebuilt)
               : # default: lock-verified prebuilts, nothing to set
