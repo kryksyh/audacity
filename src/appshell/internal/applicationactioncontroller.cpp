@@ -97,6 +97,10 @@ void ApplicationActionController::init()
     cd->onRequest(this, APP_ASK_HELP_COMMAND, [this]() { return openAskForHelpPage(); });
     cd->onRequest(this, APP_PREFERENCES_COMMAND, [this]() { return openPreferencesDialog(); });
     cd->onRequest(this, APP_REVERT_FACTORY_COMMAND, [this]() { return revertToFactorySettings(); });
+    cd->onRequest(this, APP_MEASURE_LATENCY_COMMAND, [this]() {
+        interactive()->open("audacity://measure-latency");
+        return make_ok();
+    });
     cd->onRequest(this, APP_AUDIO_SETTINGS_COMMAND, [this]() { return openAudioSettingsDialog(); });
     cd->onRequest(this, APP_SHORTCUTS_PREFERENCES_COMMAND, [this]() { return openShortcutsPreferencesDialog(); });
     cd->onRequest(this, APP_EDITING_PREFERENCES_COMMAND, [this]() { return openEditingPreferencesDialog(); });

@@ -26,6 +26,8 @@ qt_add_qml_module(appshell_qml
         FirstLaunchSetup/appupdateusageinfopagemodel.h
         framelesswindowmodel.cpp
         framelesswindowmodel.h
+        latencymeasurementmodel.cpp
+        latencymeasurementmodel.h
         maintoolbarmodel.cpp
         maintoolbarmodel.h
         mainwindowtitleprovider.cpp
@@ -72,6 +74,7 @@ qt_add_qml_module(appshell_qml
         HomePage/HomeMenu.qml
         HomePage/HomePage.qml
         HomePage/PluginsPage.qml
+        MeasureLatencyDialog.qml
         Main.qml
         Main.wasm.qml
         MainToolBar.qml

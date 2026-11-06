@@ -81,6 +81,7 @@ void AppShellModule::resolveImports()
         ir->registerPageUri(muse::Uri("audacity://publish"));
         ir->registerPageUri(muse::Uri("audacity://devtools"));
 
+        ir->registerQmlUri(muse::Uri("audacity://measure-latency"), "Audacity.AppShell", "MeasureLatencyDialog");
         ir->registerQmlUri(muse::Uri("audacity://about/audacity"), "Audacity.AppShell", "AboutDialog");
         ir->registerQmlUri(muse::Uri("audacity://firstLaunchSetup"), "Audacity.AppShell", "FirstLaunchSetupDialog");
         ir->registerQmlUri(muse::Uri("audacity://signin/audiocom"), "Audacity.AppShell", "SigninAudiocomDialog");

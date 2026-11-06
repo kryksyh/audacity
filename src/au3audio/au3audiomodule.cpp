@@ -7,6 +7,7 @@
 
 #include "internal/au3audioengine.h"
 #include "internal/au3audiodrivercontroller.h"
+#include "internal/au3latencymeasurement.h"
 
 #if defined(Q_OS_MAC)
 #include "internal/platform/macos/macossystemaudiodeviceslistener.h"
@@ -32,6 +33,7 @@ void Au3AudioModule::registerExports()
 {
     m_audioEngine = std::make_shared<Au3AudioEngine>();
     m_audioDriverController = std::make_shared<Au3AudioDriverController>();
+    m_latencyMeasurement = std::make_shared<Au3LatencyMeasurement>();
 
 #if defined(Q_OS_MAC)
     m_systemAudioDevicesListener = std::make_shared<MacosSystemAudioDevicesListener>();
@@ -45,6 +47,7 @@ void Au3AudioModule::registerExports()
 
     globalIoc()->registerExport<audio::IAudioEngine>(mname, m_audioEngine);
     globalIoc()->registerExport<audio::IAudioDriverController>(mname, m_audioDriverController);
+    globalIoc()->registerExport<audio::ILatencyMeasurement>(mname, m_latencyMeasurement);
     globalIoc()->registerExport<ISystemAudioDevicesListener>(mname, m_systemAudioDevicesListener);
 }
 
@@ -58,5 +61,6 @@ void Au3AudioModule::onInit(const muse::IApplication::RunMode&)
 void Au3AudioModule::onDeinit()
 {
     m_systemAudioDevicesListener->stopListening();
+    m_latencyMeasurement->deinit();
     m_audioEngine->deinit();
 }

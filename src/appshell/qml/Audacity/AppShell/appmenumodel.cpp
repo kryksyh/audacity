@@ -675,6 +675,8 @@ MenuItemList AppMenuModel::makeGeneratorItems()
 MenuItemList AppMenuModel::makeToolItems()
 {
     MenuItemList items {
+        makeMenuItem(APP_MEASURE_LATENCY_COMMAND),
+        makeSeparator(),
         makeMenuItem(effects::EFFECTS_PLUGIN_MANAGER_COMMAND),
         makeSeparator(),
         // makeMenuItem("manage-macros"),

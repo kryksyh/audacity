@@ -17,6 +17,8 @@ set(MODULE_SRC
     ${CMAKE_CURRENT_LIST_DIR}/internal/au3audioengine.h
     ${CMAKE_CURRENT_LIST_DIR}/internal/au3audiodrivercontroller.cpp
     ${CMAKE_CURRENT_LIST_DIR}/internal/au3audiodrivercontroller.h
+    ${CMAKE_CURRENT_LIST_DIR}/internal/au3latencymeasurement.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/internal/au3latencymeasurement.h
     ${CMAKE_CURRENT_LIST_DIR}/internal/au3audioiolistener.h
     ${CMAKE_CURRENT_LIST_DIR}/internal/defaultplaybackpolicy.cpp
     ${CMAKE_CURRENT_LIST_DIR}/internal/defaultplaybackpolicy.h

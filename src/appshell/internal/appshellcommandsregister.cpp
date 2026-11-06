@@ -99,6 +99,13 @@ const std::vector<CommandInfo> s_commandInfos = {
         Decoration()
     },
     CommandInfo{
+        APP_MEASURE_LATENCY_COMMAND,
+        TranslatableString("command", "Measure latency…"),
+        TranslatableString("command_description", "Measure the audio recording delay"),
+        InputSchema(),
+        Decoration()
+    },
+    CommandInfo{
         APP_AUDIO_SETTINGS_COMMAND,
         //: Command title: shown as a menu item or a button label; keep it short
         TranslatableString("command", "Audio settings"),

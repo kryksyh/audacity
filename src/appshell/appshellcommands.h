@@ -17,6 +17,7 @@ inline static const muse::rcommand::Command APP_ONLINE_HANDBOOK_COMMAND("command
 inline static const muse::rcommand::Command APP_ASK_HELP_COMMAND("command://app/ask-help");
 inline static const muse::rcommand::Command APP_PREFERENCES_COMMAND("command://app/preferences");
 inline static const muse::rcommand::Command APP_REVERT_FACTORY_COMMAND("command://app/revert-factory");
+inline static const muse::rcommand::Command APP_MEASURE_LATENCY_COMMAND("command://app/measure-latency");
 inline static const muse::rcommand::Command APP_AUDIO_SETTINGS_COMMAND("command://app/audio-settings");
 inline static const muse::rcommand::Command APP_SHORTCUTS_PREFERENCES_COMMAND("command://app/shortcuts-preferences");
 inline static const muse::rcommand::Command APP_EDITING_PREFERENCES_COMMAND("command://app/editing-preferences");

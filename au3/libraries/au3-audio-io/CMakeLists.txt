@@ -16,6 +16,10 @@ set( SOURCES
    AudioIOExt.h
    AudioIOListener.cpp
    AudioIOListener.h
+   PortAudioLatencyTest.cpp
+   PortAudioLatencyTest.h
+   LatencySignalAnalysis.cpp
+   LatencySignalAnalysis.h
    PlaybackSchedule.cpp
    PlaybackSchedule.h
    ProjectAudioIO.cpp
