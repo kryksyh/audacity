@@ -33,6 +33,8 @@ enum class Problem {
     MissingBlocks,
     //! A missing block start time before the next block, or after the sequence end
     MissingBlockWithoutLength,
+    //! The autosave misses blocks, and the last save is complete
+    StaleAutosave,
     //! PRAGMA integrity_check result
     IntegrityErrors,
 };

@@ -181,6 +181,8 @@ TEST_F(ProjectInspectorTests, AutosaveIsTheDocumentThatAudacityLoads)
     ASSERT_TRUE(inspection.ret) << inspection.ret.toString();
     const Inspection& result = inspection.val;
     EXPECT_EQ(result.activeDocument, "autosave");
+    EXPECT_TRUE(result.has(Problem::MissingBlocks));
+    EXPECT_TRUE(result.has(Problem::StaleAutosave));
     ASSERT_EQ(result.missingBlocks.size(), 1u);
     EXPECT_EQ(result.missingBlocks.front().id, 9);
     ASSERT_EQ(result.documents.size(), 2u);
@@ -188,6 +190,24 @@ TEST_F(ProjectInspectorTests, AutosaveIsTheDocumentThatAudacityLoads)
     EXPECT_EQ(result.documents[0].missingBlocks, 0u);
     EXPECT_EQ(result.documents[1].source, "autosave");
     EXPECT_EQ(result.documents[1].missingBlocks, 1u);
+}
+
+TEST_F(ProjectInspectorTests, AnAutosaveIsNotStaleWhenTheLastSaveMissesBlocks)
+{
+    //! [GIVEN] A last save without block 1, and an autosave that also references block 9, which the file does not hold
+    const auto path = file("both.aup4");
+    writeProjectFile(path, twoClipProject(false, true));
+    TestProject autosave = twoClipProject(false, true);
+    autosave.tracks.front().clips.push_back({ "Take 3", 30.0, { { 9, 4096, false } } });
+    writeAutosave(path, autosave);
+
+    //! [WHEN] It is inspected
+    const RetVal<Inspection> inspection = inspect(path);
+
+    //! [THEN] Blocks are missing, but the last save is no complete version to go back to
+    ASSERT_TRUE(inspection.ret) << inspection.ret.toString();
+    EXPECT_TRUE(inspection.val.has(Problem::MissingBlocks));
+    EXPECT_FALSE(inspection.val.has(Problem::StaleAutosave));
 }
 
 TEST_F(ProjectInspectorTests, RowsInTheWalFileAreNotMissing)

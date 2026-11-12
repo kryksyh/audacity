@@ -250,6 +250,13 @@ RetVal<Inspection> ProjectInspector::inspect(const io::path_t& path, const Inspe
         if (withoutLength) {
             inspection.problems.push_back(Problem::MissingBlockWithoutLength);
         }
+        const auto lastSave = std::find_if(inspection.documents.begin(), inspection.documents.end(), [](const DocumentInfo& d) {
+            return d.source == "project";
+        });
+        if (loaded == autosave && !inspection.missingBlocks.empty() && lastSave != inspection.documents.end()
+            && lastSave->readable && lastSave->missingBlocks == 0) {
+            inspection.problems.push_back(Problem::StaleAutosave);
+        }
     }
 
     if (options.checkIntegrity) {

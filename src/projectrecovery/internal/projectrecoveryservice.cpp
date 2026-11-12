@@ -32,10 +32,10 @@ QFuture<RetVal<Inspection> > ProjectRecoveryService::inspect(const io::path_t& p
     });
 }
 
-QFuture<RetVal<RepairReport> > ProjectRecoveryService::repair(const io::path_t& original, const io::path_t& output)
+QFuture<RetVal<RepairReport> > ProjectRecoveryService::repair(RepairMethod method, const io::path_t& original, const io::path_t& output)
 {
-    return run<RetVal<RepairReport> >(m_pool, [original, output]() {
-        return ProjectRepairer().repair(original, output);
+    return run<RetVal<RepairReport> >(m_pool, [method, original, output]() {
+        return ProjectRepairer().repair(method, original, output);
     });
 }
 

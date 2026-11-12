@@ -9,6 +9,7 @@
 
 #include "testprojectbuilder.h"
 
+#include <algorithm>
 #include <fstream>
 
 using namespace muse;
@@ -35,9 +36,10 @@ protected:
 
     std::filesystem::path file(const std::string& name) const { return m_dir / name; }
 
-    RetVal<RepairReport> repair(const std::filesystem::path& original, const std::filesystem::path& output) const
+    RetVal<RepairReport> repair(const std::filesystem::path& original, const std::filesystem::path& output,
+                                RepairMethod method = RepairMethod::SilenceMissingBlocks) const
     {
-        return ProjectRepairer().repair(io::path_t(original.string()), io::path_t(output.string()),
+        return ProjectRepairer().repair(method, io::path_t(original.string()), io::path_t(output.string()),
                                         io::path_t((m_dir / "work").string()));
     }
 
@@ -60,12 +62,32 @@ TestProject voiceProject(bool firstBlockStored, bool lastBlockStored)
     return project;
 }
 
-BinaryXml readDocumentRow(const std::filesystem::path& path, const std::string& table)
+//! A project with a complete last save and an autosave that references block 9, which the file does not hold
+void writeStaleAutosaveProject(const std::filesystem::path& path)
+{
+    writeProjectFile(path, voiceProject(true, true));
+    TestProject autosave = voiceProject(true, true);
+    autosave.tracks.front().clips.push_back({ "Take 3", 30.0, { { 9, 4096, false } } });
+    writeAutosave(path, autosave);
+}
+
+int64_t rowCount(const std::filesystem::path& path, const std::string& table)
+{
+    int64_t count = -1;
+    Database database;
+    EXPECT_TRUE(database.open(io::path_t(path.string()), Database::Mode::Immutable));
+    EXPECT_TRUE(database.query("SELECT count(*) FROM " + table + ";", {}, [&count](const DatabaseRow& row) {
+        count = row.integer(0);
+    }));
+    return count;
+}
+
+BinaryXml readDocumentRow(const std::filesystem::path& path, const std::string& table, const std::string& where = "id = 1")
 {
     BinaryXml binary;
     Database database;
     EXPECT_TRUE(database.open(io::path_t(path.string()), Database::Mode::Immutable));
-    EXPECT_TRUE(database.query("SELECT dict, doc FROM " + table + " WHERE id = 1;", {}, [&binary](const DatabaseRow& row) {
+    EXPECT_TRUE(database.query("SELECT dict, doc FROM " + table + " WHERE " + where + ";", {}, [&binary](const DatabaseRow& row) {
         binary = { row.blob(0), row.blob(1) };
     }));
     return binary;
@@ -119,27 +141,121 @@ TEST_F(ProjectRepairerTests, MissingBlocksBecomeSilenceOfTheSameLength)
     expectNoSideFiles(original);
 }
 
-TEST_F(ProjectRepairerTests, OnlyTheAutosaveIsRepairedWhenAudacityLoadsIt)
+TEST_F(ProjectRepairerTests, ASilencedAutosaveBecomesTheProject)
 {
-    //! [GIVEN] A complete project document and an autosave that references a block the file does not hold
+    //! [GIVEN] A complete last save and an autosave that references a block the file does not hold
     const auto original = file("autosave.aup4");
-    writeProjectFile(original, voiceProject(true, true));
-    TestProject autosave = voiceProject(true, true);
-    autosave.tracks.front().clips.push_back({ "Take 3", 30.0, { { 9, 4096, false } } });
-    writeAutosave(original, autosave);
+    writeStaleAutosaveProject(original);
+    const int64_t generations = rowCount(original, "project_history");
     const auto output = file("autosave (Recovered).aup4");
 
-    //! [WHEN] It is repaired
+    //! [WHEN] Its missing blocks become silence
     const RetVal<RepairReport> report = repair(original, output);
 
-    //! [THEN] The autosave has silence in place of block 9, and the project row has the same bytes as before
+    //! [THEN] The project row is the autosave with silence in place of block 9, and no autosave stays
     ASSERT_TRUE(report.ret) << report.ret.toString();
-    EXPECT_EQ(report.val.verification.activeDocument, "autosave");
-    EXPECT_EQ(blockIds(output, "autosave"), (std::vector<int64_t> { 1, 2, 3, -4096 }));
+    ASSERT_EQ(report.val.silencedBlocks.size(), 1u);
+    EXPECT_EQ(report.val.verification.activeDocument, "project");
+    EXPECT_EQ(blockIds(output, "project"), (std::vector<int64_t> { 1, 2, 3, -4096 }));
+    EXPECT_EQ(rowCount(output, "autosave"), 0);
+
+    //! [THEN] As after a save, the newest generation of the journal is the project row
+    EXPECT_EQ(rowCount(output, "project_history"), generations + 1);
+    const BinaryXml project = readDocumentRow(output, "project");
+    const BinaryXml newest = readDocumentRow(output, "project_history",
+                                             "generation = (SELECT max(generation) FROM project_history)");
+    EXPECT_EQ(newest.dict, project.dict);
+    EXPECT_EQ(newest.doc, project.doc);
+    expectNoSideFiles(output);
+}
+
+TEST_F(ProjectRepairerTests, RestoringTheLastSaveDeletesTheAutosave)
+{
+    //! [GIVEN] A complete last save and an autosave that references a block the file does not hold
+    const auto original = file("autosave.aup4");
+    writeStaleAutosaveProject(original);
+    const auto originalBytes = readFileBytes(original);
+    const auto output = file("autosave (Recovered).aup4");
+
+    //! [WHEN] The last save is restored
+    const RetVal<RepairReport> report = repair(original, output, RepairMethod::RestoreLastSave);
+
+    //! [THEN] No autosave stays, and the project row has the same bytes as before
+    ASSERT_TRUE(report.ret) << report.ret.toString();
+    EXPECT_TRUE(report.val.silencedBlocks.empty());
+    EXPECT_TRUE(report.val.verification.isHealthy());
+    EXPECT_EQ(report.val.verification.activeDocument, "project");
+    EXPECT_EQ(rowCount(output, "autosave"), 0);
     const BinaryXml before = readDocumentRow(original, "project");
     const BinaryXml after = readDocumentRow(output, "project");
     EXPECT_EQ(after.dict, before.dict);
     EXPECT_EQ(after.doc, before.doc);
+    expectNoSideFiles(output);
+    EXPECT_EQ(readFileBytes(original), originalBytes);
+}
+
+TEST_F(ProjectRepairerTests, RestoringTheLastSaveIgnoresTheBlockLengthsOfTheAutosave)
+{
+    //! [GIVEN] A complete last save, and an autosave whose missing block 9 starts after the end of its sequence
+    const auto original = file("nolength.aup4");
+    writeProjectFile(original, voiceProject(true, true));
+    TestProject autosave = voiceProject(true, true);
+    autosave.tracks.front().clips.push_back({ "Take 3", 30.0, { { 8, 4096, false }, { 9, 4096, false } } });
+    writeAutosave(original, autosave);
+    RetVal<XmlDocument> decoded = decodeBinaryXml(readDocumentRow(original, "autosave"));
+    ASSERT_TRUE(decoded.ret) << decoded.ret.toString();
+    for (XmlNode& track : decoded.val.elements.front().children) {
+        for (XmlNode& clip : track.children) {
+            for (XmlNode& sequence : clip.children) {
+                const bool holdsBlock9 = std::any_of(sequence.children.begin(), sequence.children.end(), [](const XmlNode& block) {
+                    const XmlValue* id = block.attribute("blockid");
+                    return id && id->integer == 9;
+                });
+                for (XmlAttribute& attribute : sequence.attributes) {
+                    if (holdsBlock9 && attribute.name == "numsamples") {
+                        attribute.value.integer = 100;
+                    }
+                }
+            }
+        }
+    }
+    const BinaryXml binary = encodeBinaryXml(decoded.val);
+    {
+        Database db;
+        ASSERT_TRUE(db.open(io::path_t(original.string()), Database::Mode::ReadWrite));
+        ASSERT_TRUE(db.query("UPDATE autosave SET dict = ?1, doc = ?2 WHERE id = 1;", { binary.dict, binary.doc }));
+    }
+
+    //! [WHEN] The last save is restored
+    const auto restored = file("nolength (Recovered).aup4");
+    const RetVal<RepairReport> report = repair(original, restored, RepairMethod::RestoreLastSave);
+
+    //! [THEN] No autosave stays
+    ASSERT_TRUE(report.ret) << report.ret.toString();
+    EXPECT_EQ(rowCount(restored, "autosave"), 0);
+
+    //! [THEN] Silence cannot replace the block that has no length
+    const auto silenced = file("nolength (Recovered 2).aup4");
+    const RetVal<RepairReport> refused = repair(original, silenced);
+    EXPECT_EQ(refused.ret.code(), static_cast<int>(Ret::Code::NotSupported));
+    EXPECT_FALSE(std::filesystem::exists(silenced));
+}
+
+TEST_F(ProjectRepairerTests, RestoringTheLastSaveNeedsAStaleAutosave)
+{
+    //! [GIVEN] A project whose last save misses a block, with no autosave
+    const auto original = file("missing.aup4");
+    writeProjectFile(original, voiceProject(false, true));
+    const auto output = file("missing (Recovered).aup4");
+
+    //! [WHEN] The last save is restored
+    const RetVal<RepairReport> report = repair(original, output, RepairMethod::RestoreLastSave);
+
+    //! [THEN] The repair refuses, and no output stays
+    EXPECT_FALSE(report.ret);
+    EXPECT_EQ(report.ret.code(), static_cast<int>(Ret::Code::BadArgs));
+    EXPECT_FALSE(std::filesystem::exists(output));
+    expectNoSideFiles(output);
 }
 
 TEST_F(ProjectRepairerTests, RowsInTheWalFileAreInTheOutput)
