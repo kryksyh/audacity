@@ -23,6 +23,7 @@ public:
     virtual ~IProjectRecoveryService() = default;
 
     virtual QFuture<muse::RetVal<Inspection> > inspect(const muse::io::path_t& path) = 0;
-    virtual QFuture<muse::RetVal<RepairReport> > repair(const muse::io::path_t& original, const muse::io::path_t& output) = 0;
+    virtual QFuture<muse::RetVal<RepairReport> > repair(RepairMethod method, const muse::io::path_t& original,
+                                                        const muse::io::path_t& output) = 0;
 };
 }

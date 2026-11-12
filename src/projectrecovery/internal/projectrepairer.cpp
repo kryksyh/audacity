@@ -35,32 +35,39 @@ std::string problemText(Problem problem)
         return "blocks are missing";
     case Problem::MissingBlockWithoutLength:
         return "a missing block has no length";
+    case Problem::StaleAutosave:
+        return "the autosave misses blocks that the last save does not need";
     case Problem::IntegrityErrors:
         return "the database has integrity errors";
     }
     return "an unknown problem";
 }
+}
 
-//! Only missing blocks have a repair for now
-Ret checkRepairable(const Inspection& inspection)
+Ret au::projectrecovery::checkRepairable(RepairMethod method, const Inspection& inspection)
 {
+    const bool restore = method == RepairMethod::RestoreLastSave;
     std::string others;
     for (const Problem problem : inspection.problems) {
-        if (problem != Problem::MissingBlocks) {
+        // Restoring the last save drops the autosave together with its block lengths
+        const bool handled = problem == Problem::MissingBlocks || problem == Problem::StaleAutosave
+                             || (restore && problem == Problem::MissingBlockWithoutLength);
+        if (!handled) {
             others += (others.empty() ? "" : "; ") + problemText(problem);
         }
     }
     if (!others.empty()) {
         return make_ret(Ret::Code::NotSupported, "no repair for these problems: " + others);
     }
-    if (!inspection.has(Problem::MissingBlocks)) {
-        return make_ret(Ret::Code::BadArgs, "the project has no problem to repair");
+    const Problem needed = restore ? Problem::StaleAutosave : Problem::MissingBlocks;
+    if (!inspection.has(needed)) {
+        return make_ret(Ret::Code::BadArgs, "the project has no problem that this method repairs");
     }
     return make_ok();
 }
-}
 
-RetVal<RepairReport> ProjectRepairer::repair(const io::path_t& original, const io::path_t& output, const io::path_t& workDir) const
+RetVal<RepairReport> ProjectRepairer::repair(RepairMethod method, const io::path_t& original, const io::path_t& output,
+                                             const io::path_t& workDir) const
 {
     // SQLite would apply a -wal file that it finds next to the output
     for (const char* suffix : { "", "-wal", "-shm" }) {
@@ -77,9 +84,22 @@ RetVal<RepairReport> ProjectRepairer::repair(const io::path_t& original, const i
 
     // The output has no -wal frames, so this inspection reads what the repair edits
     const RetVal<Inspection> inspection = ProjectInspector().inspect(output);
-    ret = inspection.ret ? checkRepairable(inspection.val) : inspection.ret;
+    ret = inspection.ret ? checkRepairable(method, inspection.val) : inspection.ret;
     if (ret) {
-        ret = silenceMissingBlocks(output, inspection.val);
+        if (method == RepairMethod::RestoreLastSave) {
+            ret = deleteAutosave(output);
+        } else {
+            ret = silenceMissingBlocks(output, inspection.val);
+            if (ret && inspection.val.activeDocument == "autosave") {
+                ret = promoteAutosave(output);
+            }
+        }
+    }
+    // Audacity opens a project with a -wal file as one that did not close
+    for (const char* suffix : SIDE_FILES) {
+        if (ret && fileSystem()->exists(output + suffix)) {
+            ret = make_ret(Ret::Code::InternalError, std::string("the output keeps its ") + suffix + " file");
+        }
     }
     if (!ret) {
         removeOutput(output);
@@ -98,7 +118,9 @@ RetVal<RepairReport> ProjectRepairer::repair(const io::path_t& original, const i
     }
 
     RepairReport report;
-    report.silencedBlocks = inspection.val.missingBlocks;
+    if (method == RepairMethod::SilenceMissingBlocks) {
+        report.silencedBlocks = inspection.val.missingBlocks;
+    }
     report.verification = verification.val;
     return RetVal<RepairReport>::make_ok(report);
 }
@@ -155,18 +177,45 @@ Ret ProjectRepairer::silenceMissingBlocks(const io::path_t& output, const Inspec
         return doc.ret;
     }
     ret = database.query("UPDATE " + table + " SET doc = ?1 WHERE id = 1;", { doc.val });
+    database.close();
+    return ret;
+}
+
+Ret ProjectRepairer::promoteAutosave(const io::path_t& output) const
+{
+    Database database;
+    Ret ret = database.open(output, Database::Mode::ReadWrite);
     if (!ret) {
         return ret;
     }
-    database.close();
-
-    // Audacity opens a project with a -wal file as one that did not close
-    for (const char* suffix : SIDE_FILES) {
-        if (fileSystem()->exists(output + suffix)) {
-            return make_ret(Ret::Code::InternalError, std::string("the output keeps its ") + suffix + " file");
-        }
+    // As ProjectFileIO::WriteDoc writes a save: the project row, then the same document in the journal of the last 10
+    std::string sql = "BEGIN;"
+                      "INSERT OR REPLACE INTO project(id, dict, doc) SELECT 1, dict, doc FROM autosave WHERE id = 1;";
+    if (database.hasTable("project_history")) {
+        sql += "INSERT INTO project_history(saved_at, dict, doc)"
+               " SELECT CAST(strftime('%s','now') AS INTEGER), dict, doc FROM project WHERE id = 1;"
+               "DELETE FROM project_history WHERE generation NOT IN"
+               " (SELECT generation FROM project_history ORDER BY generation DESC LIMIT 10);";
     }
-    return make_ok();
+    sql += "DELETE FROM autosave;"
+           "COMMIT;";
+    ret = database.exec(sql);
+    if (!ret) {
+        database.exec("ROLLBACK;");
+    }
+    database.close();
+    return ret;
+}
+
+Ret ProjectRepairer::deleteAutosave(const io::path_t& output) const
+{
+    Database database;
+    Ret ret = database.open(output, Database::Mode::ReadWrite);
+    if (ret) {
+        ret = database.exec("DELETE FROM autosave;");
+    }
+    database.close();
+    return ret;
 }
 
 void ProjectRepairer::removeOutput(const io::path_t& output) const

@@ -269,7 +269,7 @@ StyledDialogView {
 
             FlatButton {
                 visible: root.stage === ProjectRecoveryWizardModel.MethodDetails
-                text: qsTrc("projectrecovery", "Run lossy recovery")
+                text: wizard.method === ProjectRecoveryWizardModel.Lossless ? qsTrc("projectrecovery", "Run lossless recovery") : qsTrc("projectrecovery", "Run lossy recovery")
                 buttonRole: ButtonBoxModel.AcceptRole
                 buttonId: ButtonBoxModel.CustomButton + 4
                 accentButton: true
@@ -382,7 +382,15 @@ StyledDialogView {
                 StyledTextLabel {
                     Layout.fillWidth: true
                     Layout.topMargin: 8
-                    text: parent.recovering ? qsTrc("projectrecovery", "Replacing %n missing block(s) with silence…", "", wizard.missingBlockCount) : qsTrc("projectrecovery", "Checking database integrity and scanning blocks…")
+                    text: {
+                        if (!parent.recovering) {
+                            return qsTrc("projectrecovery", "Checking database integrity and scanning blocks…")
+                        }
+                        if (wizard.method === ProjectRecoveryWizardModel.Lossless) {
+                            return qsTrc("projectrecovery", "Restoring the last saved version…")
+                        }
+                        return qsTrc("projectrecovery", "Replacing %n missing block(s) with silence…", "", wizard.missingBlockCount)
+                    }
                     horizontalAlignment: Text.AlignHCenter
                     wrapMode: Text.Wrap
                 }
@@ -726,7 +734,7 @@ StyledDialogView {
 
                 PageHeading {
                     title: prv.methodTitle(wizard.method)
-                    description: qsTrc("projectrecovery", "Missing audio is replaced with silence of the same length. All other audio stays as it is.")
+                    description: wizard.method === ProjectRecoveryWizardModel.Lossless ? qsTrc("projectrecovery", "The project opens as it was at the last save. Changes made after the last save are not kept.") : qsTrc("projectrecovery", "Missing audio is replaced with silence of the same length. All other audio stays as it is.")
                 }
 
                 Container {

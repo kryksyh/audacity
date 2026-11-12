@@ -132,7 +132,7 @@ private:
     void onInspected();
     void onRepaired();
     void setStage(Stage stage);
-    bool canRepair() const;
+    bool canRun(Method method) const;
     const DocumentInfo* activeDocument() const;
     muse::io::path_t makeOutputPath() const;
 

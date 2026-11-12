@@ -207,8 +207,10 @@ QVariantList ProjectRecoveryWizardModel::missingBlocks() const
 QVariantList ProjectRecoveryWizardModel::availableMethods() const
 {
     QVariantList methods;
-    if (canRepair()) {
-        methods << static_cast<int>(Method::Lossy);
+    for (const Method method : { Method::Lossless, Method::Lossy, Method::Database }) {
+        if (canRun(method)) {
+            methods << static_cast<int>(method);
+        }
     }
     return methods;
 }
@@ -223,13 +225,20 @@ QString ProjectRecoveryWizardModel::outputPath() const
     return m_outputPath;
 }
 
-bool ProjectRecoveryWizardModel::canRepair() const
+bool ProjectRecoveryWizardModel::canRun(Method method) const
 {
     if (!m_inspection) {
         return false;
     }
-    const std::vector<Problem>& problems = m_inspection->problems;
-    return problems.size() == 1 && problems.front() == Problem::MissingBlocks;
+    switch (method) {
+    case Method::Lossless:
+        return checkRepairable(RepairMethod::RestoreLastSave, *m_inspection).success();
+    case Method::Lossy:
+        return checkRepairable(RepairMethod::SilenceMissingBlocks, *m_inspection).success();
+    case Method::Database:
+        return false;
+    }
+    return false;
 }
 
 void ProjectRecoveryWizardModel::next()
@@ -275,10 +284,10 @@ void ProjectRecoveryWizardModel::back()
 
 void ProjectRecoveryWizardModel::selectMethod(int method)
 {
-    if (m_stage != Stage::ChooseMethod || static_cast<Method>(method) != Method::Lossy || !canRepair()) {
+    if (m_stage != Stage::ChooseMethod || !canRun(static_cast<Method>(method))) {
         return;
     }
-    m_method = Method::Lossy;
+    m_method = static_cast<Method>(method);
     setStage(Stage::MethodDetails);
 }
 
@@ -295,15 +304,16 @@ void ProjectRecoveryWizardModel::onInspected()
 
 void ProjectRecoveryWizardModel::runRecovery()
 {
-    if (m_stage != Stage::MethodDetails || !canRepair()) {
+    if (m_stage != Stage::MethodDetails || !canRun(m_method)) {
         return;
     }
+    const RepairMethod method = m_method == Method::Lossless ? RepairMethod::RestoreLastSave : RepairMethod::SilenceMissingBlocks;
     const io::path_t original(m_projectPath);
     const io::path_t output = makeOutputPath();
     m_outputPath = output.toQString();
     m_error.clear();
     setStage(Stage::Recovering);
-    m_repairWatcher.setFuture(recoveryService()->repair(original, output));
+    m_repairWatcher.setFuture(recoveryService()->repair(method, original, output));
 }
 
 void ProjectRecoveryWizardModel::onRepaired()
